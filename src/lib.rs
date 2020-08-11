@@ -1,16 +1,16 @@
-use num_bigint::{BigInt, BigUint};
+use num_bigint::{BigInt, BigUint, ToBigInt, ToBigUint};
 use num_integer::{Integer, Roots};
 pub use num_traits::{Num, One, Signed, ToPrimitive, Zero};
 use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
     Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 
 pub use num_bigint::{ParseBigIntError, Sign, TryFromBigIntError};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 type SmallInt = i128;
 
@@ -242,7 +242,7 @@ impl CBigInt {
     /// ```
     #[inline]
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
-        todo!()
+        BigInt::from(self.clone()).to_u32_digits()
     }
 
     /// Returns the two's-complement byte representation of the `BigInt` in big-endian byte order.
@@ -257,7 +257,7 @@ impl CBigInt {
     /// ```
     #[inline]
     pub fn to_signed_bytes_be(&self) -> Vec<u8> {
-        todo!()
+        BigInt::from(self.clone()).to_signed_bytes_be()
     }
 
     /// Returns the two's-complement byte representation of the `BigInt` in little-endian byte order.
@@ -272,7 +272,7 @@ impl CBigInt {
     /// ```
     #[inline]
     pub fn to_signed_bytes_le(&self) -> Vec<u8> {
-        todo!()
+        BigInt::from(self.clone()).to_signed_bytes_le()
     }
 
     /// Returns the integer formatted as a string in the given radix.
@@ -288,7 +288,7 @@ impl CBigInt {
     /// ```
     #[inline]
     pub fn to_str_radix(&self, radix: u32) -> String {
-        todo!()
+        BigInt::from(self.clone()).to_str_radix(radix)
     }
 
     /// Returns the integer in the requested base in big-endian digit order.
@@ -307,7 +307,7 @@ impl CBigInt {
     /// ```
     #[inline]
     pub fn to_radix_be(&self, radix: u32) -> (Sign, Vec<u8>) {
-        todo!()
+        BigInt::from(self.clone()).to_radix_be(radix)
     }
 
     /// Returns the integer in the requested base in little-endian digit order.
@@ -326,7 +326,7 @@ impl CBigInt {
     /// ```
     #[inline]
     pub fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>) {
-        todo!()
+        BigInt::from(self.clone()).to_radix_le(radix)
     }
 
     /// Returns the sign of the `BigInt` as a `Sign`.
@@ -379,6 +379,15 @@ impl CBigInt {
         }
     }
 
+    #[inline]
+    pub fn try_magnitude(&self) -> Option<&BigUint> {
+        match self {
+            Self::Small(_) => None,
+            Self::Positive(mag) => Some(mag),
+            Self::Negative(mag) => Some(mag),
+        }
+    }
+
     /// Convert this `BigInt` into its `Sign` and `BigUint` magnitude,
     /// the reverse of `BigInt::from_biguint`.
     ///
@@ -394,14 +403,27 @@ impl CBigInt {
     /// ```
     #[inline]
     pub fn into_parts(self) -> (Sign, BigUint) {
-        todo!()
+        BigInt::from(self).into_parts()
     }
 
     /// Determines the fewest bits necessary to express the `BigInt`,
     /// not including the sign.
     #[inline]
     pub fn bits(&self) -> u64 {
-        todo!()
+        match self {
+            &Self::Small(n) => {
+                if n >= 0 {
+                    127 - n.leading_zeros()
+                } else if n == i128::MIN {
+                    128
+                } else {
+                    (-n).leading_zeros()
+                }
+            }
+            .into(),
+            Self::Positive(mag) => mag.bits(),
+            Self::Negative(mag) => mag.bits(),
+        }
     }
 
     /// Converts this `CBigInt` into a `BigInt`.
@@ -509,6 +531,18 @@ impl Display for CBigInt {
     }
 }
 
+impl ToBigInt for CBigInt {
+    fn to_bigint(&self) -> Option<BigInt> {
+        Some(self.clone().into())
+    }
+}
+
+impl ToBigUint for CBigInt {
+    fn to_biguint(&self) -> Option<BigUint> {
+        self.clone().try_into().ok()
+    }
+}
+
 impl From<BigInt> for CBigInt {
     fn from(value: BigInt) -> Self {
         Self::from_bigint(value)
@@ -528,13 +562,34 @@ impl From<CBigInt> for BigInt {
 }
 
 impl<'a> TryFrom<&'a CBigInt> for Cow<'a, BigUint> {
-    type Error = ();
+    type Error = TryFromBigIntError<()>;
     fn try_from(value: &'a CBigInt) -> Result<Self, Self::Error> {
         match value {
-            CBigInt::Small(i) => BigUint::try_from(*i).map_err(|_| ()).map(Cow::Owned),
+            CBigInt::Small(n) => match n.to_biguint() {
+                None => Err(try_into_bigint_error()),
+                Some(uint) => Ok(Cow::Owned(uint)),
+            },
             CBigInt::Positive(uint) => Ok(Cow::Borrowed(uint)),
-            CBigInt::Negative(_) => Err(()),
+            CBigInt::Negative(_) => Err(try_into_bigint_error()),
         }
+    }
+}
+
+impl TryFrom<CBigInt> for BigUint {
+    type Error = TryFromBigIntError<()>;
+    fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
+        match value {
+            CBigInt::Small(n) => n.to_biguint().ok_or_else(try_into_bigint_error),
+            CBigInt::Positive(mag) => Ok(mag),
+            CBigInt::Negative(_) => Err(try_into_bigint_error()),
+        }
+    }
+}
+
+impl TryFrom<&CBigInt> for BigUint {
+    type Error = TryFromBigIntError<()>;
+    fn try_from(value: &CBigInt) -> Result<Self, Self::Error> {
+        value.clone().try_into()
     }
 }
 
@@ -695,7 +750,7 @@ impl Neg for CBigInt {
     fn neg(self) -> Self::Output {
         if let Self::Small(a) = self {
             if let (b, false) = a.overflowing_neg() {
-                return Self::Small(b);
+                return b.into();
             }
         }
         BigInt::from(self).neg().into()
@@ -715,7 +770,7 @@ impl Not for CBigInt {
 
     fn not(self) -> Self::Output {
         if let Self::Small(a) = self {
-            return Self::Small(a.not());
+            return a.not().into();
         }
         BigInt::from(self).not().into()
     }
@@ -727,6 +782,11 @@ impl Not for &CBigInt {
     fn not(self) -> Self::Output {
         self.clone().not()
     }
+}
+
+// We can't constructor a TryFromBigIntError directly, so we get sneaky.
+fn try_into_bigint_error() -> TryFromBigIntError<()> {
+    BigUint::try_from(-1).expect_err("converting -1 to BigUint fails")
 }
 
 macro_rules! ref_op {
@@ -779,20 +839,27 @@ macro_rules! each_prim {
     ([@int_prim, $prim:ident, $to_prim:ident]) => {
         impl From<$prim> for CBigInt {
             fn from(value: $prim) -> Self {
-                if let Ok(promoted) = SmallInt::try_from(value) {
-                    CBigInt::Small(promoted)
+                if let Ok(converted) = SmallInt::try_from(value) {
+                    converted.into()
                 } else {
                     BigInt::from(value).into()
                 }
             }
         }
         impl TryFrom<CBigInt> for $prim {
-            type Error = (); // TODO
-            fn try_from(value: CBigInt) -> Result<Self, ()> {
-                if let CBigInt::Small(value) = value {
-                    $prim::try_from(value).map_err(|_| ())
+            type Error = TryFromBigIntError<BigInt>;
+            fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
+                if let CBigInt::Small(n) = value {
+                    match n.$to_prim() {
+                        Some(prim) => Ok(prim),
+                        None => {
+                            // This is guaranteed to fail; it's done because there's no more
+                            // straightforward way to construct an appropriate TryFromBigIntError.
+                            $prim::try_from(BigInt::from(value))
+                        }
+                    }
                 } else {
-                    $prim::try_from(BigInt::from(value)).map_err(|_| ())
+                    $prim::try_from(BigInt::from(value))
                 }
             }
         }
