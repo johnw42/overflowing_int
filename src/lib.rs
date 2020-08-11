@@ -21,13 +21,16 @@ pub enum CBigInt {
     Negative(BigUint),
 }
 
+use CBigInt::*;
+use Sign::*;
+
 impl CBigInt {
     /// Creates and initializes a BigInt.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn new(sign: Sign, digits: Vec<u32>) -> CBigInt {
-        if sign == Sign::NoSign {
-            return CBigInt::Small(0);
+        if sign == NoSign {
+            return Small(0);
         }
         if digits.len() <= 4 {
             let mut value = 0;
@@ -35,24 +38,24 @@ impl CBigInt {
                 value = (value << 32) | digit as i128;
             }
             if value >= 0 {
-                if sign == Sign::Minus {
+                if sign == Minus {
                     value = -value;
                 }
-                return CBigInt::Small(value);
+                return Small(value);
             }
         }
         let magnitude = BigUint::new(digits);
-        if sign == Sign::Plus {
-            CBigInt::Positive(magnitude)
+        if sign == Plus {
+            Positive(magnitude)
         } else {
-            CBigInt::Negative(magnitude)
+            Negative(magnitude)
         }
     }
 
     #[inline]
     pub fn from_bigint(data: BigInt) -> CBigInt {
         match data.to_i128() {
-            Some(value) => CBigInt::Small(value),
+            Some(value) => Small(value),
             None => {
                 let (sign, data) = data.into_parts();
                 Self::from_biguint(sign, data)
@@ -65,14 +68,14 @@ impl CBigInt {
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn from_biguint(sign: Sign, data: BigUint) -> CBigInt {
         match sign {
-            Sign::NoSign => CBigInt::Small(0),
-            Sign::Plus => match data.to_i128() {
-                Some(value) => CBigInt::Small(value),
-                None => CBigInt::Positive(data),
+            NoSign => Small(0),
+            Plus => match data.to_i128() {
+                Some(value) => Small(value),
+                None => Positive(data),
             },
-            Sign::Minus => match data.to_i128() {
-                Some(value) => CBigInt::Small(-value),
-                None => CBigInt::Negative(data),
+            Minus => match data.to_i128() {
+                Some(value) => Small(-value),
+                None => Negative(data),
             },
         }
     }
@@ -101,13 +104,13 @@ impl CBigInt {
     /// ```
     /// use num_bigint::{BigInt, Sign};
     ///
-    /// assert_eq!(BigInt::from_bytes_be(Sign::Plus, b"A"),
+    /// assert_eq!(BigInt::from_bytes_be(Plus, b"A"),
     ///            BigInt::parse_bytes(b"65", 10).unwrap());
-    /// assert_eq!(BigInt::from_bytes_be(Sign::Plus, b"AA"),
+    /// assert_eq!(BigInt::from_bytes_be(Plus, b"AA"),
     ///            BigInt::parse_bytes(b"16705", 10).unwrap());
-    /// assert_eq!(BigInt::from_bytes_be(Sign::Plus, b"AB"),
+    /// assert_eq!(BigInt::from_bytes_be(Plus, b"AB"),
     ///            BigInt::parse_bytes(b"16706", 10).unwrap());
-    /// assert_eq!(BigInt::from_bytes_be(Sign::Plus, b"Hello world!"),
+    /// assert_eq!(BigInt::from_bytes_be(Plus, b"Hello world!"),
     ///            BigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     #[inline]
@@ -170,7 +173,7 @@ impl CBigInt {
     ///
     /// let inbase190 = vec![15, 33, 125, 12, 14];
     /// let a = BigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
-    /// assert_eq!(a.to_radix_be(190), (Sign:: Minus, inbase190));
+    /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
     pub fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<CBigInt> {
         BigInt::from_radix_be(sign, buf, radix).map(Self::from_bigint)
@@ -235,10 +238,10 @@ impl CBigInt {
     /// use num_bigint::{BigInt, Sign};
     ///
     /// assert_eq!(BigInt::from(-1125).to_u32_digits(), (Sign::Minus, vec![1125]));
-    /// assert_eq!(BigInt::from(4294967295u32).to_u32_digits(), (Sign::Plus, vec![4294967295]));
-    /// assert_eq!(BigInt::from(4294967296u64).to_u32_digits(), (Sign::Plus, vec![0, 1]));
+    /// assert_eq!(BigInt::from(4294967295u32).to_u32_digits(), (Plus, vec![4294967295]));
+    /// assert_eq!(BigInt::from(4294967296u64).to_u32_digits(), (Plus, vec![0, 1]));
     /// assert_eq!(BigInt::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
-    /// assert_eq!(BigInt::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
+    /// assert_eq!(BigInt::from(112500000000i64).to_u32_digits(), (Plus, vec![830850304, 26]));
     /// ```
     #[inline]
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
@@ -344,17 +347,17 @@ impl CBigInt {
     #[inline]
     pub fn sign(&self) -> Sign {
         match self {
-            Self::Small(n) => {
+            Small(n) => {
                 if *n > 0 {
-                    Sign::Plus
+                    Plus
                 } else if *n < 0 {
-                    Sign::Minus
+                    Minus
                 } else {
-                    Sign::NoSign
+                    NoSign
                 }
             }
-            Self::Positive(_) => Sign::Plus,
-            Self::Negative(_) => Sign::Minus,
+            Positive(_) => Plus,
+            Negative(_) => Minus,
         }
     }
 
@@ -373,18 +376,18 @@ impl CBigInt {
     #[inline]
     pub fn magnitude(&self) -> Cow<BigUint> {
         match self {
-            Self::Small(n) => Cow::Owned(BigInt::from(*n).into_parts().1),
-            Self::Positive(mag) => Cow::Borrowed(mag),
-            Self::Negative(mag) => Cow::Borrowed(mag),
+            Small(n) => Cow::Owned(BigInt::from(*n).into_parts().1),
+            Positive(mag) => Cow::Borrowed(mag),
+            Negative(mag) => Cow::Borrowed(mag),
         }
     }
 
     #[inline]
     pub fn try_magnitude(&self) -> Option<&BigUint> {
         match self {
-            Self::Small(_) => None,
-            Self::Positive(mag) => Some(mag),
-            Self::Negative(mag) => Some(mag),
+            Small(_) => None,
+            Positive(mag) => Some(mag),
+            Negative(mag) => Some(mag),
         }
     }
 
@@ -411,7 +414,7 @@ impl CBigInt {
     #[inline]
     pub fn bits(&self) -> u64 {
         match self {
-            &Self::Small(n) => {
+            &Small(n) => {
                 if n >= 0 {
                     127 - n.leading_zeros()
                 } else if n == i128::MIN {
@@ -421,8 +424,8 @@ impl CBigInt {
                 }
             }
             .into(),
-            Self::Positive(mag) => mag.bits(),
-            Self::Negative(mag) => mag.bits(),
+            Positive(mag) => mag.bits(),
+            Negative(mag) => mag.bits(),
         }
     }
 
@@ -430,9 +433,9 @@ impl CBigInt {
     #[inline]
     fn into_bigint(self) -> BigInt {
         match self {
-            Self::Small(n) => BigInt::from(n),
-            Self::Positive(uint) => BigInt::from_biguint(Sign::Plus, uint),
-            Self::Negative(uint) => BigInt::from_biguint(Sign::Minus, uint),
+            Small(n) => BigInt::from(n),
+            Positive(uint) => BigInt::from_biguint(Plus, uint),
+            Negative(uint) => BigInt::from_biguint(Minus, uint),
         }
     }
 
@@ -445,15 +448,15 @@ impl CBigInt {
     /// Converts this `BigInt` into a `BigUint`, if it's not negative.
     pub fn to_biguint(&self) -> Option<BigUint> {
         match self {
-            Self::Small(n) => {
+            Small(n) => {
                 if *n >= 0 {
                     Some(BigUint::from(*n as u128))
                 } else {
                     None
                 }
             }
-            Self::Positive(uint) => Some(uint.clone()),
-            Self::Negative(_) => None,
+            Positive(uint) => Some(uint.clone()),
+            Negative(_) => None,
         }
     }
 
@@ -479,7 +482,7 @@ impl CBigInt {
 
     /// Returns `self ^ exponent`.
     pub fn pow(&self, exponent: u32) -> Self {
-        if let Self::Small(a) = &self {
+        if let Small(a) = &self {
             if let (a, false) = a.overflowing_pow(exponent) {
                 return a.into();
             }
@@ -496,7 +499,7 @@ impl CBigInt {
     ///
     /// Panics if the exponent is negative or the modulus is zero.
     pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-        if let Self::Positive(uint) = self {
+        if let Positive(uint) = self {
             if let Ok(exponent) = Cow::<BigUint>::try_from(exponent) {
                 if let Ok(modulus) = Cow::<BigUint>::try_from(modulus) {
                     return uint.modpow(exponent.borrow(), modulus.borrow()).into();
@@ -517,16 +520,16 @@ impl CBigInt {
 
 impl Default for CBigInt {
     fn default() -> Self {
-        CBigInt::Small(0)
+        Small(0)
     }
 }
 
 impl Display for CBigInt {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Small(n) => write!(f, "{}", n),
-            Self::Positive(n) => write!(f, "{}", n),
-            Self::Negative(n) => write!(f, "-{}", n),
+            Small(n) => write!(f, "{}", n),
+            Positive(n) => write!(f, "{}", n),
+            Negative(n) => write!(f, "-{}", n),
         }
     }
 }
@@ -551,7 +554,7 @@ impl From<BigInt> for CBigInt {
 
 impl From<BigUint> for CBigInt {
     fn from(value: BigUint) -> Self {
-        Self::from_biguint(Sign::Plus, value)
+        Self::from_biguint(Plus, value)
     }
 }
 
@@ -565,12 +568,12 @@ impl<'a> TryFrom<&'a CBigInt> for Cow<'a, BigUint> {
     type Error = TryFromBigIntError<()>;
     fn try_from(value: &'a CBigInt) -> Result<Self, Self::Error> {
         match value {
-            CBigInt::Small(n) => match n.to_biguint() {
+            Small(n) => match n.to_biguint() {
                 None => Err(try_into_bigint_error()),
                 Some(uint) => Ok(Cow::Owned(uint)),
             },
-            CBigInt::Positive(uint) => Ok(Cow::Borrowed(uint)),
-            CBigInt::Negative(_) => Err(try_into_bigint_error()),
+            Positive(uint) => Ok(Cow::Borrowed(uint)),
+            Negative(_) => Err(try_into_bigint_error()),
         }
     }
 }
@@ -579,9 +582,9 @@ impl TryFrom<CBigInt> for BigUint {
     type Error = TryFromBigIntError<()>;
     fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
         match value {
-            CBigInt::Small(n) => n.to_biguint().ok_or_else(try_into_bigint_error),
-            CBigInt::Positive(mag) => Ok(mag),
-            CBigInt::Negative(_) => Err(try_into_bigint_error()),
+            Small(n) => n.to_biguint().ok_or_else(try_into_bigint_error),
+            Positive(mag) => Ok(mag),
+            Negative(_) => Err(try_into_bigint_error()),
         }
     }
 }
@@ -599,7 +602,7 @@ impl Zero for CBigInt {
     }
 
     fn is_zero(&self) -> bool {
-        if let Self::Small(n) = self {
+        if let Small(n) = self {
             n.is_zero()
         } else {
             false
@@ -613,7 +616,7 @@ impl One for CBigInt {
     }
 
     fn is_one(&self) -> bool {
-        if let Self::Small(n) = self {
+        if let Small(n) = self {
             n.is_one()
         } else {
             false
@@ -632,15 +635,15 @@ impl Num for CBigInt {
 impl Signed for CBigInt {
     fn abs(&self) -> Self {
         match self {
-            Self::Small(a) => {
+            Small(a) => {
                 if let (b, false) = a.overflowing_abs() {
                     b.into()
                 } else {
                     BigInt::from(*a).abs().into()
                 }
             }
-            Self::Positive(a) => Self::Positive(a.clone()),
-            Self::Negative(a) => Self::Positive(a.clone()),
+            Positive(a) => Positive(a.clone()),
+            Negative(a) => Positive(a.clone()),
         }
     }
 
@@ -650,25 +653,25 @@ impl Signed for CBigInt {
 
     fn signum(&self) -> Self {
         match self {
-            Self::Small(a) => a.signum().into(),
-            Self::Positive(_) => 1.into(),
-            Self::Negative(_) => (-1).into(),
+            Small(a) => a.signum().into(),
+            Positive(_) => 1.into(),
+            Negative(_) => (-1).into(),
         }
     }
 
     fn is_positive(&self) -> bool {
         match self {
-            Self::Small(a) => a.is_positive(),
-            Self::Positive(_) => true,
-            Self::Negative(_) => false,
+            Small(a) => a.is_positive(),
+            Positive(_) => true,
+            Negative(_) => false,
         }
     }
 
     fn is_negative(&self) -> bool {
         match self {
-            Self::Small(a) => a.is_negative(),
-            Self::Negative(_) => true,
-            Self::Positive(_) => false,
+            Small(a) => a.is_negative(),
+            Negative(_) => true,
+            Positive(_) => false,
         }
     }
 }
@@ -685,13 +688,13 @@ impl Ord for CBigInt {
             Ordering::Equal
         } else {
             match (self, other) {
-                (Self::Small(a), Self::Small(b)) => a.cmp(b),
-                (Self::Positive(a), Self::Positive(b)) => a.cmp(b),
-                (Self::Negative(a), Self::Negative(b)) => b.cmp(a),
-                (Self::Positive(_), _) => Ordering::Greater,
-                (_, Self::Positive(_)) => Ordering::Less,
-                (Self::Negative(_), _) => Ordering::Less,
-                (_, Self::Negative(_)) => Ordering::Greater,
+                (Small(a), Small(b)) => a.cmp(b),
+                (Positive(a), Positive(b)) => a.cmp(b),
+                (Negative(a), Negative(b)) => b.cmp(a),
+                (Positive(_), _) => Ordering::Greater,
+                (_, Positive(_)) => Ordering::Less,
+                (Negative(_), _) => Ordering::Less,
+                (_, Negative(_)) => Ordering::Greater,
             }
         }
     }
@@ -737,7 +740,7 @@ impl Integer for CBigInt {
 
 impl Roots for CBigInt {
     fn nth_root(&self, n: u32) -> Self {
-        if let Self::Small(a) = self {
+        if let Small(a) = self {
             return a.nth_root(n).into();
         }
         Self::from_biguint(self.sign(), (self.magnitude().borrow() as &BigUint).sqrt())
@@ -748,7 +751,7 @@ impl Neg for CBigInt {
     type Output = CBigInt;
 
     fn neg(self) -> Self::Output {
-        if let Self::Small(a) = self {
+        if let Small(a) = self {
             if let (b, false) = a.overflowing_neg() {
                 return b.into();
             }
@@ -769,7 +772,7 @@ impl Not for CBigInt {
     type Output = CBigInt;
 
     fn not(self) -> Self::Output {
-        if let Self::Small(a) = self {
+        if let Small(a) = self {
             return a.not().into();
         }
         BigInt::from(self).not().into()
@@ -849,7 +852,7 @@ macro_rules! each_prim {
         impl TryFrom<CBigInt> for $prim {
             type Error = TryFromBigIntError<BigInt>;
             fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
-                if let CBigInt::Small(n) = value {
+                if let Small(n) = value {
                     match n.$to_prim() {
                         Some(prim) => Ok(prim),
                         None => {
@@ -870,7 +873,7 @@ macro_rules! each_prim {
 macro_rules! to_prim_method {
     ([@int_prim, $prim:ident, $to_prim:ident]) => {
         fn $to_prim(&self) -> Option<$prim> {
-            if let CBigInt::Small(value) = self {
+            if let Small(value) = self {
                 $prim::try_from(*value).ok()
             } else {
                 $prim::try_from(BigInt::from(self.clone())).ok()
@@ -879,7 +882,7 @@ macro_rules! to_prim_method {
     };
     ([@float_prim, $prim:ident, $to_prim:ident]) => {
         fn $to_prim(&self) -> Option<$prim> {
-            if let CBigInt::Small(value) = self {
+            if let Small(value) = self {
                 Some(*value as $prim)
             } else {
                 BigInt::from(self.clone()).$to_prim()
@@ -893,7 +896,7 @@ macro_rules! each_op {
         impl $trait for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: Self) -> Self::Output {
-                if let (Self::Small(a), Self::Small(b)) = (&self, &rhs) {
+                if let (Small(a), Small(b)) = (&self, &rhs) {
                     if let (c, false) = a.$overflowing_op(*b) {
                         return c.into();
                     }
@@ -911,7 +914,7 @@ macro_rules! each_op {
         impl $trait for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: Self) -> Self::Output {
-                if let (Self::Small(a), Self::Small(b)) = (&self, &rhs) {
+                if let (Small(a), Small(b)) = (&self, &rhs) {
                     return a.$op(*b).into();
                 }
                 BigInt::from(self).$op(BigInt::from(rhs)).into()
@@ -944,10 +947,10 @@ macro_rules! each_prim_and_op {
         impl $trait<$prim> for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: $prim) -> Self::Output {
-                if let CBigInt::Small(prim) = &self {
+                if let Small(prim) = &self {
                     if let Ok(promoted) = SmallInt::try_from(rhs) {
                         if let (result, false) = prim.$overflowing_op(promoted) {
-                            return CBigInt::Small(result);
+                            return Small(result);
                         }
                     }
                 }
@@ -957,10 +960,10 @@ macro_rules! each_prim_and_op {
         impl $trait<CBigInt> for $prim {
             type Output = CBigInt;
             fn $op(self, rhs: CBigInt) -> Self::Output {
-                if let CBigInt::Small(prim) = &rhs {
+                if let Small(prim) = &rhs {
                     if let Ok(promoted) = SmallInt::try_from(self) {
                         if let (result, false) = promoted.$overflowing_op(*prim) {
-                            return CBigInt::Small(result);
+                            return Small(result);
                         }
                     }
                 }
@@ -977,10 +980,10 @@ macro_rules! each_prim_and_op {
         impl $trait<$prim> for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: $prim) -> Self::Output {
-                if let CBigInt::Small(lhs) = &self {
+                if let Small(lhs) = &self {
                     if let Ok(rhs) = u32::try_from(rhs) {
                         if let (result, false) = lhs.$overflowing_op(rhs) {
-                            return CBigInt::Small(result);
+                            return Small(result);
                         }
                     }
                 }
