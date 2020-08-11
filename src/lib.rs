@@ -5,8 +5,8 @@ use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::ops::{
-    Add, AddAssign, BitAnd, BitAndAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Shl,
-    ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
+    Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 
 pub use num_bigint::{ParseBigIntError, Sign, TryFromBigIntError};
@@ -710,6 +710,25 @@ impl Neg for &CBigInt {
     }
 }
 
+impl Not for CBigInt {
+    type Output = CBigInt;
+
+    fn not(self) -> Self::Output {
+        if let Self::Small(a) = self {
+            return Self::Small(a.not());
+        }
+        BigInt::from(self).not().into()
+    }
+}
+
+impl Not for &CBigInt {
+    type Output = CBigInt;
+
+    fn not(self) -> Self::Output {
+        self.clone().not()
+    }
+}
+
 macro_rules! ref_op {
     ($trait:ident<$rhs_type:ty> for $lhs_type:ty, $op:ident) => {
         impl $trait<&$rhs_type> for $lhs_type {
@@ -931,41 +950,7 @@ prims_and_ops! {
     [@arith_op, Rem, rem, RemAssign, rem_assign, overflowing_div],
     [@shift_op, Shl, shl, ShlAssign, shl_assign, overflowing_shl],
     [@shift_op, Shr, shr, ShrAssign, shr_assign, overflowing_shr],
-    [@bit_op, BitAnd, bitand, BitAndAssign, bitand_assign];
+    [@bit_op, BitAnd, bitand, BitAndAssign, bitand_assign],
+    [@bit_op, BitOr, bitor, BitOrAssign, bitor_assign],
+    [@bit_op, BitXor, bitxor, BitXorAssign, bitxor_assign];
 }
-
-// #[test]
-// fn cross_product() {
-//     macro_rules! cross {
-//         ([$($x:ident)*] [$($y:ident)*]) => {
-//             cross!(@a [$($x),*] [$($y)*]);
-//         };
-//         (@b [$($x:ident),*] [$y:ident]) => {
-//             $(println!("({}, {})", stringify!($x), stringify!($y));)*
-//         };
-//         (@a $xs:tt [$($y:ident)*]) => {
-//             $(cross!(@b $xs [$y]);)*
-//         };
-//     }
-//     cross!([a b c d] [x y z]);
-//
-//     // macro_rules! cartesian_impl {
-//     //     ($out:tt [] $b:tt $init_b:tt) => {
-//     //         println!("{}", stringify!($out));
-//     //     };
-//     //     ($out:tt [$a:expr, $($at:tt)*] [] $init_b:tt) => {
-//     //         cartesian_impl!($out [$($at)*] $init_b $init_b)
-//     //     };
-//     //     ([$($out:tt)*] [$a:expr, $($at:tt)*] [$b:expr, $($bt:tt)*] $init_b:tt) => {
-//     //         cartesian_impl!([$($out)* ($a, $b),] [$a, $($at)*] [$($bt)*] $init_b)
-//     //     };
-//     // }
-//     //
-//     // macro_rules! cartesian {
-//     //     ([$($a:tt)*], [$($b:tt)*]) => {
-//     //         cartesian_impl!([] [$($a)*,] [$($b)*,] [$($b)*,])
-//     //     };
-//     // }
-//     // cartesian!([a, b, c, d], [x, y, z]);
-//     panic!();
-// }
