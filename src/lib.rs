@@ -25,6 +25,14 @@ use CBigInt::*;
 use Sign::*;
 
 impl CBigInt {
+    fn from_small_int(n: SmallInt) -> CBigInt {
+        if n == SmallInt::MIN {
+            BigInt::from(n).into()
+        } else {
+            Small(n)
+        }
+    }
+
     /// Creates and initializes a BigInt.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
@@ -860,7 +868,7 @@ macro_rules! each_prim {
         impl From<$prim> for CBigInt {
             fn from(value: $prim) -> Self {
                 if let Ok(converted) = SmallInt::try_from(value) {
-                    converted.into()
+                    CBigInt::from_small_int(converted)
                 } else {
                     BigInt::from(value).into()
                 }
@@ -1040,4 +1048,24 @@ prims_and_ops! {
     [@bit_op, BitAnd, bitand, BitAndAssign, bitand_assign],
     [@bit_op, BitOr, bitor, BitOrAssign, bitor_assign],
     [@bit_op, BitXor, bitxor, BitXorAssign, bitxor_assign];
+}
+
+#[test]
+fn doctest() {
+    use crate::{CBigInt, Sign};
+    use num_bigint::BigUint;
+    use num_traits::Zero;
+
+    assert_eq!(
+        CBigInt::from(1234).into_parts(),
+        (Sign::Plus, BigUint::from(1234u32))
+    );
+    assert_eq!(
+        CBigInt::from(-4321).into_parts(),
+        (Sign::Minus, BigUint::from(4321u32))
+    );
+    assert_eq!(
+        CBigInt::zero().into_parts(),
+        (Sign::NoSign, BigUint::zero())
+    );
 }
