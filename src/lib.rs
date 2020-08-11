@@ -102,16 +102,16 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{BigInt, Sign};
+    /// use compact_bigint::{CBigInt, Sign};
     ///
-    /// assert_eq!(BigInt::from_bytes_be(Plus, b"A"),
-    ///            BigInt::parse_bytes(b"65", 10).unwrap());
-    /// assert_eq!(BigInt::from_bytes_be(Plus, b"AA"),
-    ///            BigInt::parse_bytes(b"16705", 10).unwrap());
-    /// assert_eq!(BigInt::from_bytes_be(Plus, b"AB"),
-    ///            BigInt::parse_bytes(b"16706", 10).unwrap());
-    /// assert_eq!(BigInt::from_bytes_be(Plus, b"Hello world!"),
-    ///            BigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
+    /// assert_eq!(CBigInt::from_bytes_be(Sign::Plus, b"A"),
+    ///            CBigInt::parse_bytes(b"65", 10).unwrap());
+    /// assert_eq!(CBigInt::from_bytes_be(Sign::Plus, b"AA"),
+    ///            CBigInt::parse_bytes(b"16705", 10).unwrap());
+    /// assert_eq!(CBigInt::from_bytes_be(Sign::Plus, b"AB"),
+    ///            CBigInt::parse_bytes(b"16706", 10).unwrap());
+    /// assert_eq!(CBigInt::from_bytes_be(Sign::Plus, b"Hello world!"),
+    ///            CBigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     #[inline]
     pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> CBigInt {
@@ -148,11 +148,11 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{BigInt, ToBigInt};
+    /// use compact_bigint::{CBigInt, ToCBigInt};
     ///
-    /// assert_eq!(BigInt::parse_bytes(b"1234", 10), ToBigInt::to_bigint(&1234));
-    /// assert_eq!(BigInt::parse_bytes(b"ABCD", 16), ToBigInt::to_bigint(&0xABCD));
-    /// assert_eq!(BigInt::parse_bytes(b"G", 16), None);
+    /// assert_eq!(CBigInt::parse_bytes(b"1234", 10), ToCBigInt::to_bigint(&1234));
+    /// assert_eq!(CBigInt::parse_bytes(b"ABCD", 16), TocBigInt::to_bigint(&0xABCD));
+    /// assert_eq!(CBigInt::parse_bytes(b"G", 16), None);
     /// ```
     #[inline]
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<CBigInt> {
@@ -169,10 +169,10 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{BigInt, Sign};
+    /// use compact_bigint::{CBigInt, Sign};
     ///
     /// let inbase190 = vec![15, 33, 125, 12, 14];
-    /// let a = BigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
+    /// let a = CBigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
     pub fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<CBigInt> {
@@ -189,10 +189,10 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{BigInt, Sign};
+    /// use compact_bigint::{CBigInt, Sign};
     ///
     /// let inbase190 = vec![14, 12, 125, 33, 15];
-    /// let a = BigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
+    /// let a = CBigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
     pub fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<CBigInt> {
@@ -204,9 +204,9 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{ToBigInt, Sign};
+    /// use compact_bigint::{ToCBigInt, Sign};
     ///
-    /// let i = -1125.to_bigint().unwrap();
+    /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_bytes_be(), (Sign::Minus, vec![4, 101]));
     /// ```
     #[inline]
@@ -219,9 +219,9 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{ToBigInt, Sign};
+    /// use compact_bigint::{ToCBigInt, Sign};
     ///
-    /// let i = -1125.to_bigint().unwrap();
+    /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_bytes_le(), (Sign::Minus, vec![101, 4]));
     /// ```
     #[inline]
@@ -235,13 +235,13 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{BigInt, Sign};
+    /// use compact_bigint::{CBigInt, Sign};
     ///
-    /// assert_eq!(BigInt::from(-1125).to_u32_digits(), (Sign::Minus, vec![1125]));
-    /// assert_eq!(BigInt::from(4294967295u32).to_u32_digits(), (Plus, vec![4294967295]));
-    /// assert_eq!(BigInt::from(4294967296u64).to_u32_digits(), (Plus, vec![0, 1]));
-    /// assert_eq!(BigInt::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
-    /// assert_eq!(BigInt::from(112500000000i64).to_u32_digits(), (Plus, vec![830850304, 26]));
+    /// assert_eq!(CBigInt::from(-1125).to_u32_digits(), (Sign::Minus, vec![1125]));
+    /// assert_eq!(CBigInt::from(4294967295u32).to_u32_digits(), (Sign::Plus, vec![4294967295]));
+    /// assert_eq!(CBigInt::from(4294967296u64).to_u32_digits(), (Sign::Plus, vec![0, 1]));
+    /// assert_eq!(CBigInt::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
+    /// assert_eq!(CBigInt::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
     /// ```
     #[inline]
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
@@ -253,9 +253,9 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::ToBigInt;
+    /// use compact_bigint::ToCBigInt;
     ///
-    /// let i = -1125.to_bigint().unwrap();
+    /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_signed_bytes_be(), vec![251, 155]);
     /// ```
     #[inline]
@@ -268,9 +268,9 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::ToBigInt;
+    /// use compact_bigint::ToCBigInt;
     ///
-    /// let i = -1125.to_bigint().unwrap();
+    /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_signed_bytes_le(), vec![155, 251]);
     /// ```
     #[inline]
@@ -284,9 +284,9 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::BigInt;
+    /// use compact_bigint::CBigInt;
     ///
-    /// let i = BigInt::parse_bytes(b"ff", 16).unwrap();
+    /// let i = CBigInt::parse_bytes(b"ff", 16).unwrap();
     /// assert_eq!(i.to_str_radix(16), "ff");
     /// ```
     #[inline]
@@ -302,9 +302,9 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{BigInt, Sign};
+    /// use compact_bigint::{CBigInt, Sign};
     ///
-    /// assert_eq!(BigInt::from(-0xFFFFi64).to_radix_be(159),
+    /// assert_eq!(CBigInt::from(-0xFFFFi64).to_radix_be(159),
     ///            (Sign::Minus, vec![2, 94, 27]));
     /// // 0xFFFF = 65535 = 2*(159^2) + 94*159 + 27
     /// ```
@@ -321,9 +321,9 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{BigInt, Sign};
+    /// use compact_bigint::{CBigInt, Sign};
     ///
-    /// assert_eq!(BigInt::from(-0xFFFFi64).to_radix_le(159),
+    /// assert_eq!(CBigInt::from(-0xFFFFi64).to_radix_le(159),
     ///            (Sign::Minus, vec![27, 94, 2]));
     /// // 0xFFFF = 65535 = 27 + 94*159 + 2*(159^2)
     /// ```
@@ -337,12 +337,12 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{BigInt, Sign};
+    /// use compact_bigint::{CBigInt, Sign};
     /// use num_traits::Zero;
     ///
-    /// assert_eq!(BigInt::from(1234).sign(), Sign::Plus);
-    /// assert_eq!(BigInt::from(-4321).sign(), Sign::Minus);
-    /// assert_eq!(BigInt::zero().sign(), Sign::NoSign);
+    /// assert_eq!(CBigInt::from(1234).sign(), Sign::Plus);
+    /// assert_eq!(CBigInt::from(-4321).sign(), Sign::Minus);
+    /// assert_eq!(CBigInt::zero().sign(), Sign::NoSign);
     /// ```
     #[inline]
     pub fn sign(&self) -> Sign {
@@ -366,12 +366,14 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{BigInt, BigUint};
+    /// use compact_bigint::CBigInt;
     /// use num_traits::Zero;
+    /// use std::borrow::Borrow;
+    /// use num_bigint::BigUint;
     ///
-    /// assert_eq!(BigInt::from(1234).magnitude(), &BigUint::from(1234u32));
-    /// assert_eq!(BigInt::from(-4321).magnitude(), &BigUint::from(4321u32));
-    /// assert!(BigInt::zero().magnitude().is_zero());
+    /// assert_eq!(CBigInt::from(1234).magnitude().borrow() as &BigUint, &BigUint::from(1234u32));
+    /// assert_eq!(CBigInt::from(-4321).magnitude().borrow() as &BigUint, &BigUint::from(4321u32));
+    /// assert!(CBigInt::zero().magnitude().is_zero());
     /// ```
     #[inline]
     pub fn magnitude(&self) -> Cow<BigUint> {
@@ -397,12 +399,13 @@ impl CBigInt {
     /// # Examples
     ///
     /// ```
-    /// use num_bigint::{BigInt, BigUint, Sign};
+    /// use compact_bigint::{CBigInt, Sign};
     /// use num_traits::Zero;
+    /// use num_bigint::BigUint;
     ///
-    /// assert_eq!(BigInt::from(1234).into_parts(), (Sign::Plus, BigUint::from(1234u32)));
-    /// assert_eq!(BigInt::from(-4321).into_parts(), (Sign::Minus, BigUint::from(4321u32)));
-    /// assert_eq!(BigInt::zero().into_parts(), (Sign::NoSign, BigUint::zero()));
+    /// assert_eq!(CBigInt::from(1234).into_parts(), (Sign::Plus, BigUint::from(1234u32)));
+    /// assert_eq!(CBigInt::from(-4321).into_parts(), (Sign::Minus, BigUint::from(4321u32)));
+    /// assert_eq!(CBigInt::zero().into_parts(), (Sign::NoSign, BigUint::zero()));
     /// ```
     #[inline]
     pub fn into_parts(self) -> (Sign, BigUint) {
@@ -515,6 +518,20 @@ impl CBigInt {
     /// or `None` if the entire number is zero.
     pub fn trailing_zeros(&self) -> Option<u64> {
         todo!()
+    }
+}
+
+pub trait ToCBigInt {
+    fn to_cbigint(&self) -> Option<CBigInt>;
+}
+
+impl<T> ToCBigInt for T
+where
+    T: Clone,
+    CBigInt: TryFrom<T>,
+{
+    fn to_cbigint(&self) -> Option<CBigInt> {
+        CBigInt::try_from(self.clone()).ok()
     }
 }
 
