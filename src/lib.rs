@@ -25,12 +25,9 @@ use CBigInt::*;
 use Sign::*;
 
 impl CBigInt {
+    #[inline]
     fn from_small_int(n: SmallInt) -> CBigInt {
-        if n == SmallInt::MIN {
-            BigInt::from(n).into()
-        } else {
-            Small(n)
-        }
+        Small(n)
     }
 
     /// Creates and initializes a BigInt.
@@ -49,7 +46,7 @@ impl CBigInt {
                 if sign == Minus {
                     value = -value;
                 }
-                return Small(value);
+                return Self::from_small_int(value);
             }
         }
         let magnitude = BigUint::new(digits);
@@ -63,7 +60,7 @@ impl CBigInt {
     #[inline]
     pub fn from_bigint(data: BigInt) -> CBigInt {
         match data.to_i128() {
-            Some(value) => Small(value),
+            Some(value) => Self::from_small_int(value),
             None => {
                 let (sign, data) = data.into_parts();
                 Self::from_biguint(sign, data)
@@ -78,11 +75,17 @@ impl CBigInt {
         match sign {
             NoSign => Small(0),
             Plus => match data.to_i128() {
-                Some(value) => Small(value),
+                Some(value) => {
+                    debug_assert!(value >= 0);
+                    Small(value)
+                }
                 None => Positive(data),
             },
             Minus => match data.to_i128() {
-                Some(value) => Small(-value),
+                Some(value) => {
+                    debug_assert!(value >= 0);
+                    Small(-value)
+                }
                 None => Negative(data),
             },
         }
@@ -158,8 +161,8 @@ impl CBigInt {
     /// ```
     /// use compact_bigint::{CBigInt, ToCBigInt};
     ///
-    /// assert_eq!(CBigInt::parse_bytes(b"1234", 10), ToCBigInt::to_bigint(&1234));
-    /// assert_eq!(CBigInt::parse_bytes(b"ABCD", 16), TocBigInt::to_bigint(&0xABCD));
+    /// assert_eq!(CBigInt::parse_bytes(b"1234", 10), ToCBigInt::to_cbigint(&1234));
+    /// assert_eq!(CBigInt::parse_bytes(b"ABCD", 16), ToCBigInt::to_cbigint(&0xABCD));
     /// assert_eq!(CBigInt::parse_bytes(b"G", 16), None);
     /// ```
     #[inline]
@@ -355,10 +358,10 @@ impl CBigInt {
     #[inline]
     pub fn sign(&self) -> Sign {
         match self {
-            Small(n) => {
-                if *n > 0 {
+            &Small(n) => {
+                if n > 0 {
                     Plus
-                } else if *n < 0 {
+                } else if n < 0 {
                     Minus
                 } else {
                     NoSign
@@ -778,7 +781,7 @@ impl Neg for CBigInt {
     fn neg(self) -> Self::Output {
         if let Small(a) = self {
             if let (b, false) = a.overflowing_neg() {
-                return b.into();
+                return CBigInt::from_small_int(b);
             }
         }
         BigInt::from(self).neg().into()
@@ -975,7 +978,7 @@ macro_rules! each_prim_and_op {
                 if let Small(prim) = &self {
                     if let Ok(promoted) = SmallInt::try_from(rhs) {
                         if let (result, false) = prim.$overflowing_op(promoted) {
-                            return Small(result);
+                            return CBigInt::from_small_int(result);
                         }
                     }
                 }
@@ -988,7 +991,7 @@ macro_rules! each_prim_and_op {
                 if let Small(prim) = &rhs {
                     if let Ok(promoted) = SmallInt::try_from(self) {
                         if let (result, false) = promoted.$overflowing_op(*prim) {
-                            return Small(result);
+                            return CBigInt::from_small_int(result);
                         }
                     }
                 }
@@ -1008,7 +1011,7 @@ macro_rules! each_prim_and_op {
                 if let Small(lhs) = &self {
                     if let Ok(rhs) = u32::try_from(rhs) {
                         if let (result, false) = lhs.$overflowing_op(rhs) {
-                            return Small(result);
+                            return CBigInt::from_small_int(result);
                         }
                     }
                 }
@@ -1048,24 +1051,4 @@ prims_and_ops! {
     [@bit_op, BitAnd, bitand, BitAndAssign, bitand_assign],
     [@bit_op, BitOr, bitor, BitOrAssign, bitor_assign],
     [@bit_op, BitXor, bitxor, BitXorAssign, bitxor_assign];
-}
-
-#[test]
-fn doctest() {
-    use crate::{CBigInt, Sign};
-    use num_bigint::BigUint;
-    use num_traits::Zero;
-
-    assert_eq!(
-        CBigInt::from(1234).into_parts(),
-        (Sign::Plus, BigUint::from(1234u32))
-    );
-    assert_eq!(
-        CBigInt::from(-4321).into_parts(),
-        (Sign::Minus, BigUint::from(4321u32))
-    );
-    assert_eq!(
-        CBigInt::zero().into_parts(),
-        (Sign::NoSign, BigUint::zero())
-    );
 }
