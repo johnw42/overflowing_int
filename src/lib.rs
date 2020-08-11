@@ -1,12 +1,16 @@
 use num_bigint::{BigInt, BigUint};
 use num_integer::{Integer, Roots};
-use num_traits::{Num, One, Signed, ToPrimitive, Zero};
+pub use num_traits::{Num, One, Signed, ToPrimitive, Zero};
 use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::convert::TryFrom;
-use std::ops::{Add, BitAnd, Div, Mul, Neg, Rem, Shl, Shr, Sub};
+use std::ops::{
+    Add, AddAssign, BitAnd, BitAndAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Shl,
+    ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+};
 
 pub use num_bigint::{ParseBigIntError, Sign, TryFromBigIntError};
+use std::fmt::{Display, Formatter};
 
 type SmallInt = i128;
 
@@ -489,6 +493,22 @@ impl CBigInt {
     }
 }
 
+impl Default for CBigInt {
+    fn default() -> Self {
+        CBigInt::Small(0)
+    }
+}
+
+impl Display for CBigInt {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Small(n) => write!(f, "{}", n),
+            Self::Positive(n) => write!(f, "{}", n),
+            Self::Negative(n) => write!(f, "-{}", n),
+        }
+    }
+}
+
 impl From<BigInt> for CBigInt {
     fn from(value: BigInt) -> Self {
         Self::from_bigint(value)
@@ -690,64 +710,6 @@ impl Neg for &CBigInt {
     }
 }
 
-impl ToPrimitive for CBigInt {
-    fn to_isize(&self) -> Option<isize> {
-        isize::try_from(self.clone()).ok()
-    }
-
-    fn to_i8(&self) -> Option<i8> {
-        unimplemented!()
-    }
-
-    fn to_i16(&self) -> Option<i16> {
-        unimplemented!()
-    }
-
-    fn to_i32(&self) -> Option<i32> {
-        unimplemented!()
-    }
-
-    fn to_i64(&self) -> Option<i64> {
-        unimplemented!()
-    }
-
-    fn to_i128(&self) -> Option<i128> {
-        unimplemented!()
-    }
-
-    fn to_usize(&self) -> Option<usize> {
-        unimplemented!()
-    }
-
-    fn to_u8(&self) -> Option<u8> {
-        unimplemented!()
-    }
-
-    fn to_u16(&self) -> Option<u16> {
-        unimplemented!()
-    }
-
-    fn to_u32(&self) -> Option<u32> {
-        unimplemented!()
-    }
-
-    fn to_u64(&self) -> Option<u64> {
-        unimplemented!()
-    }
-
-    fn to_u128(&self) -> Option<u128> {
-        unimplemented!()
-    }
-
-    fn to_f32(&self) -> Option<f32> {
-        unimplemented!()
-    }
-
-    fn to_f64(&self) -> Option<f64> {
-        unimplemented!()
-    }
-}
-
 macro_rules! ref_op {
     ($trait:ident<$rhs_type:ty> for $lhs_type:ty, $op:ident) => {
         impl $trait<&$rhs_type> for $lhs_type {
@@ -772,10 +734,13 @@ macro_rules! ref_op {
 }
 
 macro_rules! prims_and_ops {
-    (@prims $([@int_prim, $prim:ident]),*; @ops $($op:tt),*;) => {
-        $(each_prim!([@int_prim, $prim]);)*
+    (@prims $($prim:tt),*; @ops $($op:tt),*;) => {
+        impl ToPrimitive for CBigInt {
+            $(to_prim_method!($prim);)*
+        }
+        $(each_prim!($prim);)*
         $(each_op!($op);)*
-        iter_ops_then_prims!(@prims {$([@int_prim, $prim]),*}; @ops $($op),*;);
+        iter_ops_then_prims!(@prims {$($prim),*}; @ops $($op),*;);
     };
 }
 
@@ -786,13 +751,13 @@ macro_rules! iter_ops_then_prims {
 }
 
 macro_rules! iter_prims_for_op {
-    (@prims {$([@int_prim, $prim:ident]),*}; $op:tt) => {
-        $(each_prim_and_op!([@int_prim, $prim], $op);)*
+    (@prims {$($prim:tt),*}; $op:tt) => {
+        $(each_prim_and_op!($prim, $op);)*
     };
 }
 
 macro_rules! each_prim {
-    ([@int_prim, $prim:ident]) => {
+    ([@int_prim, $prim:ident, $to_prim:ident]) => {
         impl From<$prim> for CBigInt {
             fn from(value: $prim) -> Self {
                 if let Ok(promoted) = SmallInt::try_from(value) {
@@ -813,10 +778,32 @@ macro_rules! each_prim {
             }
         }
     };
+    ([@float_prim, $prim:ident, $to_prim:ident]) => {};
+}
+
+macro_rules! to_prim_method {
+    ([@int_prim, $prim:ident, $to_prim:ident]) => {
+        fn $to_prim(&self) -> Option<$prim> {
+            if let CBigInt::Small(value) = self {
+                $prim::try_from(*value).ok()
+            } else {
+                $prim::try_from(BigInt::from(self.clone())).ok()
+            }
+        }
+    };
+    ([@float_prim, $prim:ident, $to_prim:ident]) => {
+        fn $to_prim(&self) -> Option<$prim> {
+            if let CBigInt::Small(value) = self {
+                Some(*value as $prim)
+            } else {
+                BigInt::from(self.clone()).$to_prim()
+            }
+        }
+    };
 }
 
 macro_rules! each_op {
-    ([@arith_op, $trait:ident, $op:ident, $overflowing_op:ident]) => {
+    ([@arith_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident]) => {
         impl $trait for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: Self) -> Self::Output {
@@ -828,11 +815,13 @@ macro_rules! each_op {
                 BigInt::from(self).$op(BigInt::from(rhs)).into()
             }
         }
+        assign_op!($trait, $op, $assign_trait, $assign_op);
         ref_op!($trait<CBigInt> for CBigInt, $op);
     };
-    ([@shift_op $(, $_dummy:tt)*]) => {
+    ([@shift_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident]) => {
+        assign_op!($trait, $op, $assign_trait, $assign_op);
     };
-    ([@bit_op, $trait:ident, $op:ident]) => {
+    ([@bit_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]) => {
         impl $trait for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: Self) -> Self::Output {
@@ -842,12 +831,30 @@ macro_rules! each_op {
                 BigInt::from(self).$op(BigInt::from(rhs)).into()
             }
         }
+        assign_op!($trait, $op, $assign_trait, $assign_op);
         ref_op!($trait<CBigInt> for CBigInt, $op);
     };
 }
 
+macro_rules! assign_op {
+    ($trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident) => {
+        impl<T> $assign_trait<T> for CBigInt
+        where
+            CBigInt: $trait<T, Output = CBigInt>,
+        {
+            fn $assign_op(&mut self, rhs: T) {
+                let lhs = std::mem::take(self);
+                *self = lhs.$op(rhs);
+            }
+        }
+    };
+}
+
 macro_rules! each_prim_and_op {
-      ([@int_prim, $prim:ident], [@arith_op, $trait:ident, $op:ident, $overflowing_op:ident]) => {
+    (
+        [@int_prim, $prim:ident, $to_prim:ident],
+        [@arith_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident]
+    ) => {
         impl $trait<$prim> for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: $prim) -> Self::Output {
@@ -877,7 +884,10 @@ macro_rules! each_prim_and_op {
         ref_op!($trait<$prim> for CBigInt, $op);
         ref_op!($trait<CBigInt> for $prim, $op);
     };
-    ([@int_prim, $prim:ident], [@shift_op, $trait:ident, $op:ident, $overflowing_op:ident]) => {
+    (
+        [@int_prim, $prim:ident, $to_prim:ident],
+        [@shift_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident]
+    ) => {
         impl $trait<$prim> for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: $prim) -> Self::Output {
@@ -893,33 +903,35 @@ macro_rules! each_prim_and_op {
         }
         ref_op!($trait<$prim> for CBigInt, $op);
     };
-    ([@int_prim, $prim:ident], [@bit_op, $trait:ident, $op:ident]) => {
-    };
+    ($prim:tt, [@bit_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]) => {};
+    ([@float_prim $(, $_1:tt)*], $_2:tt) => {};
 }
 
 prims_and_ops! {
     @prims
-    [@int_prim, i8],
-    [@int_prim, i16],
-    [@int_prim, i32],
-    [@int_prim, i64],
-    [@int_prim, i128],
-    [@int_prim, isize],
-    [@int_prim, u8],
-    [@int_prim, u16],
-    [@int_prim, u32],
-    [@int_prim, u64],
-    [@int_prim, u128],
-    [@int_prim, usize];
+    [@int_prim, i8, to_i8],
+    [@int_prim, i16, to_i16],
+    [@int_prim, i32, to_i32],
+    [@int_prim, i64, to_i64],
+    [@int_prim, i128, to_i128],
+    [@int_prim, isize, to_isize],
+    [@int_prim, u8, to_u8],
+    [@int_prim, u16, to_u16],
+    [@int_prim, u32, to_u32],
+    [@int_prim, u64, to_u64],
+    [@int_prim, u128, to_u128],
+    [@int_prim, usize, to_usize],
+    [@float_prim, f32, to_f32],
+    [@float_prim, f64, to_f64];
     @ops
-    [@arith_op, Add, add, overflowing_add],
-    [@arith_op, Sub, sub, overflowing_sub],
-    [@arith_op, Mul, mul, overflowing_mul],
-    [@arith_op, Div, div, overflowing_div],
-    [@arith_op, Rem, rem, overflowing_div],
-    [@shift_op, Shl, shl, overflowing_shl],
-    [@shift_op, Shr, shr, overflowing_shr],
-    [@bit_op, BitAnd, bitand];
+    [@arith_op, Add, add, AddAssign, add_assign, overflowing_add],
+    [@arith_op, Sub, sub, SubAssign, sub_assign, overflowing_sub],
+    [@arith_op, Mul, mul, MulAssign, mul_assign, overflowing_mul],
+    [@arith_op, Div, div, DivAssign, div_assign, overflowing_div],
+    [@arith_op, Rem, rem, RemAssign, rem_assign, overflowing_div],
+    [@shift_op, Shl, shl, ShlAssign, shl_assign, overflowing_shl],
+    [@shift_op, Shr, shr, ShrAssign, shr_assign, overflowing_shr],
+    [@bit_op, BitAnd, bitand, BitAndAssign, bitand_assign];
 }
 
 // #[test]
