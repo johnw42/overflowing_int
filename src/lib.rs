@@ -665,10 +665,10 @@ impl CBigInt {
     pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         if let Positive(uint) = self {
             // Possibly avoid some cloning by operating directly on unsigned values.
-            if let Ok(exponent) = Cow::<BigUint>::try_from(exponent) {
-                if let Ok(modulus) = Cow::<BigUint>::try_from(modulus) {
-                    return uint.modpow(exponent.borrow(), modulus.borrow()).into();
-                }
+            if !exponent.is_negative() && !modulus.is_negative() {
+                return uint
+                    .modpow(exponent.magnitude().borrow(), modulus.magnitude().borrow())
+                    .into();
             }
         }
         BigInt::from(self.clone())
@@ -747,20 +747,6 @@ impl From<BigUint> for CBigInt {
 impl From<CBigInt> for BigInt {
     fn from(value: CBigInt) -> Self {
         value.into_bigint()
-    }
-}
-
-impl<'a> TryFrom<&'a CBigInt> for Cow<'a, BigUint> {
-    type Error = TryFromBigIntError<()>;
-    fn try_from(value: &'a CBigInt) -> Result<Self, Self::Error> {
-        match value {
-            Small(n) => match n.to_biguint() {
-                None => Err(try_into_bigint_error()),
-                Some(uint) => Ok(Cow::Owned(uint)),
-            },
-            Positive(uint) => Ok(Cow::Borrowed(uint)),
-            Negative(_) => Err(try_into_bigint_error()),
-        }
     }
 }
 
