@@ -1,16 +1,16 @@
-use num_bigint::{BigInt, BigUint, ToBigInt, ToBigUint};
+pub use num_bigint::{
+    BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint, TryFromBigIntError,
+};
 use num_integer::{Integer, Roots};
-pub use num_traits::{Num, One, Signed, ToPrimitive, Zero};
+use num_traits::{Num, One, Signed, ToPrimitive, Zero};
 use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
     Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
-
-pub use num_bigint::{ParseBigIntError, Sign, TryFromBigIntError};
-use std::fmt::{Debug, Display, Formatter};
 
 type SmallInt = i128;
 
@@ -25,7 +25,7 @@ use CBigInt::*;
 use Sign::*;
 
 impl CBigInt {
-    #[inline]
+    #[inline(always)]
     fn from_small_int(n: SmallInt) -> CBigInt {
         Small(n)
     }
@@ -38,15 +38,15 @@ impl CBigInt {
             return Small(0);
         }
         if digits.len() <= 4 {
-            let mut value = 0;
+            let mut value: SmallInt = 0;
             for &digit in &digits {
-                value = (value << 32) | digit as i128;
+                value = (value << 32) | digit as SmallInt;
             }
             if value >= 0 {
                 if sign == Minus {
                     value = -value;
                 }
-                return Self::from_small_int(value);
+                return value.into();
             }
         }
         let magnitude = BigUint::new(digits);
@@ -60,7 +60,7 @@ impl CBigInt {
     #[inline]
     pub fn from_bigint(data: BigInt) -> CBigInt {
         match data.to_i128() {
-            Some(value) => Self::from_small_int(value),
+            Some(value) => value.into(),
             None => {
                 let (sign, data) = data.into_parts();
                 Self::from_biguint(sign, data)
@@ -68,7 +68,7 @@ impl CBigInt {
         }
     }
 
-    /// Creates and initializes a `BigInt`.
+    /// Creates and initializes a `CBigInt`.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn from_biguint(sign: Sign, data: BigUint) -> CBigInt {
@@ -91,14 +91,72 @@ impl CBigInt {
         }
     }
 
-    /// Creates and initializes a `BigInt`.
+    #[inline(always)]
+    fn from_accum(sign: Sign, accum: u128) -> Option<CBigInt> {
+        let accum = accum as i128;
+        if accum >= 0 {
+            Some(match sign {
+                Plus => Small(accum),
+                Minus => Small(-accum),
+                NoSign => Small(0),
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    fn accum_be(bytes: &[u8]) -> Option<u128> {
+        if bytes.len() <= 16 {
+            let mut accum = 0;
+            for &byte in bytes {
+                accum = accum << 8 | byte as u128;
+            }
+            Some(accum)
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    fn accum_le(bytes: &[u8]) -> Option<u128> {
+        if bytes.len() <= 16 {
+            let mut accum = 0;
+            for (i, &byte) in bytes.iter().enumerate() {
+                accum |= (byte as u128) << 8 * i;
+            }
+            Some(accum)
+        } else {
+            None
+        }
+    }
+
+    /// Creates and initializes a `CBigInt`.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn from_slice(sign: Sign, slice: &[u32]) -> CBigInt {
+        if slice.len() <= 4 {
+            let mut accum = 0;
+            if slice.len() > 0 {
+                accum = slice[0] as u128;
+                if slice.len() > 1 {
+                    accum |= (slice[1] as u128) << 32;
+                    if slice.len() > 2 {
+                        accum |= (slice[2] as u128) << 64;
+                        if slice.len() > 3 {
+                            accum |= (slice[3] as u128) << 96;
+                        }
+                    }
+                }
+            }
+            if let Some(result) = Self::from_accum(sign, accum) {
+                return result;
+            }
+        }
         Self::new(sign, Vec::from(slice))
     }
 
-    /// Reinitializes a `BigInt`.
+    /// Reinitializes a `CBigInt`.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
@@ -106,7 +164,7 @@ impl CBigInt {
         *self = Self::from_slice(sign, slice);
     }
 
-    /// Creates and initializes a `BigInt`.
+    /// Creates and initializes a `CBigInt`.
     ///
     /// The bytes are in big-endian byte order.
     ///
@@ -124,37 +182,51 @@ impl CBigInt {
     /// assert_eq!(CBigInt::from_bytes_be(Sign::Plus, b"Hello world!"),
     ///            CBigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
-    #[inline]
     pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> CBigInt {
+        if let Some(accum) = Self::accum_be(bytes) {
+            if let Some(result) = Self::from_accum(sign, accum) {
+                return result;
+            }
+        }
         Self::from_biguint(sign, BigUint::from_bytes_be(bytes))
     }
 
-    /// Creates and initializes a `BigInt`.
+    /// Creates and initializes a `CBigInt`.
     ///
     /// The bytes are in little-endian byte order.
-    #[inline]
     pub fn from_bytes_le(sign: Sign, bytes: &[u8]) -> CBigInt {
+        if let Some(accum) = Self::accum_le(bytes) {
+            if let Some(result) = Self::from_accum(sign, accum) {
+                return result;
+            }
+        }
         Self::from_biguint(sign, BigUint::from_bytes_le(bytes))
     }
 
-    /// Creates and initializes a `BigInt` from an array of bytes in
+    /// Creates and initializes a `CBigInt` from an array of bytes in
     /// two's complement binary representation.
     ///
     /// The digits are in big-endian base 2<sup>8</sup>.
-    #[inline]
     pub fn from_signed_bytes_be(digits: &[u8]) -> CBigInt {
-        Self::from_bigint(BigInt::from_signed_bytes_be(digits))
+        if let Some(accum) = Self::accum_be(digits) {
+            Small(accum as i128)
+        } else {
+            Self::from_bigint(BigInt::from_signed_bytes_be(digits))
+        }
     }
 
-    /// Creates and initializes a `BigInt` from an array of bytes in two's complement.
+    /// Creates and initializes a `CBigInt` from an array of bytes in two's complement.
     ///
     /// The digits are in little-endian base 2<sup>8</sup>.
-    #[inline]
     pub fn from_signed_bytes_le(digits: &[u8]) -> CBigInt {
-        Self::from_bigint(BigInt::from_signed_bytes_le(digits))
+        if let Some(accum) = Self::accum_le(digits) {
+            Small(accum as i128)
+        } else {
+            Self::from_bigint(BigInt::from_signed_bytes_le(digits))
+        }
     }
 
-    /// Creates and initializes a `BigInt`.
+    /// Creates and initializes a `CBigInt`.
     ///
     /// # Examples
     ///
@@ -170,7 +242,7 @@ impl CBigInt {
         BigInt::parse_bytes(buf, radix).map(Self::from_bigint)
     }
 
-    /// Creates and initializes a `BigInt`. Each u8 of the input slice is
+    /// Creates and initializes a `CBigInt`. Each u8 of the input slice is
     /// interpreted as one digit of the number
     /// and must therefore be less than `radix`.
     ///
@@ -190,7 +262,7 @@ impl CBigInt {
         BigInt::from_radix_be(sign, buf, radix).map(Self::from_bigint)
     }
 
-    /// Creates and initializes a `BigInt`. Each u8 of the input slice is
+    /// Creates and initializes a `CBigInt`. Each u8 of the input slice is
     /// interpreted as one digit of the number
     /// and must therefore be less than `radix`.
     ///
@@ -210,7 +282,19 @@ impl CBigInt {
         BigInt::from_radix_le(sign, buf, radix).map(Self::from_bigint)
     }
 
-    /// Returns the sign and the byte representation of the `BigInt` in big-endian byte order.
+    fn make_accum(value: i128) -> (Sign, u128) {
+        if value == 0 {
+            (NoSign, 0)
+        } else if value >= 0 {
+            (Plus, value as u128)
+        } else if value == i128::MIN {
+            (Minus, value as u128)
+        } else {
+            (Minus, (-value) as u128)
+        }
+    }
+
+    /// Returns the sign and the byte representation of the `CBigInt` in big-endian byte order.
     ///
     /// # Examples
     ///
@@ -220,12 +304,25 @@ impl CBigInt {
     /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_bytes_be(), (Sign::Minus, vec![4, 101]));
     /// ```
-    #[inline]
     pub fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
-        self.to_bigint().to_bytes_be()
+        match self {
+            &Small(n) => match Self::make_accum(n) {
+                (NoSign, _) => (NoSign, Vec::new()),
+                (sign, mut accum) => {
+                    let mut bytes = Vec::with_capacity(16);
+                    while accum != 0 {
+                        bytes.push(accum as u8);
+                        accum >>= 8;
+                    }
+                    (sign, bytes)
+                }
+            },
+            Positive(mag) => (Plus, mag.to_bytes_be()),
+            Negative(mag) => (Minus, mag.to_bytes_be()),
+        }
     }
 
-    /// Returns the sign and the byte representation of the `BigInt` in little-endian byte order.
+    /// Returns the sign and the byte representation of the `CBigInt` in little-endian byte order.
     ///
     /// # Examples
     ///
@@ -235,12 +332,26 @@ impl CBigInt {
     /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_bytes_le(), (Sign::Minus, vec![101, 4]));
     /// ```
-    #[inline]
     pub fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
-        self.to_bigint().to_bytes_le()
+        match self {
+            &Small(n) => {
+                let (sign, accum) = Self::make_accum(n);
+                if sign == NoSign {
+                    (sign, Vec::new())
+                } else {
+                    let mut bytes = accum.to_le_bytes().to_vec();
+                    while let Some(0) = bytes.last() {
+                        bytes.pop();
+                    }
+                    (sign, bytes)
+                }
+            }
+            Positive(mag) => (Plus, mag.to_bytes_le()),
+            Negative(mag) => (Minus, mag.to_bytes_le()),
+        }
     }
 
-    /// Returns the sign and the `u32` digits representation of the `BigInt` ordered least
+    /// Returns the sign and the `u32` digits representation of the `CBigInt` ordered least
     /// significant digit first.
     ///
     /// # Examples
@@ -254,12 +365,25 @@ impl CBigInt {
     /// assert_eq!(CBigInt::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
     /// assert_eq!(CBigInt::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
     /// ```
-    #[inline]
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
-        BigInt::from(self.clone()).to_u32_digits()
+        match self {
+            &Small(n) => match Self::make_accum(n) {
+                (NoSign, _) => (NoSign, Vec::new()),
+                (sign, mut accum) => {
+                    let mut digits = Vec::with_capacity(4);
+                    while accum != 0 {
+                        digits.push(accum as u32);
+                        accum >>= 32;
+                    }
+                    (sign, digits)
+                }
+            },
+            Positive(mag) => (Plus, mag.to_u32_digits()),
+            Negative(mag) => (Minus, mag.to_u32_digits()),
+        }
     }
 
-    /// Returns the two's-complement byte representation of the `BigInt` in big-endian byte order.
+    /// Returns the two's-complement byte representation of the `CBigInt` in big-endian byte order.
     ///
     /// # Examples
     ///
@@ -269,12 +393,24 @@ impl CBigInt {
     /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_signed_bytes_be(), vec![251, 155]);
     /// ```
-    #[inline]
     pub fn to_signed_bytes_be(&self) -> Vec<u8> {
-        BigInt::from(self.clone()).to_signed_bytes_be()
+        match self {
+            &Small(0) => Vec::new(),
+            &Small(n) => {
+                let bytes = n.to_be_bytes();
+                let to_discard = if n >= 0 { 0 } else { 0xff };
+                let mut i = 0;
+                while i < bytes.len() && bytes[i] == to_discard {
+                    i += 1
+                }
+                bytes[i..].to_vec()
+            }
+            Positive(mag) => mag.to_bytes_be(),
+            Negative(_) => BigInt::from(self.clone()).to_signed_bytes_be(),
+        }
     }
 
-    /// Returns the two's-complement byte representation of the `BigInt` in little-endian byte order.
+    /// Returns the two's-complement byte representation of the `CBigInt` in little-endian byte order.
     ///
     /// # Examples
     ///
@@ -284,9 +420,21 @@ impl CBigInt {
     /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_signed_bytes_le(), vec![155, 251]);
     /// ```
-    #[inline]
     pub fn to_signed_bytes_le(&self) -> Vec<u8> {
-        BigInt::from(self.clone()).to_signed_bytes_le()
+        match self {
+            &Small(0) => Vec::new(),
+            &Small(n) => {
+                let bytes = n.to_le_bytes();
+                let to_discard = if n >= 0 { 0 } else { 0xff };
+                let mut i = 16;
+                while i > 0 && bytes[i - 1] == to_discard {
+                    i -= 1
+                }
+                bytes[..i].to_vec()
+            }
+            Positive(mag) => mag.to_bytes_le(),
+            Negative(_) => BigInt::from(self.clone()).to_signed_bytes_le(),
+        }
     }
 
     /// Returns the integer formatted as a string in the given radix.
@@ -343,7 +491,7 @@ impl CBigInt {
         BigInt::from(self.clone()).to_radix_le(radix)
     }
 
-    /// Returns the sign of the `BigInt` as a `Sign`.
+    /// Returns the sign of the `CBigInt` as a `Sign`.
     ///
     /// # Examples
     ///
@@ -372,7 +520,7 @@ impl CBigInt {
         }
     }
 
-    /// Returns the magnitude of the `BigInt` as a `BigUint`.
+    /// Returns the magnitude of the `CBigInt` as a `BigUint`.
     ///
     /// # Examples
     ///
@@ -395,6 +543,8 @@ impl CBigInt {
         }
     }
 
+    /// Returns the magnitude of the `CBigInt` as a `BigUint` if the necessary
+    /// `BigUint` already exists.
     #[inline]
     pub fn try_magnitude(&self) -> Option<&BigUint> {
         match self {
@@ -404,8 +554,8 @@ impl CBigInt {
         }
     }
 
-    /// Convert this `BigInt` into its `Sign` and `BigUint` magnitude,
-    /// the reverse of `BigInt::from_biguint`.
+    /// Convert this `CBigInt` into its `Sign` and `BigUint` magnitude,
+    /// the reverse of `CBigInt::from_biguint`.
     ///
     /// # Examples
     ///
@@ -459,7 +609,7 @@ impl CBigInt {
         self.clone().into_bigint()
     }
 
-    /// Converts this `BigInt` into a `BigUint`, if it's not negative.
+    /// Converts this `CBigInt` into a `BigUint`, if it's not negative.
     pub fn to_biguint(&self) -> Option<BigUint> {
         match self {
             Small(n) => {
@@ -514,6 +664,7 @@ impl CBigInt {
     /// Panics if the exponent is negative or the modulus is zero.
     pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         if let Positive(uint) = self {
+            // Possibly avoid some cloning by operating directly on unsigned values.
             if let Ok(exponent) = Cow::<BigUint>::try_from(exponent) {
                 if let Ok(modulus) = Cow::<BigUint>::try_from(modulus) {
                     return uint.modpow(exponent.borrow(), modulus.borrow()).into();
@@ -528,7 +679,14 @@ impl CBigInt {
     /// Returns the number of least-significant bits that are zero,
     /// or `None` if the entire number is zero.
     pub fn trailing_zeros(&self) -> Option<u64> {
-        todo!()
+        match self {
+            &Small(0) => None,
+            &Small(n) if n > 0 => Some(n.trailing_zeros() as u64),
+            &Small(i128::MIN) => Some(128),
+            &Small(n) => Some((-n).trailing_zeros() as u64),
+            Positive(mag) => mag.trailing_zeros(),
+            Negative(mag) => mag.trailing_zeros(),
+        }
     }
 }
 
@@ -730,39 +888,88 @@ impl Ord for CBigInt {
 
 impl Integer for CBigInt {
     fn div_floor(&self, other: &Self) -> Self {
-        unimplemented!()
+        if let (&Small(lhs), &Small(rhs)) = (self, other) {
+            if (lhs, rhs) != (SmallInt::MIN, -1) {
+                return lhs.div_floor(&rhs).into();
+            }
+        }
+        BigInt::from(self.clone())
+            .div_floor(&BigInt::from(other.clone()))
+            .into()
     }
 
     fn mod_floor(&self, other: &Self) -> Self {
-        unimplemented!()
+        if let (&Small(lhs), &Small(rhs)) = (self, other) {
+            lhs.mod_floor(&rhs).into()
+        } else {
+            BigInt::from(self.clone())
+                .mod_floor(&BigInt::from(other.clone()))
+                .into()
+        }
     }
 
     fn gcd(&self, other: &Self) -> Self {
-        unimplemented!()
+        if let (&Small(lhs), &Small(rhs)) = (self, other) {
+            lhs.gcd(&rhs).into()
+        } else {
+            BigInt::from(self.clone())
+                .gcd(&BigInt::from(other.clone()))
+                .into()
+        }
     }
 
     fn lcm(&self, other: &Self) -> Self {
-        unimplemented!()
+        if let (&Small(lhs), &Small(rhs)) = (self, other) {
+            if !lhs.overflowing_mul(rhs).1 {
+                return lhs.lcm(&rhs).into();
+            }
+        }
+        BigInt::from(self.clone())
+            .lcm(&BigInt::from(other.clone()))
+            .into()
     }
 
     fn divides(&self, other: &Self) -> bool {
-        unimplemented!()
+        if let (&Small(lhs), &Small(rhs)) = (self, other) {
+            lhs.divides(&rhs)
+        } else {
+            BigInt::from(self.clone()).divides(&BigInt::from(other.clone()))
+        }
     }
 
     fn is_multiple_of(&self, other: &Self) -> bool {
-        unimplemented!()
+        if let (&Small(lhs), &Small(rhs)) = (self, other) {
+            lhs.is_multiple_of(&rhs)
+        } else {
+            BigInt::from(self.clone()).is_multiple_of(&BigInt::from(other.clone()))
+        }
     }
 
     fn is_even(&self) -> bool {
-        unimplemented!()
+        match self {
+            Small(n) => n.is_even(),
+            Positive(mag) => mag.is_even(),
+            Negative(mag) => mag.is_even(),
+        }
     }
 
     fn is_odd(&self) -> bool {
-        unimplemented!()
+        match self {
+            Small(n) => n.is_odd(),
+            Positive(mag) => mag.is_odd(),
+            Negative(mag) => mag.is_odd(),
+        }
     }
 
     fn div_rem(&self, other: &Self) -> (Self, Self) {
-        unimplemented!()
+        if let (&Small(lhs), &Small(rhs)) = (self, other) {
+            if (lhs, rhs) != (SmallInt::MIN, -1) {
+                let (q, r) = lhs.div_rem(&rhs);
+                return (q.into(), r.into());
+            }
+        }
+        let (q, r) = BigInt::from(self.clone()).div_rem(&BigInt::from(other.clone()));
+        return (q.into(), r.into());
     }
 }
 
@@ -781,7 +988,7 @@ impl Neg for CBigInt {
     fn neg(self) -> Self::Output {
         if let Small(a) = self {
             if let (b, false) = a.overflowing_neg() {
-                return CBigInt::from_small_int(b);
+                return b.into();
             }
         }
         BigInt::from(self).neg().into()
@@ -978,7 +1185,7 @@ macro_rules! each_prim_and_op {
                 if let Small(prim) = &self {
                     if let Ok(promoted) = SmallInt::try_from(rhs) {
                         if let (result, false) = prim.$overflowing_op(promoted) {
-                            return CBigInt::from_small_int(result);
+                            return result.into();
                         }
                     }
                 }
@@ -991,7 +1198,7 @@ macro_rules! each_prim_and_op {
                 if let Small(prim) = &rhs {
                     if let Ok(promoted) = SmallInt::try_from(self) {
                         if let (result, false) = promoted.$overflowing_op(*prim) {
-                            return CBigInt::from_small_int(result);
+                            return result.into();
                         }
                     }
                 }
@@ -1011,7 +1218,7 @@ macro_rules! each_prim_and_op {
                 if let Small(lhs) = &self {
                     if let Ok(rhs) = u32::try_from(rhs) {
                         if let (result, false) = lhs.$overflowing_op(rhs) {
-                            return CBigInt::from_small_int(result);
+                            return result.into();
                         }
                     }
                 }
@@ -1045,10 +1252,47 @@ prims_and_ops! {
     [@arith_op, Sub, sub, SubAssign, sub_assign, overflowing_sub],
     [@arith_op, Mul, mul, MulAssign, mul_assign, overflowing_mul],
     [@arith_op, Div, div, DivAssign, div_assign, overflowing_div],
-    [@arith_op, Rem, rem, RemAssign, rem_assign, overflowing_div],
+    [@arith_op, Rem, rem, RemAssign, rem_assign, overflowing_rem],
     [@shift_op, Shl, shl, ShlAssign, shl_assign, overflowing_shl],
     [@shift_op, Shr, shr, ShrAssign, shr_assign, overflowing_shr],
     [@bit_op, BitAnd, bitand, BitAndAssign, bitand_assign],
     [@bit_op, BitOr, bitor, BitOrAssign, bitor_assign],
     [@bit_op, BitXor, bitxor, BitXorAssign, bitxor_assign];
+}
+
+#[test]
+fn test() {
+    let bin_ops: &[(
+        &str,
+        fn(CBigInt, CBigInt) -> CBigInt,
+        fn(BigInt, BigInt) -> BigInt,
+    )] = &[
+        ("+", CBigInt::add, BigInt::add),
+        ("-", CBigInt::sub, BigInt::sub),
+        ("*", CBigInt::mul, BigInt::mul),
+        ("/", CBigInt::div, BigInt::div),
+        ("%", CBigInt::rem, BigInt::rem),
+    ];
+    let mut small_range = vec![SmallInt::MIN, SmallInt::MAX, -SmallInt::MAX];
+    small_range.extend((-10..=10).into_iter());
+    let mut range: Vec<_> = small_range.into_iter().map(BigInt::from).collect();
+    range.push(BigInt::from(i128::MAX) * 2);
+    range.push(BigInt::from(i128::MIN) * 2);
+
+    for (op_name, cop, op) in bin_ops {
+        for a in &range {
+            for b in &range {
+                if !b.is_zero() {
+                    assert_eq!(
+                        BigInt::from(cop(CBigInt::from(a.clone()), CBigInt::from(b.clone()))),
+                        op(a.clone(), b.clone()),
+                        "failed: {} {} {}",
+                        a,
+                        op_name,
+                        b,
+                    );
+                }
+            }
+        }
+    }
 }
