@@ -1036,31 +1036,8 @@ macro_rules! ref_op {
     };
 }
 
-macro_rules! prims_and_ops {
-    (@prims $($prim:tt),*; @ops $($op:tt),*;) => {
-        impl ToPrimitive for CBigInt {
-            $(to_prim_method!($prim);)*
-        }
-        $(each_prim!($prim);)*
-        $(each_op!($op);)*
-        iter_ops_then_prims!(@prims {$($prim),*}; @ops $($op),*;);
-    };
-}
-
-macro_rules! iter_ops_then_prims {
-    (@prims $prims:tt; @ops $($op:tt),*;) => {
-        $(iter_prims_for_op!(@prims $prims; $op);)*
-    };
-}
-
-macro_rules! iter_prims_for_op {
-    (@prims {$($prim:tt),*}; $op:tt) => {
-        $(each_prim_and_op!($prim, $op);)*
-    };
-}
-
 macro_rules! each_prim {
-    ([@int_prim, $prim:ident, $to_prim:ident]) => {
+    (int_prim, $prim:ident, $to_prim:ident) => {
         impl From<$prim> for CBigInt {
             fn from(value: $prim) -> Self {
                 if let Ok(converted) = SmallInt::try_from(value) {
@@ -1088,11 +1065,11 @@ macro_rules! each_prim {
             }
         }
     };
-    ([@float_prim, $prim:ident, $to_prim:ident]) => {};
+    (float_prim, $prim:ident, $to_prim:ident) => {};
 }
 
 macro_rules! to_prim_method {
-    ([@int_prim, $prim:ident, $to_prim:ident]) => {
+    (int_prim, $prim:ident, $to_prim:ident) => {
         fn $to_prim(&self) -> Option<$prim> {
             if let Small(value) = self {
                 $prim::try_from(*value).ok()
@@ -1101,7 +1078,7 @@ macro_rules! to_prim_method {
             }
         }
     };
-    ([@float_prim, $prim:ident, $to_prim:ident]) => {
+    (float_prim, $prim:ident, $to_prim:ident) => {
         fn $to_prim(&self) -> Option<$prim> {
             if let Small(value) = self {
                 Some(*value as $prim)
@@ -1112,8 +1089,14 @@ macro_rules! to_prim_method {
     };
 }
 
+macro_rules! each_untyped_prim {
+    ($type:ident, $prim:ident, $to_prim:ident) => {
+        with_ops!(each_prim_and_op, [$type, $prim, $to_prim]);
+    };
+}
+
 macro_rules! each_op {
-    ([@arith_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident]) => {
+    (arith_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident) => {
         impl $trait for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: Self) -> Self::Output {
@@ -1128,10 +1111,10 @@ macro_rules! each_op {
         assign_op!($trait, $op, $assign_trait, $assign_op);
         ref_op!($trait<CBigInt> for CBigInt, $op);
     };
-    ([@shift_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident]) => {
+    (shift_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident) => {
         assign_op!($trait, $op, $assign_trait, $assign_op);
     };
-    ([@bit_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]) => {
+    (bit_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident) => {
         impl $trait for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: Self) -> Self::Output {
@@ -1162,8 +1145,8 @@ macro_rules! assign_op {
 
 macro_rules! each_prim_and_op {
     (
-        [@int_prim, $prim:ident, $to_prim:ident],
-        [@arith_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident]
+        int_prim, $prim:ident, $to_prim:ident,
+        arith_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident
     ) => {
         impl $trait<$prim> for CBigInt {
             type Output = CBigInt;
@@ -1195,8 +1178,8 @@ macro_rules! each_prim_and_op {
         ref_op!($trait<CBigInt> for $prim, $op);
     };
     (
-        [@int_prim, $prim:ident, $to_prim:ident],
-        [@shift_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident]
+        int_prim, $prim:ident, $to_prim:ident,
+        shift_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident, $overflowing_op:ident
     ) => {
         impl $trait<$prim> for CBigInt {
             type Output = CBigInt;
@@ -1213,38 +1196,67 @@ macro_rules! each_prim_and_op {
         }
         ref_op!($trait<$prim> for CBigInt, $op);
     };
-    ($prim:tt, [@bit_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]) => {};
-    ([@float_prim $(, $_1:tt)*], $_2:tt) => {};
+    ($prim_type:ident, $prim:ident, $to_prim:ident, bit_op, $trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident) => {};
+    (float_prim $(, $_1:tt)*) => {};
 }
 
-prims_and_ops! {
-    @prims
-    [@int_prim, i8, to_i8],
-    [@int_prim, i16, to_i16],
-    [@int_prim, i32, to_i32],
-    [@int_prim, i64, to_i64],
-    [@int_prim, i128, to_i128],
-    [@int_prim, isize, to_isize],
-    [@int_prim, u8, to_u8],
-    [@int_prim, u16, to_u16],
-    [@int_prim, u32, to_u32],
-    [@int_prim, u64, to_u64],
-    [@int_prim, u128, to_u128],
-    [@int_prim, usize, to_usize],
-    [@float_prim, f32, to_f32],
-    [@float_prim, f64, to_f64];
-    @ops
-    [@arith_op, Add, add, AddAssign, add_assign, overflowing_add],
-    [@arith_op, Sub, sub, SubAssign, sub_assign, overflowing_sub],
-    [@arith_op, Mul, mul, MulAssign, mul_assign, overflowing_mul],
-    [@arith_op, Div, div, DivAssign, div_assign, overflowing_div],
-    [@arith_op, Rem, rem, RemAssign, rem_assign, overflowing_rem],
-    [@shift_op, Shl, shl, ShlAssign, shl_assign, overflowing_shl],
-    [@shift_op, Shr, shr, ShrAssign, shr_assign, overflowing_shr],
-    [@bit_op, BitAnd, bitand, BitAndAssign, bitand_assign],
-    [@bit_op, BitOr, bitor, BitOrAssign, bitor_assign],
-    [@bit_op, BitXor, bitxor, BitXorAssign, bitxor_assign];
+macro_rules! call_macro {
+    ($name:ident, $init_args:tt, $($final_args:tt),* $(,)?) => {
+        $(call_macro!(@internal $name, $init_args, $final_args);)*
+    };
+    (@internal $name:ident, [$($init_arg:tt),*], [$($final_arg:tt),*]) => {
+        $name!($($init_arg,)*$($final_arg),*);
+    }
 }
+
+macro_rules! with_prims {
+    ($macro:ident, $args:tt) => {
+        call_macro!(
+            $macro,
+            $args,
+            [int_prim, i8, to_i8],
+            [int_prim, i16, to_i16],
+            [int_prim, i32, to_i32],
+            [int_prim, i64, to_i64],
+            [int_prim, i128, to_i128],
+            [int_prim, isize, to_isize],
+            [int_prim, u8, to_u8],
+            [int_prim, u16, to_u16],
+            [int_prim, u32, to_u32],
+            [int_prim, u64, to_u64],
+            [int_prim, u128, to_u128],
+            [int_prim, usize, to_usize],
+            [float_prim, f32, to_f32],
+            [float_prim, f64, to_f64]
+        );
+    };
+}
+
+macro_rules! with_ops {
+    ($macro:ident, $args:tt) => {
+        call_macro!(
+            $macro,
+            $args,
+            [arith_op, Add, add, AddAssign, add_assign, overflowing_add],
+            [arith_op, Sub, sub, SubAssign, sub_assign, overflowing_sub],
+            [arith_op, Mul, mul, MulAssign, mul_assign, overflowing_mul],
+            [arith_op, Div, div, DivAssign, div_assign, overflowing_div],
+            [arith_op, Rem, rem, RemAssign, rem_assign, overflowing_rem],
+            [shift_op, Shl, shl, ShlAssign, shl_assign, overflowing_shl],
+            [shift_op, Shr, shr, ShrAssign, shr_assign, overflowing_shr],
+            [bit_op, BitAnd, bitand, BitAndAssign, bitand_assign],
+            [bit_op, BitOr, bitor, BitOrAssign, bitor_assign],
+            [bit_op, BitXor, bitxor, BitXorAssign, bitxor_assign],
+        );
+    };
+}
+
+impl ToPrimitive for CBigInt {
+    with_prims!(to_prim_method, []);
+}
+with_prims!(each_prim, []);
+with_prims!(each_untyped_prim, []);
+with_ops!(each_op, []);
 
 #[test]
 fn test() {
@@ -1282,3 +1294,17 @@ fn test() {
         }
     }
 }
+//
+// #[test]
+// fn macro_test() {
+//     macro_rules! call_macro {
+//         ($name:ident, $init_args:tt, $($final_args:tt),*) => {
+//             $(call_macro!(@internal $name, $init_args, $final_args);)*
+//         };
+//         (@internal $name:ident, [$($init_arg:tt),*], [$($final_arg:tt),*]) => {
+//             $name!($($init_arg,)*$($final_arg),*)
+//         }
+//     }
+//
+//     call_macro!(println, ["{} {} {}", 1], [2, 3], [4, 5]);
+// }
