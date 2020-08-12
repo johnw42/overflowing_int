@@ -308,13 +308,13 @@ impl CBigInt {
         match self {
             &Small(n) => match Self::make_accum(n) {
                 (NoSign, _) => (NoSign, Vec::new()),
-                (sign, mut accum) => {
-                    let mut bytes = Vec::with_capacity(16);
-                    while accum != 0 {
-                        bytes.push(accum as u8);
-                        accum >>= 8;
+                (sign, accum) => {
+                    let bytes = accum.to_be_bytes();
+                    let mut i = 0;
+                    while i < bytes.len() && bytes[i] == 0 {
+                        i += 1
                     }
-                    (sign, bytes)
+                    (sign, bytes[i..].to_vec())
                 }
             },
             Positive(mag) => (Plus, mag.to_bytes_be()),
