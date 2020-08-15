@@ -1,44 +1,48 @@
-pub use num_bigint::{
-    BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint, TryFromBigIntError,
-};
-
-use num_integer::{Integer, Roots};
-use num_traits::{Num, One, Signed, ToPrimitive, Zero};
 use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
-use std::mem::ManuallyDrop;
+use std::mem::{size_of, ManuallyDrop};
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
     Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 use std::panic::catch_unwind;
-use CBigInt::*;
-use Sign::*;
 
-type SmallInt = i128;
+use num_bigint::{
+    BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint, TryFromBigIntError,
+};
+use num_integer::{Integer, Roots};
+use num_traits::{Num, One, Signed, ToPrimitive, Zero};
+
+use CBigInt::*;
+
+use crate::Sign::*;
+use crate::{Digit, Udigit};
+
+type Accum = Digit;
+type Uaccum = Udigit;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CBigInt {
-    Small(SmallInt),
+    Small(Digit),
     Positive(BigUint),
     Negative(BigUint),
 }
 
-enum GenInt {
+pub enum GenInt {
     Big(BigInt),
-    Small(SmallInt),
+    Small(Digit),
 }
 
 enum GenIntRef<'a> {
     Big(&'a BigInt),
-    Small(SmallInt),
+    Small(Digit),
 }
 
 enum GenIntCow<'a> {
     Big(Cow<'a, BigInt>),
-    Small(SmallInt),
+    Small(Digit),
 }
 
 impl From<CBigInt> for GenInt {
@@ -100,6 +104,8 @@ struct GenIntFn<F>(F);
 struct GenIntRefFn<F>(F);
 struct GenIntCowFn<F>(F);
 
+const DIGIT_BITS: usize = size_of::<Digit>() * 8;
+
 // struct GenIntCowFn1<F, T>(F)
 // where
 //     F: FnOnce(GenIntCow) -> T;
@@ -134,7 +140,7 @@ where
 impl<FB, FS, T> CBigIntFn<T> for GenIntFn<(FB, FS)>
 where
     FB: FnOnce(BigInt) -> T,
-    FS: FnOnce(SmallInt) -> T,
+    FS: FnOnce(Digit) -> T,
 {
     fn apply(self, arg: CBigInt) -> T {
         let (fb, fs) = self.0;
@@ -174,7 +180,7 @@ where
 impl<FB, FS, T> CBigIntFn<T> for GenIntRefFn<(FB, FS)>
 where
     FB: for<'a> FnOnce(&'a BigInt) -> T,
-    FS: FnOnce(SmallInt) -> T,
+    FS: FnOnce(Digit) -> T,
 {
     fn apply(self, arg: CBigInt) -> T {
         let (fb, fs) = self.0;
@@ -195,7 +201,7 @@ where
     }
 }
 
-// impl<T> CBigIntFn<T> for GenIntRefFn<(fn(&BigInt) -> T, fn(SmallInt) -> T)> {
+// impl<T> CBigIntFn<T> for GenIntRefFn<(fn(&BigInt) -> T, fn(Digit) -> T)> {
 //     fn apply(self, arg: CBigInt) -> T {
 //         let (fb, fs) = self.0;
 //         GenIntRefFn(|arg: GenIntRef| -> T {
@@ -241,7 +247,7 @@ where
 // impl<FB, FS, T> CBigIntFn1<T> for (FB, FS)
 // where
 //     FB: FnOnce(BigInt),
-//     FS: FnOnce(SmallInt),
+//     FS: FnOnce(Digit),
 // {
 //     fn apply_small(self, arg: CBigInt) -> T {
 //         let (fb, fs) = self;
@@ -302,7 +308,7 @@ trait CBigIntFn2<T> {
 // fn maybe_bigint_mut<T>(
 //     arg: &mut CBigInt,
 //     f: impl FnOnce(&mut BigInt) -> T,
-//     g: impl FnOnce(&mut SmallInt) -> T,
+//     g: impl FnOnce(&mut Digit) -> T,
 // ) -> T {
 //     let (sign, mag) = match arg {
 //         Small(value) => return g(value),
@@ -360,7 +366,7 @@ trait CBigIntFn2<T> {
 
 impl CBigInt {
     #[inline(always)]
-    fn from_small_int(n: SmallInt) -> CBigInt {
+    pub(crate) fn from_small_int(n: Digit) -> CBigInt {
         Small(n)
     }
 
@@ -372,9 +378,9 @@ impl CBigInt {
             return Small(0);
         }
         if digits.len() <= 4 {
-            let mut value: SmallInt = 0;
+            let mut value: Digit = 0;
             for &digit in &digits {
-                value = (value << 32) | digit as SmallInt;
+                value = (value << 32) | digit as Digit;
             }
             if value >= 0 {
                 if sign == Minus {
@@ -408,26 +414,26 @@ impl CBigInt {
     pub fn from_biguint(sign: Sign, data: BigUint) -> CBigInt {
         match sign {
             NoSign => Small(0),
-            Plus => match data.to_i128() {
-                Some(value) => {
+            Plus => match Digit::try_from(&data) {
+                Ok(value) => {
                     debug_assert!(value >= 0);
                     Small(value)
                 }
-                None => Positive(data),
+                Err(_) => Positive(data),
             },
-            Minus => match data.to_i128() {
-                Some(value) => {
+            Minus => match Digit::try_from(&data) {
+                Ok(value) => {
                     debug_assert!(value >= 0);
                     Small(-value)
                 }
-                None => Negative(data),
+                Err(_) => Negative(data),
             },
         }
     }
 
     #[inline(always)]
-    fn from_accum(sign: Sign, accum: u128) -> Option<CBigInt> {
-        let accum = accum as i128;
+    fn from_accum(sign: Sign, accum: Udigit) -> Option<CBigInt> {
+        let accum = accum as Digit;
         if accum >= 0 {
             Some(match sign {
                 Plus => Small(accum),
@@ -440,11 +446,11 @@ impl CBigInt {
     }
 
     #[inline(always)]
-    fn accum_be(bytes: &[u8]) -> Option<u128> {
+    fn accum_be(bytes: &[u8]) -> Option<Udigit> {
         if bytes.len() <= 16 {
             let mut accum = 0;
             for &byte in bytes {
-                accum = accum << 8 | byte as u128;
+                accum = accum << 8 | byte as Udigit;
             }
             Some(accum)
         } else {
@@ -453,11 +459,11 @@ impl CBigInt {
     }
 
     #[inline(always)]
-    fn accum_le(bytes: &[u8]) -> Option<u128> {
+    fn accum_le(bytes: &[u8]) -> Option<Udigit> {
         if bytes.len() <= 16 {
             let mut accum = 0;
             for (i, &byte) in bytes.iter().enumerate() {
-                accum |= (byte as u128) << 8 * i;
+                accum |= (byte as Udigit) << 8 * i;
             }
             Some(accum)
         } else {
@@ -469,19 +475,10 @@ impl CBigInt {
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn from_slice(sign: Sign, slice: &[u32]) -> CBigInt {
-        if slice.len() <= 4 {
+        if slice.len() <= size_of::<Udigit>() / size_of::<u32>() {
             let mut accum = 0;
-            if slice.len() > 0 {
-                accum = slice[0] as u128;
-                if slice.len() > 1 {
-                    accum |= (slice[1] as u128) << 32;
-                    if slice.len() > 2 {
-                        accum |= (slice[2] as u128) << 64;
-                        if slice.len() > 3 {
-                            accum |= (slice[3] as u128) << 96;
-                        }
-                    }
-                }
+            for (i, &word) in slice.iter().enumerate() {
+                accum |= (word as Udigit) << i * 8;
             }
             if let Some(result) = Self::from_accum(sign, accum) {
                 return result;
@@ -543,7 +540,7 @@ impl CBigInt {
     /// The digits are in big-endian base 2<sup>8</sup>.
     pub fn from_signed_bytes_be(digits: &[u8]) -> CBigInt {
         if let Some(accum) = Self::accum_be(digits) {
-            Small(accum as i128)
+            Small(accum as Digit)
         } else {
             Self::from_bigint(BigInt::from_signed_bytes_be(digits))
         }
@@ -554,7 +551,7 @@ impl CBigInt {
     /// The digits are in little-endian base 2<sup>8</sup>.
     pub fn from_signed_bytes_le(digits: &[u8]) -> CBigInt {
         if let Some(accum) = Self::accum_le(digits) {
-            Small(accum as i128)
+            Small(accum as Digit)
         } else {
             Self::from_bigint(BigInt::from_signed_bytes_le(digits))
         }
@@ -616,15 +613,15 @@ impl CBigInt {
         BigInt::from_radix_le(sign, buf, radix).map(Self::from_bigint)
     }
 
-    fn make_accum(value: i128) -> (Sign, u128) {
+    fn make_accum(value: Digit) -> (Sign, Udigit) {
         if value == 0 {
             (NoSign, 0)
         } else if value >= 0 {
-            (Plus, value as u128)
-        } else if value == i128::MIN {
-            (Minus, value as u128)
+            (Plus, value as Udigit)
+        } else if value == Digit::MIN {
+            (Minus, value as Udigit)
         } else {
-            (Minus, (-value) as u128)
+            (Minus, (-value) as Udigit)
         }
     }
 
@@ -914,9 +911,9 @@ impl CBigInt {
         match self {
             &Small(n) => {
                 if n >= 0 {
-                    127 - n.leading_zeros()
-                } else if n == i128::MIN {
-                    128
+                    DIGIT_BITS as u32 - 1 - n.leading_zeros()
+                } else if n == Digit::MIN {
+                    DIGIT_BITS as u32
                 } else {
                     (-n).leading_zeros()
                 }
@@ -1016,7 +1013,7 @@ impl CBigInt {
         match self {
             &Small(0) => None,
             &Small(n) if n > 0 => Some(n.trailing_zeros() as u64),
-            &Small(i128::MIN) => Some(128),
+            &Small(Digit::MIN) => Some(DIGIT_BITS as u64),
             &Small(n) => Some((-n).trailing_zeros() as u64),
             Positive(mag) => mag.trailing_zeros(),
             Negative(mag) => mag.trailing_zeros(),
@@ -1205,7 +1202,7 @@ impl Ord for CBigInt {
 impl Integer for CBigInt {
     fn div_floor(&self, other: &Self) -> Self {
         if let (&Small(lhs), &Small(rhs)) = (self, other) {
-            if (lhs, rhs) != (SmallInt::MIN, -1) {
+            if (lhs, rhs) != (Digit::MIN, -1) {
                 return lhs.div_floor(&rhs).into();
             }
         }
@@ -1284,7 +1281,7 @@ impl Integer for CBigInt {
 
     fn div_rem(&self, other: &Self) -> (Self, Self) {
         if let (&Small(lhs), &Small(rhs)) = (self, other) {
-            if (lhs, rhs) != (SmallInt::MIN, -1) {
+            if (lhs, rhs) != (Digit::MIN, -1) {
                 let (q, r) = lhs.div_rem(&rhs);
                 return (q.into(), r.into());
             }
@@ -1414,7 +1411,7 @@ macro_rules! each_prim {
         with_ops!(each_prim_and_op, [int_prim, [$prim, $to_prim]]);
         impl From<$prim> for CBigInt {
             fn from(value: $prim) -> Self {
-                if let Ok(converted) = SmallInt::try_from(value) {
+                if let Ok(converted) = Digit::try_from(value) {
                     CBigInt::from_small_int(converted)
                 } else {
                     BigInt::from(value).into()
@@ -1591,7 +1588,7 @@ macro_rules! each_prim_and_op {
             type Output = CBigInt;
             fn $op(self, rhs: $prim) -> Self::Output {
                 if let Small(prim) = &self {
-                    if let Ok(promoted) = SmallInt::try_from(rhs) {
+                    if let Ok(promoted) = Digit::try_from(rhs) {
                         if let (result, false) = prim.$overflowing_op(promoted) {
                             return result.into();
                         }
@@ -1604,7 +1601,7 @@ macro_rules! each_prim_and_op {
             type Output = CBigInt;
             fn $op(self, rhs: CBigInt) -> Self::Output {
                 if let Small(prim) = &rhs {
-                    if let Ok(promoted) = SmallInt::try_from(self) {
+                    if let Ok(promoted) = Digit::try_from(self) {
                         if let (result, false) = promoted.$overflowing_op(*prim) {
                             return result.into();
                         }
@@ -1673,7 +1670,7 @@ fn test() {
         ("/", CBigInt::div, BigInt::div),
         ("%", CBigInt::rem, BigInt::rem),
     ];
-    let mut small_range = vec![SmallInt::MIN, SmallInt::MAX, -SmallInt::MAX];
+    let mut small_range = vec![Digit::MIN, Digit::MAX, -Digit::MAX];
     small_range.extend((-10..=10).into_iter());
     let mut range: Vec<_> = small_range.into_iter().map(BigInt::from).collect();
     range.push(BigInt::from(i128::MAX) * 2);
