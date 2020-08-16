@@ -685,19 +685,6 @@ impl CBigInt {
         }
     }
 
-    fn overflowing_op(
-        &self,
-        other: &CBigInt,
-        f: fn(Digit, Digit) -> (Digit, bool),
-    ) -> Option<CBigInt> {
-        if let Some((a, b)) = self.to_digit_with(other) {
-            if let (result, false) = f(a, b) {
-                return Some(result.into());
-            }
-        }
-        None
-    }
-
     fn bitwise_op(&self, other: &CBigInt, f: fn(Digit, Digit) -> Digit) -> Option<CBigInt> {
         if let Some((a, b)) = self.to_digit_with(other) {
             Some(f(a, b).into())
@@ -735,8 +722,39 @@ impl<'a> ToCow<'a> for &'a BigInt {
     }
 }
 
+impl<'a> ToCow<'a> for Decoded<Cow<'a, BigInt>> {
+    fn to_cow(self) -> Cow<'a, BigInt> {
+        match self {
+            Decoded::Small(n) => Cow::Owned(n.into()),
+            Decoded::Big(cow) => cow,
+        }
+    }
+}
+
+trait ToDecodedCow<'a> {
+    fn to_decoded_cow(self) -> Decoded<Cow<'a, BigInt>>;
+}
+
+impl<'a> ToDecodedCow<'a> for CBigInt {
+    fn to_decoded_cow(self) -> Decoded<Cow<'a, BigInt>> {
+        match self.decode() {
+            Decoded::Small(n) => Decoded::Small(n),
+            Decoded::Big(n) => Decoded::Big(n.to_cow()),
+        }
+    }
+}
+
+impl<'a> ToDecodedCow<'a> for &'a CBigInt {
+    fn to_decoded_cow(self) -> Decoded<Cow<'a, BigInt>> {
+        match self.decode_ref() {
+            Decoded::Small(n) => Decoded::Small(n),
+            Decoded::Big(n) => Decoded::Big(n.to_cow()),
+        }
+    }
+}
+
 struct BigIntOp {
-    digits: fn(Digit, Digit) -> Digit,
+    digits: fn(Digit, Digit) -> Option<Digit>,
     owned: fn(BigInt, BigInt) -> BigInt,
     owned_borrowed: fn(BigInt, &BigInt) -> BigInt,
     borrowed_owned: for<'a> fn(&'a BigInt, BigInt) -> BigInt,
@@ -746,10 +764,19 @@ struct BigIntOp {
 impl BigIntOp {
     fn call<'a, L, R>(&self, lhs: L, rhs: R) -> CBigInt
     where
-        L: ToCow<'a>,
-        R: ToCow<'a>,
+        L: ToDecodedCow<'a>,
+        R: ToDecodedCow<'a>,
     {
         use Cow::*;
+        let lhs = lhs.to_decoded_cow();
+        let rhs = rhs.to_decoded_cow();
+
+        if let (&Decoded::Small(lhs), &Decoded::Small(rhs)) = (&lhs, &rhs) {
+            if let Some(out) = (self.digits)(lhs, rhs) {
+                return out.into();
+            }
+        }
+
         match (lhs.to_cow(), rhs.to_cow()) {
             (Owned(lhs), Owned(rhs)) => (self.owned)(lhs, rhs),
             (Owned(lhs), Borrowed(rhs)) => (self.owned_borrowed)(lhs, rhs),
@@ -759,24 +786,6 @@ impl BigIntOp {
         .into()
     }
 }
-
-// fn bigint_op(
-//     lhs: Cow<BigInt>,
-//     rhs: Cow<BigInt>,
-//     owned: fn(BigInt, BigInt) -> BigInt,
-//     owned_borrowed: fn(BigInt, &BigInt) -> BigInt,
-//     borrowed_owned: fn(&BigInt, BigInt) -> BigInt,
-//     borrowed: fn(&BigInt, &BigInt) -> BigInt,
-// ) -> CBigInt {
-//     use Cow::*;
-//     match (lhs, rhs) {
-//         (Owned(lhs), Owned(rhs)) => owned(lhs, rhs),
-//         (Owned(lhs), Borrowed(rhs)) => owned_borrowed(lhs, rhs),
-//         (Borrowed(lhs), Owned(rhs)) => borrowed_owned(lhs, rhs),
-//         (Borrowed(lhs), Borrowed(rhs)) => borrowed(lhs, rhs),
-//     }
-//     .into()
-// }
 
 pub trait ToCBigInt {
     fn to_cbigint(&self) -> Option<CBigInt>;
@@ -1131,8 +1140,7 @@ macro_rules! each_prim {
             }
         }
     };
-    [[float $(, $_1:tt)*], $prim_attrs:tt] => {
-    };
+    [[float $(, $_1:tt)*], $prim_attrs:tt] => {};
 }
 
 macro_rules! to_prim_method {
@@ -1149,7 +1157,22 @@ macro_rules! to_prim_method {
 macro_rules! bigint_op {
     [arith_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
         pub(super) const $op: BigIntOp = BigIntOp {
-            digits: $trait::$op,
+            digits: |lhs, rhs| {
+                if let (out, false) = Overflowing::$op(lhs, rhs) {
+                    Some(out)
+                } else {
+                    None
+                }
+            },
+            owned: |lhs: BigInt, rhs: BigInt| $trait::$op(lhs, rhs),
+            owned_borrowed: |lhs: BigInt, rhs: &BigInt| $trait::$op(lhs, rhs),
+            borrowed_owned: |lhs: &BigInt, rhs: BigInt| $trait::$op(lhs, rhs),
+            borrowed: |lhs: &BigInt, rhs: &BigInt| $trait::$op(lhs, rhs),
+        };
+    };
+    [bit_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
+        pub(super) const $op: BigIntOp = BigIntOp {
+            digits: |lhs, rhs| Some($trait::$op(lhs, rhs)),
             owned: |lhs: BigInt, rhs: BigInt| $trait::$op(lhs, rhs),
             owned_borrowed: |lhs: BigInt, rhs: &BigInt| $trait::$op(lhs, rhs),
             borrowed_owned: |lhs: &BigInt, rhs: BigInt| $trait::$op(lhs, rhs),
@@ -1159,6 +1182,7 @@ macro_rules! bigint_op {
     [$($_1:tt),*] => {};
 }
 
+#[allow(non_upper_case_globals)]
 mod bigint_ops {
     use super::*;
 
@@ -1170,31 +1194,25 @@ macro_rules! op_traits {
         impl $trait<CBigInt> for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: CBigInt) -> Self::Output {
-                self.overflowing_op(&rhs, Overflowing::$op)
-                    .unwrap_or_else(|| {
-                        bigint_ops::$op.call(self, rhs)
-                    })
+                bigint_ops::$op.call(self, rhs)
             }
         }
         impl $trait<CBigInt> for &CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: CBigInt) -> Self::Output {
-                self.overflowing_op(&rhs, Overflowing::$op)
-                    .unwrap_or_else(|| self.to_bigint().as_ref().$op(BigInt::from(rhs)).into())
+                bigint_ops::$op.call(self, rhs)
             }
         }
         impl $trait<&CBigInt> for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: &CBigInt) -> Self::Output {
-                self.overflowing_op(rhs, Overflowing::$op)
-                    .unwrap_or_else(|| BigInt::from(self).$op(rhs.to_bigint().as_ref()).into())
+                bigint_ops::$op.call(self, rhs)
             }
         }
         impl $trait<&CBigInt> for &CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: &CBigInt) -> Self::Output {
-                self.overflowing_op(rhs, Overflowing::$op)
-                    .unwrap_or_else(|| self.to_bigint().as_ref().$op(rhs.to_bigint().as_ref()).into())
+                bigint_ops::$op.call(self, rhs)
             }
         }
         assign_op!($trait, $op, $assign_trait, $assign_op);
@@ -1203,35 +1221,7 @@ macro_rules! op_traits {
         assign_op!($trait, $op, $assign_trait, $assign_op);
     };
     [bit_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
-        impl $trait<CBigInt> for CBigInt {
-            type Output = CBigInt;
-            fn $op(self, rhs: CBigInt) -> Self::Output {
-                self.bitwise_op(&rhs, $trait::$op)
-                    .unwrap_or_else(|| BigInt::from(self).$op(BigInt::from(rhs)).into())
-            }
-        }
-        impl $trait<CBigInt> for &CBigInt {
-            type Output = CBigInt;
-            fn $op(self, rhs: CBigInt) -> Self::Output {
-                self.bitwise_op(&rhs, $trait::$op)
-                    .unwrap_or_else(|| self.to_bigint().as_ref().$op(BigInt::from(rhs)).into())
-            }
-        }
-        impl $trait<&CBigInt> for CBigInt {
-            type Output = CBigInt;
-            fn $op(self, rhs: &CBigInt) -> Self::Output {
-                self.bitwise_op(rhs, $trait::$op)
-                    .unwrap_or_else(|| BigInt::from(self).$op(rhs.to_bigint().as_ref()).into())
-            }
-        }
-        impl $trait<&CBigInt> for &CBigInt {
-            type Output = CBigInt;
-            fn $op(self, rhs: &CBigInt) -> Self::Output {
-                self.bitwise_op(rhs, $trait::$op)
-                    .unwrap_or_else(|| self.to_bigint().as_ref().$op(rhs.to_bigint().as_ref()).into())
-            }
-        }
-        assign_op![$trait, $op, $assign_trait, $assign_op];
+        op_traits!(arith_op, [$trait, $op, $assign_trait, $assign_op]);
     };
 }
 
