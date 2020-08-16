@@ -2,7 +2,7 @@ use std::mem::align_of;
 
 use num_bigint::BigInt;
 
-pub use inner::*;
+pub use inner::Encoded;
 
 use crate::Digit;
 
@@ -20,22 +20,22 @@ mod inner {
 
     #[cfg(feature = "unsafe_encoding")]
     impl Encoded {
-        pub fn is_ptr(&self) -> bool {
+        pub(super) fn is_ptr(&self) -> bool {
             self.0 & 1 == 0
         }
 
-        pub fn is_digit(&self) -> bool {
+        pub(super) fn is_digit(&self) -> bool {
             !self.is_ptr()
         }
 
-        pub fn from_bigint(value: BigInt) -> Self {
+        pub(super) fn from_bigint(value: BigInt) -> Self {
             let ptr = Box::into_raw(Box::new(value));
             let result = Self(ptr as usize);
             debug_assert!(std::ptr::eq(result.ptr(), ptr));
             result
         }
 
-        pub fn from_digit(digit: Digit) -> Option<Self> {
+        pub(super) fn from_digit(digit: Digit) -> Option<Self> {
             let shifted = digit << 1;
             debug_assert_eq!(shifted & 1, 0);
             if shifted >> 1 == digit {
@@ -47,12 +47,12 @@ mod inner {
             }
         }
 
-        pub fn ptr(&self) -> *mut BigInt {
+        pub(super) fn ptr(&self) -> *mut BigInt {
             debug_assert!(self.is_ptr());
             self.0 as *mut BigInt
         }
 
-        pub fn digit(&self) -> Digit {
+        pub(super) fn digit(&self) -> Digit {
             debug_assert!(self.is_digit());
             self.0 as isize >> 1
         }
@@ -178,24 +178,6 @@ impl From<Decoded<BigInt>> for BigInt {
         }
     }
 }
-
-// impl From<Encoded> for Decoded<BigInt> {
-//     fn from(x: Encoded) -> Self {
-//         x.decode()
-//     }
-// }
-//
-// impl<'a> From<&'a Encoded> for Decoded<&'a BigInt> {
-//     fn from(x: &'a Encoded) -> Self {
-//         x.decode_ref()
-//     }
-// }
-//
-// impl<'a> From<&'a mut Encoded> for Decoded<&'a mut BigInt> {
-//     fn from(x: &'a mut Encoded) -> Self {
-//         x.decode_mut()
-//     }
-// }
 
 impl Decoded<BigInt> {
     #[cfg(not(feature = "unsafe_encoding"))]

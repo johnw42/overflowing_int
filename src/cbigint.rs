@@ -66,12 +66,59 @@ impl<'a> From<GenIntRef<'a>> for GenIntCow<'a> {
 
 const DIGIT_BITS: usize = size_of::<Digit>() * 8;
 
-impl CBigInt {
-    #[inline(always)]
-    pub(crate) fn from_small_int(n: Digit) -> CBigInt {
-        CBigInt(Decoded::Small(n).encode())
+fn make_accum(value: Digit) -> (Sign, Udigit) {
+    if value == 0 {
+        (NoSign, 0)
+    } else if value >= 0 {
+        (Plus, value as Udigit)
+    } else if value == Digit::MIN {
+        (Minus, value as Udigit)
+    } else {
+        (Minus, (-value) as Udigit)
     }
+}
 
+fn from_accum(sign: Sign, accum: Udigit) -> Option<CBigInt> {
+    let accum = accum as Digit;
+    if accum >= 0 {
+        Some(CBigInt(
+            Decoded::Small(match sign {
+                Plus => accum,
+                Minus => -accum,
+                NoSign => 0,
+            })
+            .encode(),
+        ))
+    } else {
+        None
+    }
+}
+
+fn accum_be(bytes: &[u8]) -> Option<Udigit> {
+    if bytes.len() <= size_of::<Digit>() {
+        let mut accum = 0;
+        for &byte in bytes {
+            accum = accum << 8 | byte as Udigit;
+        }
+        Some(accum)
+    } else {
+        None
+    }
+}
+
+fn accum_le(bytes: &[u8]) -> Option<Udigit> {
+    if bytes.len() <= size_of::<Digit>() {
+        let mut accum = 0;
+        for (i, &byte) in bytes.iter().enumerate() {
+            accum |= (byte as Udigit) << 8 * i;
+        }
+        Some(accum)
+    } else {
+        None
+    }
+}
+
+impl CBigInt {
     #[inline]
     fn decode(self) -> Decoded<BigInt> {
         self.0.decode()
@@ -120,64 +167,12 @@ impl CBigInt {
         CBigInt(Decoded::Big(BigInt::new(sign, digits)).encode())
     }
 
-    #[inline]
-    pub fn from_bigint(data: BigInt) -> CBigInt {
-        let decoded = match Digit::try_from(data) {
-            Ok(digit) => Decoded::Small(digit),
-            Err(err) => Decoded::Big(err.into_original()),
-        };
-        CBigInt(decoded.encode())
-    }
-
     /// Creates and initializes a `CBigInt`.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
     pub fn from_biguint(sign: Sign, data: BigUint) -> CBigInt {
-        Self::from_bigint(BigInt::from_biguint(sign, data))
-    }
-
-    #[inline(always)]
-    fn from_accum(sign: Sign, accum: Udigit) -> Option<CBigInt> {
-        let accum = accum as Digit;
-        if accum >= 0 {
-            Some(CBigInt(
-                Decoded::Small(match sign {
-                    Plus => accum,
-                    Minus => -accum,
-                    NoSign => 0,
-                })
-                .encode(),
-            ))
-        } else {
-            None
-        }
-    }
-
-    #[inline(always)]
-    fn accum_be(bytes: &[u8]) -> Option<Udigit> {
-        if bytes.len() <= size_of::<Digit>() {
-            let mut accum = 0;
-            for &byte in bytes {
-                accum = accum << 8 | byte as Udigit;
-            }
-            Some(accum)
-        } else {
-            None
-        }
-    }
-
-    #[inline(always)]
-    fn accum_le(bytes: &[u8]) -> Option<Udigit> {
-        if bytes.len() <= size_of::<Digit>() {
-            let mut accum = 0;
-            for (i, &byte) in bytes.iter().enumerate() {
-                accum |= (byte as Udigit) << 8 * i;
-            }
-            Some(accum)
-        } else {
-            None
-        }
+        BigInt::from_biguint(sign, data).into()
     }
 
     /// Creates and initializes a `CBigInt`.
@@ -189,7 +184,7 @@ impl CBigInt {
             for (i, &word) in slice.iter().enumerate() {
                 accum |= (word as Udigit) << i * 8;
             }
-            if let Some(result) = Self::from_accum(sign, accum) {
+            if let Some(result) = from_accum(sign, accum) {
                 return result;
             }
         }
@@ -223,8 +218,8 @@ impl CBigInt {
     ///            CBigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> CBigInt {
-        if let Some(accum) = Self::accum_be(bytes) {
-            if let Some(result) = Self::from_accum(sign, accum) {
+        if let Some(accum) = accum_be(bytes) {
+            if let Some(result) = from_accum(sign, accum) {
                 return result;
             }
         }
@@ -235,8 +230,8 @@ impl CBigInt {
     ///
     /// The bytes are in little-endian byte order.
     pub fn from_bytes_le(sign: Sign, bytes: &[u8]) -> CBigInt {
-        if let Some(accum) = Self::accum_le(bytes) {
-            if let Some(result) = Self::from_accum(sign, accum) {
+        if let Some(accum) = accum_le(bytes) {
+            if let Some(result) = from_accum(sign, accum) {
                 return result;
             }
         }
@@ -248,10 +243,10 @@ impl CBigInt {
     ///
     /// The digits are in big-endian base 2<sup>8</sup>.
     pub fn from_signed_bytes_be(digits: &[u8]) -> CBigInt {
-        if let Some(accum) = Self::accum_be(digits) {
-            Self::from_small_int(accum as Digit)
+        if let Some(accum) = accum_be(digits) {
+            (accum as Digit).into()
         } else {
-            Self::from_bigint(BigInt::from_signed_bytes_be(digits))
+            BigInt::from_signed_bytes_be(digits).into()
         }
     }
 
@@ -259,10 +254,10 @@ impl CBigInt {
     ///
     /// The digits are in little-endian base 2<sup>8</sup>.
     pub fn from_signed_bytes_le(digits: &[u8]) -> CBigInt {
-        if let Some(accum) = Self::accum_le(digits) {
-            Self::from_small_int(accum as Digit)
+        if let Some(accum) = accum_le(digits) {
+            (accum as Digit).into()
         } else {
-            Self::from_bigint(BigInt::from_signed_bytes_le(digits))
+            BigInt::from_signed_bytes_le(digits).into()
         }
     }
 
@@ -279,7 +274,7 @@ impl CBigInt {
     /// ```
     #[inline]
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<CBigInt> {
-        BigInt::parse_bytes(buf, radix).map(Self::from_bigint)
+        BigInt::parse_bytes(buf, radix).map(Self::from)
     }
 
     /// Creates and initializes a `CBigInt`. Each u8 of the input slice is
@@ -299,7 +294,7 @@ impl CBigInt {
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
     pub fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<CBigInt> {
-        BigInt::from_radix_be(sign, buf, radix).map(Self::from_bigint)
+        BigInt::from_radix_be(sign, buf, radix).map(Self::from)
     }
 
     /// Creates and initializes a `CBigInt`. Each u8 of the input slice is
@@ -319,19 +314,7 @@ impl CBigInt {
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
     pub fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<CBigInt> {
-        BigInt::from_radix_le(sign, buf, radix).map(Self::from_bigint)
-    }
-
-    fn make_accum(value: Digit) -> (Sign, Udigit) {
-        if value == 0 {
-            (NoSign, 0)
-        } else if value >= 0 {
-            (Plus, value as Udigit)
-        } else if value == Digit::MIN {
-            (Minus, value as Udigit)
-        } else {
-            (Minus, (-value) as Udigit)
-        }
+        BigInt::from_radix_le(sign, buf, radix).map(Self::from)
     }
 
     /// Returns the sign and the byte representation of the `CBigInt` in big-endian byte order.
@@ -346,7 +329,7 @@ impl CBigInt {
     /// ```
     pub fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
         match self.decode_ref() {
-            Decoded::Small(n) => match Self::make_accum(n) {
+            Decoded::Small(n) => match make_accum(n) {
                 (NoSign, _) => (NoSign, Vec::new()),
                 (sign, accum) => {
                     let bytes = accum.to_be_bytes();
@@ -374,7 +357,7 @@ impl CBigInt {
     pub fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
         match self.decode_ref() {
             Decoded::Small(n) => {
-                let (sign, accum) = Self::make_accum(n);
+                let (sign, accum) = make_accum(n);
                 if sign == NoSign {
                     (sign, Vec::new())
                 } else {
@@ -405,7 +388,7 @@ impl CBigInt {
     /// ```
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
         match self.decode_ref() {
-            Decoded::Small(n) => match Self::make_accum(n) {
+            Decoded::Small(n) => match make_accum(n) {
                 (NoSign, _) => (NoSign, Vec::new()),
                 (sign, mut accum) => {
                     let mut digits = Vec::with_capacity(4);
@@ -626,15 +609,6 @@ impl CBigInt {
 
     /// Converts this `CBigInt` into a `BigInt`.
     #[inline]
-    fn into_bigint(self) -> BigInt {
-        match self.decode() {
-            Decoded::Small(n) => BigInt::from(n),
-            Decoded::Big(n) => n,
-        }
-    }
-
-    /// Converts this `CBigInt` into a `BigInt`.
-    #[inline]
     pub fn to_bigint(&self) -> Cow<BigInt> {
         match self.decode_ref() {
             Decoded::Small(n) => Cow::Owned(BigInt::from(n)),
@@ -751,7 +725,11 @@ impl ToBigUint for CBigInt {
 
 impl From<BigInt> for CBigInt {
     fn from(value: BigInt) -> Self {
-        Self::from_bigint(value)
+        let decoded = match Digit::try_from(value) {
+            Ok(digit) => Decoded::Small(digit),
+            Err(err) => Decoded::Big(err.into_original()),
+        };
+        CBigInt(decoded.encode())
     }
 }
 
@@ -763,7 +741,10 @@ impl From<BigUint> for CBigInt {
 
 impl From<CBigInt> for BigInt {
     fn from(value: CBigInt) -> Self {
-        value.into_bigint()
+        match value.decode() {
+            Decoded::Small(n) => BigInt::from(n),
+            Decoded::Big(n) => n,
+        }
     }
 }
 
@@ -787,7 +768,7 @@ impl TryFrom<&CBigInt> for BigUint {
 
 impl Zero for CBigInt {
     fn zero() -> Self {
-        CBigInt::default()
+        CBigInt(Encoded::zero())
     }
 
     fn is_zero(&self) -> bool {
@@ -795,9 +776,16 @@ impl Zero for CBigInt {
     }
 }
 
+#[test]
+fn zero() {
+    assert!(CBigInt::zero().is_zero());
+    assert_eq!(CBigInt::zero(), CBigInt::from(0));
+    assert!(!CBigInt::from(1).is_zero());
+}
+
 impl One for CBigInt {
     fn one() -> Self {
-        CBigInt::from_small_int(1)
+        CBigInt(Encoded::one())
     }
 
     fn is_one(&self) -> bool {
@@ -805,11 +793,18 @@ impl One for CBigInt {
     }
 }
 
+#[test]
+fn one() {
+    assert!(CBigInt::one().is_one());
+    assert_eq!(CBigInt::one(), CBigInt::from(1));
+    assert!(!CBigInt::from(2).is_one());
+}
+
 impl Num for CBigInt {
     type FromStrRadixErr = ParseBigIntError;
 
     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-        BigInt::from_str_radix(str, radix).map(CBigInt::from_bigint)
+        BigInt::from_str_radix(str, radix).map(CBigInt::from)
     }
 }
 
@@ -1015,8 +1010,8 @@ macro_rules! each_prim {
     [[int $(, $_1:tt)*], [$prim:ident, $to_prim:ident]] => {
         impl From<$prim> for CBigInt {
             fn from(value: $prim) -> Self {
-                if let Ok(converted) = Digit::try_from(value) {
-                    CBigInt::from_small_int(converted)
+                if let Ok(digit) = Digit::try_from(value) {
+                    CBigInt(Decoded::Small(digit).encode())
                 } else {
                     BigInt::from(value).into()
                 }
