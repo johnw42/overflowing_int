@@ -7,8 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["unsafe_encoding"]
+default = ["i128_digit"]
 unsafe_encoding = []
+i128_digit = []
 
 [dependencies]
 num-bigint = "0.3"
@@ -17,9 +18,9 @@ num-integer = "0.1.43"
 
 [dev-dependencies]
 rand = "0.7.3"
-rand_distr = "0.2.2"
 criterion = "0.3.3"
 num = "0.3.0"
+num-bigint = {version="0.3", features=["rand"]}
 
 [[bench]]
 name = "benchmark"

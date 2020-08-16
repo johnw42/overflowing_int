@@ -1,59 +1,44 @@
-use std::convert::TryFrom;
-use std::ops::{Add, Shr};
+use std::ops::Add;
 
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
-use num_traits::Bounded;
-use rand::distributions::Standard;
+use criterion::measurement::WallTime;
+use criterion::{
+    black_box, criterion_group, criterion_main, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
+};
+use rand::distributions::Uniform;
 use rand::prelude::*;
 
 use compact_bigint::*;
 
-const INPUT_COUNT: usize = 20;
-
-fn generic_benchmark<T, I>(name: &str, shift: I, c: &mut Criterion)
+fn generic_benchmark<T>(group: &mut BenchmarkGroup<WallTime>, name: &str, bit_size: u64)
 where
-    I: Shr<Output = I>,
-    I: Bounded,
-    I: TryFrom<i128>,
-    i128: From<I>,
-    I: Copy,
-    Standard: Distribution<I>,
-    T: From<I>,
-    for<'a> &'a T: Add,
+    T: From<BigInt>,
+    for<'a> &'a T: Add<&'a T>,
 {
-    c.bench_function(name, |b| {
-        b.iter_batched_ref(
-            || {
-                let rands: Vec<_> = (0..INPUT_COUNT)
-                    .map(|_| T::from(random::<I>() >> shift))
-                    .collect();
-                rands
-            },
-            |rands| {
-                let rands = &*rands;
-                for r1 in rands {
-                    for r2 in rands {
-                        black_box(r1 + r2);
-                    }
-                }
-            },
-            BatchSize::SmallInput,
-        )
-    });
+    let mut rng = thread_rng();
+    let limit = BigInt::from(1) << (bit_size - 2);
+    let sampler = Uniform::new(-limit.clone(), limit.clone());
+
+    group.bench_with_input(
+        BenchmarkId::new(name, bit_size),
+        &bit_size,
+        |b, &_bit_size| {
+            b.iter_batched_ref(
+                || (T::from(rng.sample(&sampler)), T::from(rng.sample(&sampler))),
+                |(r1, r2)| {
+                    black_box(&*r1 + &*r2);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    generic_benchmark::<CBigInt, i128>("CBigInt i128~i32", 128 - 32, c);
-    generic_benchmark::<CBigInt, i32>("CBigInt i32", 0, c);
-    generic_benchmark::<CBigInt, i64>("CBigInt i63", 1, c);
-    generic_benchmark::<CBigInt, i64>("CBigInt i64", 0, c);
-    generic_benchmark::<CBigInt, i128>("CBigInt i65", 63, c);
-    generic_benchmark::<CBigInt, i128>("CBigInt i128", 0, c);
-    generic_benchmark::<BigInt, i32>("BigInt i32", 0, c);
-    generic_benchmark::<BigInt, i64>("BigInt i63", 1, c);
-    generic_benchmark::<BigInt, i64>("BigInt i64", 0, c);
-    generic_benchmark::<BigInt, i128>("BigInt i65", 63, c);
-    generic_benchmark::<BigInt, i128>("BigInt i128", 0, c);
+    let mut group = c.benchmark_group("Add");
+    for &bit_size in &[63, 64, 65, 128, 256, 512, 1024] {
+        generic_benchmark::<BigInt>(&mut group, "BigInt", bit_size);
+        generic_benchmark::<CBigInt>(&mut group, "CBigInt", bit_size);
+    }
 }
 
 criterion_group!(benches, criterion_benchmark);

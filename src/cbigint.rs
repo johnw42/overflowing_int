@@ -1,26 +1,25 @@
 use std::borrow::Cow;
-use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::mem::size_of;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
-    Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+    Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 
-use num_bigint::{
-    BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint, TryFromBigIntError,
-};
-use num_integer::{Integer, Roots};
-use num_traits::{Num, One, Signed, ToPrimitive, Zero};
+use num_bigint::{BigInt, BigUint, Sign, ToBigInt, ToBigUint, TryFromBigIntError};
+#[allow(unused_imports)]
+use num_traits::{ToPrimitive, Zero};
 
-use crate::encoding::{Decoded, Encoded};
+use crate::accum::*;
+use crate::decoded::Decoded;
+use crate::encoding::Encoded;
 use crate::overflowing::Overflowing;
 use crate::Sign::*;
-use crate::{Digit, Udigit};
+use crate::{Digit, Udigit, DIGIT_BITS};
 
 #[derive(Clone)]
-pub struct CBigInt(Encoded);
+pub struct CBigInt(pub(crate) Encoded);
 
 impl Debug for CBigInt {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -36,118 +35,58 @@ impl PartialEq for CBigInt {
 
 impl Eq for CBigInt {}
 
-type GenInt = Decoded<BigInt>;
-type GenIntRef<'a> = Decoded<&'a BigInt>;
-type GenIntCow<'a> = Decoded<Cow<'a, BigInt>>;
-
-impl From<CBigInt> for GenInt {
+impl From<CBigInt> for Decoded<BigInt> {
     fn from(arg: CBigInt) -> Self {
         arg.0.decode()
     }
 }
 
-impl<'a> From<GenInt> for GenIntCow<'a> {
-    fn from(value: GenInt) -> Self {
-        match value {
-            GenInt::Small(x) => GenIntCow::Small(x),
-            GenInt::Big(x) => GenIntCow::Big(Cow::Owned(x)),
-        }
+impl From<Decoded<BigInt>> for CBigInt {
+    fn from(value: Decoded<BigInt>) -> Self {
+        Self(value.encode())
     }
 }
 
-impl<'a> From<GenIntRef<'a>> for GenIntCow<'a> {
-    fn from(value: GenIntRef<'a>) -> Self {
-        match value {
-            GenIntRef::Small(x) => GenIntCow::Small(x),
-            GenIntRef::Big(x) => GenIntCow::Big(Cow::Borrowed(x)),
-        }
-    }
-}
-
-const DIGIT_BITS: usize = size_of::<Digit>() * 8;
-
-fn make_accum(value: Digit) -> (Sign, Udigit) {
-    if value == 0 {
-        (NoSign, 0)
-    } else if value >= 0 {
-        (Plus, value as Udigit)
-    } else if value == Digit::MIN {
-        (Minus, value as Udigit)
-    } else {
-        (Minus, (-value) as Udigit)
-    }
-}
-
-fn from_accum(sign: Sign, accum: Udigit) -> Option<CBigInt> {
-    let accum = accum as Digit;
-    if accum >= 0 {
-        Some(CBigInt(
-            Decoded::Small(match sign {
-                Plus => accum,
-                Minus => -accum,
-                NoSign => 0,
-            })
-            .encode(),
-        ))
-    } else {
-        None
-    }
-}
-
-fn accum_be(bytes: &[u8]) -> Option<Udigit> {
-    if bytes.len() <= size_of::<Digit>() {
-        let mut accum = 0;
-        for &byte in bytes {
-            accum = accum << 8 | byte as Udigit;
-        }
-        Some(accum)
-    } else {
-        None
-    }
-}
-
-fn accum_le(bytes: &[u8]) -> Option<Udigit> {
-    if bytes.len() <= size_of::<Digit>() {
-        let mut accum = 0;
-        for (i, &byte) in bytes.iter().enumerate() {
-            accum |= (byte as Udigit) << 8 * i;
-        }
-        Some(accum)
-    } else {
-        None
+impl From<Encoded> for CBigInt {
+    fn from(value: Encoded) -> Self {
+        Self(value)
     }
 }
 
 impl CBigInt {
     #[inline]
-    fn decode(self) -> Decoded<BigInt> {
+    pub(crate) fn decode(self) -> Decoded<BigInt> {
         self.0.decode()
     }
 
     #[inline]
-    fn decode_ref(&self) -> Decoded<&BigInt> {
+    pub(crate) fn decode_ref(&self) -> Decoded<&BigInt> {
         self.0.decode_ref()
     }
 
     #[inline]
-    fn decode_mut(&mut self) -> Decoded<&mut BigInt> {
+    pub(crate) fn decode_mut(&mut self) -> Decoded<&mut BigInt> {
         self.0.decode_mut()
     }
 
     #[inline]
-    fn to_digit(&self) -> Option<Digit> {
+    pub(crate) fn to_digit(&self) -> Option<Digit> {
         match self.decode_ref() {
-            Decoded::Small(n) => Some(n),
+            Decoded::Digit(n) => Some(n),
             _ => None,
         }
     }
 
     #[inline]
-    fn to_digit_with(&self, other: &CBigInt) -> Option<(Digit, Digit)> {
+    pub(crate) fn to_digit_with(&self, other: &CBigInt) -> Option<(Digit, Digit)> {
         match (self.to_digit(), other.to_digit()) {
             (Some(a), Some(b)) => Some((a, b)),
             _ => None,
         }
+    }
+
+    fn from_accum(sign: Sign, accum: Udigit) -> Option<Self> {
+        accum_to_digit(sign, accum).map(|digit| Decoded::Digit(digit).into())
     }
 
     /// Creates and initializes a BigInt.
@@ -189,7 +128,7 @@ impl CBigInt {
             for (i, &word) in slice.iter().enumerate() {
                 accum |= (word as Udigit) << i * 8;
             }
-            if let Some(result) = from_accum(sign, accum) {
+            if let Some(result) = Self::from_accum(sign, accum) {
                 return result;
             }
         }
@@ -224,7 +163,7 @@ impl CBigInt {
     /// ```
     pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> CBigInt {
         if let Some(accum) = accum_be(bytes) {
-            if let Some(result) = from_accum(sign, accum) {
+            if let Some(result) = Self::from_accum(sign, accum) {
                 return result;
             }
         }
@@ -236,7 +175,7 @@ impl CBigInt {
     /// The bytes are in little-endian byte order.
     pub fn from_bytes_le(sign: Sign, bytes: &[u8]) -> CBigInt {
         if let Some(accum) = accum_le(bytes) {
-            if let Some(result) = from_accum(sign, accum) {
+            if let Some(result) = Self::from_accum(sign, accum) {
                 return result;
             }
         }
@@ -334,7 +273,7 @@ impl CBigInt {
     /// ```
     pub fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
         match self.decode_ref() {
-            Decoded::Small(n) => match make_accum(n) {
+            Decoded::Digit(n) => match make_accum(n) {
                 (NoSign, _) => (NoSign, Vec::new()),
                 (sign, accum) => {
                     let bytes = accum.to_be_bytes();
@@ -361,7 +300,7 @@ impl CBigInt {
     /// ```
     pub fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
         match self.decode_ref() {
-            Decoded::Small(n) => {
+            Decoded::Digit(n) => {
                 let (sign, accum) = make_accum(n);
                 if sign == NoSign {
                     (sign, Vec::new())
@@ -393,7 +332,7 @@ impl CBigInt {
     /// ```
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
         match self.decode_ref() {
-            Decoded::Small(n) => match make_accum(n) {
+            Decoded::Digit(n) => match make_accum(n) {
                 (NoSign, _) => (NoSign, Vec::new()),
                 (sign, mut accum) => {
                     let mut digits = Vec::with_capacity(4);
@@ -420,8 +359,8 @@ impl CBigInt {
     /// ```
     pub fn to_signed_bytes_be(&self) -> Vec<u8> {
         match self.decode_ref() {
-            Decoded::Small(0) => Vec::new(),
-            Decoded::Small(n) => {
+            Decoded::Digit(0) => Vec::new(),
+            Decoded::Digit(n) => {
                 let bytes = n.to_be_bytes();
                 let to_discard = if n >= 0 { 0 } else { 0xff };
                 let mut i = 0;
@@ -446,8 +385,8 @@ impl CBigInt {
     /// ```
     pub fn to_signed_bytes_le(&self) -> Vec<u8> {
         match self.decode_ref() {
-            Decoded::Small(0) => Vec::new(),
-            Decoded::Small(n) => {
+            Decoded::Digit(0) => Vec::new(),
+            Decoded::Digit(n) => {
                 let bytes = n.to_le_bytes();
                 let to_discard = if n >= 0 { 0 } else { 0xff };
                 let mut i = size_of::<Digit>();
@@ -529,7 +468,7 @@ impl CBigInt {
     #[inline]
     pub fn sign(&self) -> Sign {
         match self.decode_ref() {
-            Decoded::Small(n) => {
+            Decoded::Digit(n) => {
                 if n > 0 {
                     Plus
                 } else if n < 0 {
@@ -559,7 +498,7 @@ impl CBigInt {
     #[inline]
     pub fn magnitude(&self) -> Cow<BigUint> {
         match self.decode_ref() {
-            Decoded::Small(n) => Cow::Owned(BigInt::from(n).into_parts().1),
+            Decoded::Digit(n) => Cow::Owned(BigInt::from(n).into_parts().1),
             Decoded::Big(n) => Cow::Borrowed(n.magnitude()),
         }
     }
@@ -569,7 +508,7 @@ impl CBigInt {
     #[inline]
     pub fn try_magnitude(&self) -> Option<&BigUint> {
         match self.decode_ref() {
-            Decoded::Small(_) => None,
+            Decoded::Digit(_) => None,
             Decoded::Big(n) => Some(n.magnitude()),
         }
     }
@@ -598,7 +537,7 @@ impl CBigInt {
     #[inline]
     pub fn bits(&self) -> u64 {
         match self.decode_ref() {
-            Decoded::Small(n) => {
+            Decoded::Digit(n) => {
                 if n >= 0 {
                     DIGIT_BITS as u32 - 1 - n.leading_zeros()
                 } else if n == Digit::MIN {
@@ -615,7 +554,7 @@ impl CBigInt {
     /// Converts this `CBigInt` into a `BigInt`.
     pub fn to_bigint(&self) -> Cow<BigInt> {
         match self.decode_ref() {
-            Decoded::Small(n) => Cow::Owned(BigInt::from(n)),
+            Decoded::Digit(n) => Cow::Owned(BigInt::from(n)),
             Decoded::Big(n) => Cow::Borrowed(n),
         }
     }
@@ -623,8 +562,8 @@ impl CBigInt {
     /// Converts this `CBigInt` into a `BigUint`, if it's not negative.
     pub fn to_biguint(&self) -> Option<BigUint> {
         match self.decode_ref() {
-            Decoded::Small(n) if n >= 0 => BigInt::from(n).to_biguint(),
-            Decoded::Small(_) => None,
+            Decoded::Digit(n) if n >= 0 => BigInt::from(n).to_biguint(),
+            Decoded::Digit(_) => None,
             Decoded::Big(n) => n.to_biguint(),
         }
     }
@@ -677,10 +616,10 @@ impl CBigInt {
     /// or `None` if the entire number is zero.
     pub fn trailing_zeros(&self) -> Option<u64> {
         match self.decode_ref() {
-            Decoded::Small(0) => None,
-            Decoded::Small(n) if n > 0 => Some(n.trailing_zeros() as u64),
-            Decoded::Small(Digit::MIN) => Some(DIGIT_BITS as u64),
-            Decoded::Small(n) => Some((-n).trailing_zeros() as u64),
+            Decoded::Digit(0) => None,
+            Decoded::Digit(n) if n > 0 => Some(n.trailing_zeros() as u64),
+            Decoded::Digit(Digit::MIN) => Some(DIGIT_BITS as u64),
+            Decoded::Digit(n) => Some((-n).trailing_zeros() as u64),
             Decoded::Big(n) => n.trailing_zeros(),
         }
     }
@@ -717,7 +656,7 @@ impl<'a> ToCow<'a> for &'a BigInt {
 impl<'a> ToCow<'a> for Decoded<Cow<'a, BigInt>> {
     fn to_cow(self) -> Cow<'a, BigInt> {
         match self {
-            Decoded::Small(n) => Cow::Owned(n.into()),
+            Decoded::Digit(n) => Cow::Owned(n.into()),
             Decoded::Big(cow) => cow,
         }
     }
@@ -730,7 +669,7 @@ trait ToDecodedCow<'a> {
 impl<'a> ToDecodedCow<'a> for CBigInt {
     fn to_decoded_cow(self) -> Decoded<Cow<'a, BigInt>> {
         match self.decode() {
-            Decoded::Small(n) => Decoded::Small(n),
+            Decoded::Digit(n) => Decoded::Digit(n),
             Decoded::Big(n) => Decoded::Big(n.to_cow()),
         }
     }
@@ -739,7 +678,7 @@ impl<'a> ToDecodedCow<'a> for CBigInt {
 impl<'a> ToDecodedCow<'a> for &'a CBigInt {
     fn to_decoded_cow(self) -> Decoded<Cow<'a, BigInt>> {
         match self.decode_ref() {
-            Decoded::Small(n) => Decoded::Small(n),
+            Decoded::Digit(n) => Decoded::Digit(n),
             Decoded::Big(n) => Decoded::Big(n.to_cow()),
         }
     }
@@ -763,7 +702,7 @@ impl BigIntOp {
         let lhs = lhs.to_decoded_cow();
         let rhs = rhs.to_decoded_cow();
 
-        if let (&Decoded::Small(lhs), &Decoded::Small(rhs)) = (&lhs, &rhs) {
+        if let (&Decoded::Digit(lhs), &Decoded::Digit(rhs)) = (&lhs, &rhs) {
             if let Some(out) = (self.digits)(lhs, rhs) {
                 return out.into();
             }
@@ -802,7 +741,7 @@ impl Default for CBigInt {
 impl Display for CBigInt {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.decode_ref() {
-            Decoded::Small(n) => write!(f, "{}", n),
+            Decoded::Digit(n) => write!(f, "{}", n),
             Decoded::Big(n) => write!(f, "{}", n),
         }
     }
@@ -823,7 +762,7 @@ impl ToBigUint for CBigInt {
 impl From<BigInt> for CBigInt {
     fn from(value: BigInt) -> Self {
         let decoded = match Digit::try_from(value) {
-            Ok(digit) => Decoded::Small(digit),
+            Ok(digit) => Decoded::Digit(digit),
             Err(err) => Decoded::Big(err.into_original()),
         };
         CBigInt(decoded.encode())
@@ -839,7 +778,7 @@ impl From<BigUint> for CBigInt {
 impl From<CBigInt> for BigInt {
     fn from(value: CBigInt) -> Self {
         match value.decode() {
-            Decoded::Small(n) => BigInt::from(n),
+            Decoded::Digit(n) => BigInt::from(n),
             Decoded::Big(n) => n,
         }
     }
@@ -849,7 +788,7 @@ impl TryFrom<CBigInt> for BigUint {
     type Error = TryFromBigIntError<()>;
     fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
         match value.0.decode() {
-            Decoded::Small(n) => n.to_biguint(),
+            Decoded::Digit(n) => n.to_biguint(),
             Decoded::Big(n) => n.to_biguint(),
         }
         .ok_or_else(try_into_bigint_error)
@@ -863,241 +802,6 @@ impl TryFrom<&CBigInt> for BigUint {
     }
 }
 
-impl Zero for CBigInt {
-    fn zero() -> Self {
-        CBigInt(Encoded::zero())
-    }
-
-    fn is_zero(&self) -> bool {
-        self.0.is_zero()
-    }
-}
-
-#[test]
-fn zero() {
-    assert!(CBigInt::zero().is_zero());
-    assert_eq!(CBigInt::zero(), CBigInt::from(0));
-    assert!(!CBigInt::from(1).is_zero());
-}
-
-impl One for CBigInt {
-    fn one() -> Self {
-        CBigInt(Encoded::one())
-    }
-
-    fn is_one(&self) -> bool {
-        self.0.is_one()
-    }
-}
-
-#[test]
-fn one() {
-    assert!(CBigInt::one().is_one());
-    assert_eq!(CBigInt::one(), CBigInt::from(1));
-    assert!(!CBigInt::from(2).is_one());
-}
-
-impl Num for CBigInt {
-    type FromStrRadixErr = ParseBigIntError;
-
-    fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-        BigInt::from_str_radix(str, radix).map(CBigInt::from)
-    }
-}
-
-impl Signed for CBigInt {
-    fn abs(&self) -> Self {
-        match self.decode_ref() {
-            Decoded::Small(a) => {
-                if let (b, false) = a.overflowing_abs() {
-                    b.into()
-                } else {
-                    BigInt::from(a).abs().into()
-                }
-            }
-            Decoded::Big(a) => a.abs().into(),
-        }
-    }
-
-    fn abs_sub(&self, other: &Self) -> Self {
-        self.sub(other).abs()
-    }
-
-    fn signum(&self) -> Self {
-        match self.sign() {
-            NoSign => 0,
-            Plus => 1,
-            Minus => -1,
-        }
-        .into()
-    }
-
-    fn is_positive(&self) -> bool {
-        self.sign() == Plus
-    }
-
-    fn is_negative(&self) -> bool {
-        self.sign() == Minus
-    }
-}
-
-impl PartialOrd for CBigInt {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for CBigInt {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (self.decode_ref(), other.decode_ref()) {
-            (Decoded::Small(a), Decoded::Small(b)) => a.cmp(&b),
-            (Decoded::Big(a), Decoded::Big(b)) => a.cmp(b),
-            _ => self
-                .sign()
-                .cmp(&other.sign())
-                .then_with(|| self.to_bigint().cmp(&other.to_bigint())),
-        }
-    }
-}
-
-impl Integer for CBigInt {
-    fn div_floor(&self, other: &Self) -> Self {
-        if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            if (lhs, rhs) != (Digit::MIN, -1) {
-                return lhs.div_floor(&rhs).into();
-            }
-        }
-        self.to_bigint().div_floor(&*other.to_bigint()).into()
-    }
-
-    fn mod_floor(&self, other: &Self) -> Self {
-        if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            if (lhs, rhs) != (Digit::MIN, -1) {
-                return lhs.mod_floor(&rhs).into();
-            }
-        }
-        self.to_bigint().mod_floor(&*other.to_bigint()).into()
-    }
-
-    fn gcd(&self, other: &Self) -> Self {
-        if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            return lhs.gcd(&rhs).into();
-        }
-        self.to_bigint().gcd(&*other.to_bigint()).into()
-    }
-
-    fn lcm(&self, other: &Self) -> Self {
-        if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            return lhs.lcm(&rhs).into();
-        }
-        self.to_bigint().lcm(&*other.to_bigint()).into()
-    }
-
-    fn divides(&self, other: &Self) -> bool {
-        if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            return lhs.divides(&rhs).into();
-        }
-        self.to_bigint().divides(&*other.to_bigint()).into()
-    }
-
-    fn is_multiple_of(&self, other: &Self) -> bool {
-        if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            return lhs.is_multiple_of(&rhs).into();
-        }
-        self.to_bigint().is_multiple_of(&*other.to_bigint()).into()
-    }
-
-    fn is_even(&self) -> bool {
-        match self.decode_ref() {
-            Decoded::Small(n) => n.is_even(),
-            Decoded::Big(n) => n.is_even(),
-        }
-    }
-
-    fn is_odd(&self) -> bool {
-        match self.decode_ref() {
-            Decoded::Small(n) => n.is_odd(),
-            Decoded::Big(n) => n.is_odd(),
-        }
-    }
-
-    fn div_rem(&self, other: &Self) -> (Self, Self) {
-        if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            if (lhs, rhs) != (Digit::MIN, -1) {
-                let (q, r) = lhs.div_rem(&rhs);
-                return (q.into(), r.into());
-            }
-        }
-        let (q, r) = self.to_bigint().div_rem(&*other.to_bigint());
-        return (q.into(), r.into());
-    }
-}
-
-#[test]
-fn gcd_test() {
-    let small = CBigInt::from(5);
-    let huge = CBigInt::from(i128::MAX).pow(2);
-    assert_eq!(huge.gcd(&small), CBigInt::from(1));
-    assert_eq!(small.gcd(&huge), CBigInt::from(1));
-}
-
-impl Roots for CBigInt {
-    fn nth_root(&self, n: u32) -> Self {
-        match self.decode_ref() {
-            Decoded::Small(a) => a.nth_root(n).into(),
-            Decoded::Big(a) => a.nth_root(n).into(),
-        }
-    }
-}
-
-impl Neg for CBigInt {
-    type Output = CBigInt;
-
-    fn neg(self) -> Self::Output {
-        if let Some(a) = self.to_digit() {
-            if let (b, false) = a.overflowing_neg() {
-                return b.into();
-            }
-        }
-        BigInt::from(self).neg().into()
-    }
-}
-
-impl Neg for &CBigInt {
-    type Output = CBigInt;
-
-    fn neg(self) -> Self::Output {
-        if let Some(a) = self.to_digit() {
-            if let (b, false) = a.overflowing_neg() {
-                return b.into();
-            }
-        }
-        (&*self.to_bigint()).neg().into()
-    }
-}
-
-impl Not for CBigInt {
-    type Output = CBigInt;
-
-    fn not(self) -> Self::Output {
-        match self.decode() {
-            Decoded::Small(n) => n.not().into(),
-            Decoded::Big(n) => n.not().into(),
-        }
-    }
-}
-
-impl Not for &CBigInt {
-    type Output = CBigInt;
-
-    fn not(self) -> Self::Output {
-        match self.decode_ref() {
-            Decoded::Small(n) => n.not().into(),
-            Decoded::Big(n) => n.not().into(),
-        }
-    }
-}
-
 // We can't constructor a TryFromBigIntError directly, so we get sneaky.
 fn try_into_bigint_error() -> TryFromBigIntError<()> {
     BigUint::try_from(-1).expect_err("converting -1 to BigUint fails")
@@ -1108,7 +812,7 @@ macro_rules! each_prim {
         impl From<$prim> for CBigInt {
             fn from(value: $prim) -> Self {
                 if let Ok(digit) = Digit::try_from(value) {
-                    CBigInt(Decoded::Small(digit).encode())
+                    CBigInt(Decoded::Digit(digit).encode())
                 } else {
                     BigInt::from(value).into()
                 }
@@ -1135,17 +839,6 @@ macro_rules! each_prim {
     };
     [[float $(, $float_attr:tt)*], $prim_attrs:tt] => {
         with_ops!(each_prim_and_op, [[float $(, $float_attr)*], $prim_attrs]);
-    };
-}
-
-macro_rules! to_prim_method {
-    [$_1:tt, [$prim:ident, $to_prim:ident]] => {
-        fn $to_prim(&self) -> Option<$prim> {
-            match self.decode_ref() {
-                Decoded::Small(value) => value.$to_prim(),
-                Decoded::Big(value) => value.$to_prim(),
-            }
-        }
     };
 }
 
@@ -1213,10 +906,27 @@ macro_rules! op_traits {
         assign_op!($trait, $op, $assign_trait, $assign_op);
     };
     [shift_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
-        assign_op!($trait, $op, $assign_trait, $assign_op);
+        //assign_op!($trait, $op, $assign_trait, $assign_op);
     };
     [bit_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
         op_traits!(arith_op, [$trait, $op, $assign_trait, $assign_op]);
+        // impl<T> $assign_trait<T> for CBigInt
+        // where
+        //     CBigInt: $trait<T, Output = CBigInt>,
+        //     BigInt: $assign_trait<T>,
+        // {
+        //     fn $assign_op(&mut self, rhs: T) {
+        //         match self.decode_mut() {
+        //             Decoded::Digit(_) => {
+        //                 let lhs = std::mem::take(self);
+        //                 *self = lhs.$op(rhs);
+        //             }
+        //             Decoded::Big(big) => {
+        //                 big.$assign_op(rhs);
+        //             }
+        //         }
+        //     }
+        // }
     };
 }
 
@@ -1225,16 +935,17 @@ macro_rules! assign_op {
         impl<T> $assign_trait<T> for CBigInt
         where
             CBigInt: $trait<T, Output = CBigInt>,
-            BigInt: $assign_trait<T>,
+            BigInt: From<T>,
+            BigInt: $assign_trait,
         {
             fn $assign_op(&mut self, rhs: T) {
                 match self.decode_mut() {
-                    Decoded::Small(_) => {
+                    Decoded::Digit(_) => {
                         let lhs = std::mem::take(self);
                         *self = lhs.$op(rhs);
                     }
                     Decoded::Big(big) => {
-                        big.$assign_op(rhs);
+                        big.$assign_op(BigInt::from(rhs));
                     }
                 }
             }
@@ -1290,19 +1001,27 @@ macro_rules! each_prim_and_op {
             $assign_op:ident
         ]
     ] => {
-        // impl $trait<$prim> for CBigInt {
-        //     type Output = CBigInt;
-        //     fn $op(self, rhs: $prim) -> Self::Output {
-        //         if let Small(lhs) = &self {
-        //             if let Ok(rhs) = u32::try_from(rhs) {
-        //                 if let (result, false) = lhs.$overflowing_op(rhs) {
-        //                     return result.into();
-        //                 }
-        //             }
-        //         }
-        //         BigInt::from(self).$op(rhs).into()
-        //     }
-        // }
+        impl $trait<$prim> for CBigInt {
+            type Output = CBigInt;
+            fn $op(self, rhs: $prim) -> Self::Output {
+                BigInt::from(self).$op(rhs).into()
+                // if let Small(lhs) = &self {
+                //     if let Ok(rhs) = u32::try_from(rhs) {
+                //         if let (result, false) = lhs.$overflowing_op(rhs) {
+                //             return result.into();
+                //         }
+                //     }
+                // }
+                // BigInt::from(self).$op(rhs).into()
+            }
+        }
+        impl $assign_trait<$prim> for CBigInt {
+            fn $assign_op(&mut self, rhs: $prim) {
+                let mut lhs = BigInt::from(std::mem::take(self));
+                lhs.$assign_op(rhs);
+                *self = lhs.into();
+            }
+        }
         // ref_op!($trait<$prim> for CBigInt, $op);
     };
     [
@@ -1313,7 +1032,8 @@ macro_rules! each_prim_and_op {
             $assign_trait:ident,
             $assign_op:ident
         ]
-    ] => {};
+    ] => {
+    };
     [
         [float $(, $_1:tt)*], [$prim:ident, $to_prim:ident],
         $op:tt, $op_attrs:tt
@@ -1326,10 +1046,6 @@ each_prim_and_op!(
     arith_op,
     [Add, add, AddAssign, add_assign]
 );
-
-impl ToPrimitive for CBigInt {
-    with_prims!(to_prim_method, []);
-}
 
 with_prims!(each_prim, []);
 with_ops!(op_traits, []);
