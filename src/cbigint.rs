@@ -613,7 +613,6 @@ impl CBigInt {
     }
 
     /// Converts this `CBigInt` into a `BigInt`.
-    #[inline]
     pub fn to_bigint(&self) -> Cow<BigInt> {
         match self.decode_ref() {
             Decoded::Small(n) => Cow::Owned(BigInt::from(n)),
@@ -707,6 +706,77 @@ impl CBigInt {
         }
     }
 }
+
+trait ToCow<'a> {
+    fn to_cow(self) -> Cow<'a, BigInt>;
+}
+
+impl<'a> ToCow<'a> for CBigInt {
+    fn to_cow(self) -> Cow<'a, BigInt> {
+        Cow::Owned(BigInt::from(self))
+    }
+}
+
+impl<'a> ToCow<'a> for &'a CBigInt {
+    fn to_cow(self) -> Cow<'a, BigInt> {
+        self.to_bigint()
+    }
+}
+
+impl<'a> ToCow<'a> for BigInt {
+    fn to_cow(self) -> Cow<'a, BigInt> {
+        Cow::Owned(self)
+    }
+}
+
+impl<'a> ToCow<'a> for &'a BigInt {
+    fn to_cow(self) -> Cow<'a, BigInt> {
+        Cow::Borrowed(self)
+    }
+}
+
+struct BigIntOp {
+    digits: fn(Digit, Digit) -> Digit,
+    owned: fn(BigInt, BigInt) -> BigInt,
+    owned_borrowed: fn(BigInt, &BigInt) -> BigInt,
+    borrowed_owned: for<'a> fn(&'a BigInt, BigInt) -> BigInt,
+    borrowed: for<'a> fn(&'a BigInt, &'a BigInt) -> BigInt,
+}
+
+impl BigIntOp {
+    fn call<'a, L, R>(&self, lhs: L, rhs: R) -> CBigInt
+    where
+        L: ToCow<'a>,
+        R: ToCow<'a>,
+    {
+        use Cow::*;
+        match (lhs.to_cow(), rhs.to_cow()) {
+            (Owned(lhs), Owned(rhs)) => (self.owned)(lhs, rhs),
+            (Owned(lhs), Borrowed(rhs)) => (self.owned_borrowed)(lhs, rhs),
+            (Borrowed(lhs), Owned(rhs)) => (self.borrowed_owned)(lhs, rhs),
+            (Borrowed(lhs), Borrowed(rhs)) => (self.borrowed)(lhs, rhs),
+        }
+        .into()
+    }
+}
+
+// fn bigint_op(
+//     lhs: Cow<BigInt>,
+//     rhs: Cow<BigInt>,
+//     owned: fn(BigInt, BigInt) -> BigInt,
+//     owned_borrowed: fn(BigInt, &BigInt) -> BigInt,
+//     borrowed_owned: fn(&BigInt, BigInt) -> BigInt,
+//     borrowed: fn(&BigInt, &BigInt) -> BigInt,
+// ) -> CBigInt {
+//     use Cow::*;
+//     match (lhs, rhs) {
+//         (Owned(lhs), Owned(rhs)) => owned(lhs, rhs),
+//         (Owned(lhs), Borrowed(rhs)) => owned_borrowed(lhs, rhs),
+//         (Borrowed(lhs), Owned(rhs)) => borrowed_owned(lhs, rhs),
+//         (Borrowed(lhs), Borrowed(rhs)) => borrowed(lhs, rhs),
+//     }
+//     .into()
+// }
 
 pub trait ToCBigInt {
     fn to_cbigint(&self) -> Option<CBigInt>;
@@ -1076,13 +1146,34 @@ macro_rules! to_prim_method {
     };
 }
 
-macro_rules! each_op {
+macro_rules! bigint_op {
+    [arith_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
+        pub(super) const $op: BigIntOp = BigIntOp {
+            digits: $trait::$op,
+            owned: |lhs: BigInt, rhs: BigInt| $trait::$op(lhs, rhs),
+            owned_borrowed: |lhs: BigInt, rhs: &BigInt| $trait::$op(lhs, rhs),
+            borrowed_owned: |lhs: &BigInt, rhs: BigInt| $trait::$op(lhs, rhs),
+            borrowed: |lhs: &BigInt, rhs: &BigInt| $trait::$op(lhs, rhs),
+        };
+    };
+    [$($_1:tt),*] => {};
+}
+
+mod bigint_ops {
+    use super::*;
+
+    with_ops!(bigint_op, []);
+}
+
+macro_rules! op_traits {
     [arith_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
         impl $trait<CBigInt> for CBigInt {
             type Output = CBigInt;
             fn $op(self, rhs: CBigInt) -> Self::Output {
                 self.overflowing_op(&rhs, Overflowing::$op)
-                    .unwrap_or_else(|| BigInt::from(self).$op(BigInt::from(rhs)).into())
+                    .unwrap_or_else(|| {
+                        bigint_ops::$op.call(self, rhs)
+                    })
             }
         }
         impl $trait<CBigInt> for &CBigInt {
@@ -1239,7 +1330,7 @@ impl ToPrimitive for CBigInt {
 
 with_prims!(each_prim, []);
 with_prims_and_ops!(each_prim_and_op, []);
-with_ops!(each_op, []);
+with_ops!(op_traits, []);
 
 #[test]
 fn test() {
