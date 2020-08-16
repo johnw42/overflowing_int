@@ -12,4 +12,5 @@ num-traits = "0.2.12"
 num-integer = "0.1.43"
 
 [features]
+default = ["unsafe_encoding"]
 unsafe_encoding = []
