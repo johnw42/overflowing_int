@@ -13,9 +13,11 @@ mod accum;
 pub mod cbigint;
 mod num_trait_impls;
 //pub mod clever;
+mod convert;
 mod decoded;
 mod encoding;
 mod overflowing;
+mod to_cow;
 
 #[cfg(feature = "i128_digit")]
 mod digits {

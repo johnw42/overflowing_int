@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::fmt::{Debug, Display, Formatter};
 use std::mem::size_of;
 use std::ops::{
@@ -7,7 +7,7 @@ use std::ops::{
     Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 
-use num_bigint::{BigInt, BigUint, Sign, ToBigInt, ToBigUint, TryFromBigIntError};
+use num_bigint::{BigInt, BigUint, Sign, TryFromBigIntError};
 #[allow(unused_imports)]
 use num_traits::{ToPrimitive, Zero};
 
@@ -15,6 +15,7 @@ use crate::accum::*;
 use crate::decoded::Decoded;
 use crate::encoding::Encoded;
 use crate::overflowing::Overflowing;
+use crate::to_cow::{ToCow, ToDecodedCow};
 use crate::Sign::*;
 use crate::{Digit, Udigit, DIGIT_BITS};
 
@@ -54,22 +55,18 @@ impl From<Encoded> for CBigInt {
 }
 
 impl CBigInt {
-    #[inline]
     pub(crate) fn decode(self) -> Decoded<BigInt> {
         self.0.decode()
     }
 
-    #[inline]
     pub(crate) fn decode_ref(&self) -> Decoded<&BigInt> {
         self.0.decode_ref()
     }
 
-    #[inline]
     pub(crate) fn decode_mut(&mut self) -> Decoded<&mut BigInt> {
         self.0.decode_mut()
     }
 
-    #[inline]
     pub(crate) fn to_digit(&self) -> Option<Digit> {
         match self.decode_ref() {
             Decoded::Digit(n) => Some(n),
@@ -77,7 +74,6 @@ impl CBigInt {
         }
     }
 
-    #[inline]
     pub(crate) fn to_digit_with(&self, other: &CBigInt) -> Option<(Digit, Digit)> {
         match (self.to_digit(), other.to_digit()) {
             (Some(a), Some(b)) => Some((a, b)),
@@ -625,65 +621,6 @@ impl CBigInt {
     }
 }
 
-trait ToCow<'a> {
-    fn to_cow(self) -> Cow<'a, BigInt>;
-}
-
-impl<'a> ToCow<'a> for CBigInt {
-    fn to_cow(self) -> Cow<'a, BigInt> {
-        Cow::Owned(BigInt::from(self))
-    }
-}
-
-impl<'a> ToCow<'a> for &'a CBigInt {
-    fn to_cow(self) -> Cow<'a, BigInt> {
-        self.to_bigint()
-    }
-}
-
-impl<'a> ToCow<'a> for BigInt {
-    fn to_cow(self) -> Cow<'a, BigInt> {
-        Cow::Owned(self)
-    }
-}
-
-impl<'a> ToCow<'a> for &'a BigInt {
-    fn to_cow(self) -> Cow<'a, BigInt> {
-        Cow::Borrowed(self)
-    }
-}
-
-impl<'a> ToCow<'a> for Decoded<Cow<'a, BigInt>> {
-    fn to_cow(self) -> Cow<'a, BigInt> {
-        match self {
-            Decoded::Digit(n) => Cow::Owned(n.into()),
-            Decoded::Big(cow) => cow,
-        }
-    }
-}
-
-trait ToDecodedCow<'a> {
-    fn to_decoded_cow(self) -> Decoded<Cow<'a, BigInt>>;
-}
-
-impl<'a> ToDecodedCow<'a> for CBigInt {
-    fn to_decoded_cow(self) -> Decoded<Cow<'a, BigInt>> {
-        match self.decode() {
-            Decoded::Digit(n) => Decoded::Digit(n),
-            Decoded::Big(n) => Decoded::Big(n.to_cow()),
-        }
-    }
-}
-
-impl<'a> ToDecodedCow<'a> for &'a CBigInt {
-    fn to_decoded_cow(self) -> Decoded<Cow<'a, BigInt>> {
-        match self.decode_ref() {
-            Decoded::Digit(n) => Decoded::Digit(n),
-            Decoded::Big(n) => Decoded::Big(n.to_cow()),
-        }
-    }
-}
-
 struct BigIntOp {
     digits: fn(Digit, Digit) -> Option<Digit>,
     owned: fn(BigInt, BigInt) -> BigInt,
@@ -745,66 +682,6 @@ impl Display for CBigInt {
             Decoded::Big(n) => write!(f, "{}", n),
         }
     }
-}
-
-impl ToBigInt for CBigInt {
-    fn to_bigint(&self) -> Option<BigInt> {
-        Some(Cow::into_owned(self.to_bigint()))
-    }
-}
-
-impl ToBigUint for CBigInt {
-    fn to_biguint(&self) -> Option<BigUint> {
-        self.clone().try_into().ok()
-    }
-}
-
-impl From<BigInt> for CBigInt {
-    fn from(value: BigInt) -> Self {
-        let decoded = match Digit::try_from(value) {
-            Ok(digit) => Decoded::Digit(digit),
-            Err(err) => Decoded::Big(err.into_original()),
-        };
-        CBigInt(decoded.encode())
-    }
-}
-
-impl From<BigUint> for CBigInt {
-    fn from(value: BigUint) -> Self {
-        Self::from_biguint(Plus, value)
-    }
-}
-
-impl From<CBigInt> for BigInt {
-    fn from(value: CBigInt) -> Self {
-        match value.decode() {
-            Decoded::Digit(n) => BigInt::from(n),
-            Decoded::Big(n) => n,
-        }
-    }
-}
-
-impl TryFrom<CBigInt> for BigUint {
-    type Error = TryFromBigIntError<()>;
-    fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
-        match value.0.decode() {
-            Decoded::Digit(n) => n.to_biguint(),
-            Decoded::Big(n) => n.to_biguint(),
-        }
-        .ok_or_else(try_into_bigint_error)
-    }
-}
-
-impl TryFrom<&CBigInt> for BigUint {
-    type Error = TryFromBigIntError<()>;
-    fn try_from(value: &CBigInt) -> Result<Self, Self::Error> {
-        value.clone().try_into()
-    }
-}
-
-// We can't constructor a TryFromBigIntError directly, so we get sneaky.
-fn try_into_bigint_error() -> TryFromBigIntError<()> {
-    BigUint::try_from(-1).expect_err("converting -1 to BigUint fails")
 }
 
 macro_rules! each_prim {
