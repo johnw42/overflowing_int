@@ -130,6 +130,11 @@ impl CBigInt {
     }
 
     #[inline]
+    fn decode_mut(&mut self) -> Decoded<&mut BigInt> {
+        self.0.decode_mut()
+    }
+
+    #[inline]
     fn to_digit(&self) -> Option<Digit> {
         match self.decode_ref() {
             Decoded::Small(n) => Some(n),
@@ -680,6 +685,27 @@ impl CBigInt {
             Decoded::Big(n) => n.trailing_zeros(),
         }
     }
+
+    fn overflowing_op(
+        &self,
+        other: &CBigInt,
+        f: fn(Digit, Digit) -> (Digit, bool),
+    ) -> Option<CBigInt> {
+        if let Some((a, b)) = self.to_digit_with(other) {
+            if let (result, false) = f(a, b) {
+                return Some(result.into());
+            }
+        }
+        None
+    }
+
+    fn bitwise_op(&self, other: &CBigInt, f: fn(Digit, Digit) -> Digit) -> Option<CBigInt> {
+        if let Some((a, b)) = self.to_digit_with(other) {
+            Some(f(a, b).into())
+        } else {
+            None
+        }
+    }
 }
 
 pub trait ToCBigInt {
@@ -1052,59 +1078,69 @@ macro_rules! to_prim_method {
 
 macro_rules! each_op {
     [arith_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
-        impl $trait for CBigInt {
+        impl $trait<CBigInt> for CBigInt {
             type Output = CBigInt;
-            fn $op(self, rhs: Self) -> Self::Output {
-                if let Some((a, b)) = self.to_digit_with(&rhs) {
-                    if let (c, false) = Overflowing::$op(a, b) {
-                        return c.into();
-                    }
-                }
-                BigInt::from(self).$op(BigInt::from(rhs)).into()
-                //dbg!(dbg!(BigInt::from(self)).$op(dbg!(BigInt::from(rhs)))).into()
+            fn $op(self, rhs: CBigInt) -> Self::Output {
+                self.overflowing_op(&rhs, Overflowing::$op)
+                    .unwrap_or_else(|| BigInt::from(self).$op(BigInt::from(rhs)).into())
+            }
+        }
+        impl $trait<CBigInt> for &CBigInt {
+            type Output = CBigInt;
+            fn $op(self, rhs: CBigInt) -> Self::Output {
+                self.overflowing_op(&rhs, Overflowing::$op)
+                    .unwrap_or_else(|| self.to_bigint().as_ref().$op(BigInt::from(rhs)).into())
+            }
+        }
+        impl $trait<&CBigInt> for CBigInt {
+            type Output = CBigInt;
+            fn $op(self, rhs: &CBigInt) -> Self::Output {
+                self.overflowing_op(rhs, Overflowing::$op)
+                    .unwrap_or_else(|| BigInt::from(self).$op(rhs.to_bigint().as_ref()).into())
+            }
+        }
+        impl $trait<&CBigInt> for &CBigInt {
+            type Output = CBigInt;
+            fn $op(self, rhs: &CBigInt) -> Self::Output {
+                self.overflowing_op(rhs, Overflowing::$op)
+                    .unwrap_or_else(|| self.to_bigint().as_ref().$op(rhs.to_bigint().as_ref()).into())
             }
         }
         assign_op!($trait, $op, $assign_trait, $assign_op);
-        ref_op!($trait<CBigInt> for CBigInt, $op);
     };
     [shift_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
         assign_op!($trait, $op, $assign_trait, $assign_op);
     };
     [bit_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
-        impl $trait for CBigInt {
+        impl $trait<CBigInt> for CBigInt {
             type Output = CBigInt;
-            fn $op(self, rhs: Self) -> Self::Output {
-                if let Some((a, b)) = self.to_digit_with(&rhs) {
-                    return a.$op(b).into();
-                }
-                BigInt::from(self).$op(BigInt::from(rhs)).into()
+            fn $op(self, rhs: CBigInt) -> Self::Output {
+                self.bitwise_op(&rhs, $trait::$op)
+                    .unwrap_or_else(|| BigInt::from(self).$op(BigInt::from(rhs)).into())
+            }
+        }
+        impl $trait<CBigInt> for &CBigInt {
+            type Output = CBigInt;
+            fn $op(self, rhs: CBigInt) -> Self::Output {
+                self.bitwise_op(&rhs, $trait::$op)
+                    .unwrap_or_else(|| self.to_bigint().as_ref().$op(BigInt::from(rhs)).into())
+            }
+        }
+        impl $trait<&CBigInt> for CBigInt {
+            type Output = CBigInt;
+            fn $op(self, rhs: &CBigInt) -> Self::Output {
+                self.bitwise_op(rhs, $trait::$op)
+                    .unwrap_or_else(|| BigInt::from(self).$op(rhs.to_bigint().as_ref()).into())
+            }
+        }
+        impl $trait<&CBigInt> for &CBigInt {
+            type Output = CBigInt;
+            fn $op(self, rhs: &CBigInt) -> Self::Output {
+                self.bitwise_op(rhs, $trait::$op)
+                    .unwrap_or_else(|| self.to_bigint().as_ref().$op(rhs.to_bigint().as_ref()).into())
             }
         }
         assign_op![$trait, $op, $assign_trait, $assign_op];
-        ref_op![$trait<CBigInt> for CBigInt, $op];
-    };
-}
-
-macro_rules! ref_op {
-    [$trait:ident<$rhs_type:ty> for $lhs_type:ty, $op:ident] => {
-        impl $trait<&$rhs_type> for $lhs_type {
-            type Output = CBigInt;
-            fn $op(self, rhs: &$rhs_type) -> CBigInt {
-                self.$op(rhs.clone())
-            }
-        }
-        impl $trait<$rhs_type> for &$lhs_type {
-            type Output = CBigInt;
-            fn $op(self, rhs: $rhs_type) -> CBigInt {
-                self.clone().$op(rhs)
-            }
-        }
-        impl $trait<&$rhs_type> for &$lhs_type {
-            type Output = CBigInt;
-            fn $op(self, rhs: &$rhs_type) -> CBigInt {
-                self.clone().$op(rhs.clone())
-            }
-        }
     };
 }
 
@@ -1113,10 +1149,18 @@ macro_rules! assign_op {
         impl<T> $assign_trait<T> for CBigInt
         where
             CBigInt: $trait<T, Output = CBigInt>,
+            BigInt: $assign_trait<T>,
         {
             fn $assign_op(&mut self, rhs: T) {
-                let lhs = std::mem::take(self);
-                *self = lhs.$op(rhs);
+                match self.decode_mut() {
+                    Decoded::Small(_) => {
+                        let lhs = std::mem::take(self);
+                        *self = lhs.$op(rhs);
+                    }
+                    Decoded::Big(big) => {
+                        big.$assign_op(rhs);
+                    }
+                }
             }
         }
     };
