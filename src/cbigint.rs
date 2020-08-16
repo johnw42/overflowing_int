@@ -19,9 +19,6 @@ use crate::overflowing::Overflowing;
 use crate::Sign::*;
 use crate::{Digit, Udigit};
 
-type Accum = Digit;
-type Uaccum = Udigit;
-
 #[derive(Clone)]
 pub struct CBigInt(Encoded);
 
@@ -67,295 +64,7 @@ impl<'a> From<GenIntRef<'a>> for GenIntCow<'a> {
     }
 }
 
-// fn maybe_bigint<T>(arg: CBigInt, f: impl FnOnce(GenInt) -> T) -> T {
-//     let (sign, mag) = match arg {
-//         Small(value) => return f(GenInt::Small(value)),
-//         Positive(mag) => (Plus, mag),
-//         Negative(mag) => (Minus, mag),
-//     };
-//     f(GenInt::Big(BigInt::from_biguint(sign, mag)))
-// }
-//
-// fn maybe_bigint_ref<T>(arg: &CBigInt, f: impl FnOnce(GenIntRef) -> T) -> T {
-//     let (sign, mag) = match arg {
-//         Small(value) => return f(GenIntRef::Small(*value)),
-//         Positive(mag) => (Plus, mag),
-//         Negative(mag) => (Minus, mag),
-//     };
-//     let bigint = ManuallyDrop::new(BigInt::from_biguint(sign, unsafe { std::ptr::read(mag) }));
-//     f(GenIntRef::Big(&*bigint))
-// }
-//
-// fn maybe_bigint_cow<T>(arg: Cow<CBigInt>, f: impl FnOnce(GenIntCow) -> T) -> T {
-//     match arg {
-//         Cow::Borrowed(arg) => maybe_bigint_ref(arg, f),
-//         Cow::Owned(arg) => maybe_bigint(arg, f),
-//     }
-// }
-
-struct GenIntFn<F>(F);
-struct GenIntRefFn<F>(F);
-struct GenIntCowFn<F>(F);
-
 const DIGIT_BITS: usize = size_of::<Digit>() * 8;
-
-// struct GenIntCowFn1<F, T>(F)
-// where
-//     F: FnOnce(GenIntCow) -> T;
-
-// trait CBigIntFn<T>
-// where
-//     Self: Sized,
-// {
-//     fn apply(self, arg: CBigInt) -> T;
-//
-//     fn apply_ref(self, arg: &CBigInt) -> T {
-//         self.apply(arg.clone())
-//     }
-//
-//     fn apply_cow(self, arg: Cow<CBigInt>) -> T {
-//         match arg {
-//             Cow::Borrowed(arg) => self.apply_ref(arg),
-//             Cow::Owned(arg) => self.apply(arg),
-//         }
-//     }
-// }
-//
-// impl<F, T> CBigIntFn<T> for GenIntFn<F>
-// where
-//     F: FnOnce(GenInt) -> T,
-// {
-//     fn apply(self, arg: CBigInt) -> T {
-//         self.0(arg.into())
-//     }
-// }
-//
-// impl<FB, FS, T> CBigIntFn<T> for GenIntFn<(FB, FS)>
-// where
-//     FB: FnOnce(BigInt) -> T,
-//     FS: FnOnce(Digit) -> T,
-// {
-//     fn apply(self, arg: CBigInt) -> T {
-//         let (fb, fs) = self.0;
-//         GenIntFn(|arg| match arg {
-//             GenInt::Small(x) => fs(x),
-//             GenInt::Big(x) => fb(x),
-//         })
-//         .apply(arg)
-//     }
-// }
-//
-// impl<F, T> CBigIntFn<T> for GenIntRefFn<F>
-// where
-//     F: for<'a> FnOnce(GenIntRef<'a>) -> T,
-// {
-//     fn apply(self, arg: CBigInt) -> T {
-//         GenIntFn(|arg| {
-//             self.0(match &arg {
-//                 GenInt::Small(x) => GenIntRef::Small(*x),
-//                 GenInt::Big(x) => GenIntRef::Big(x),
-//             })
-//         })
-//         .apply(arg)
-//     }
-//
-//     fn apply_ref(self, arg: &CBigInt) -> T {
-//         let (sign, mag) = match arg {
-//             Small(value) => return self.0(GenIntRef::Small(*value)),
-//             Positive(mag) => (Plus, mag),
-//             Negative(mag) => (Minus, mag),
-//         };
-//         let bigint = ManuallyDrop::new(BigInt::from_biguint(sign, unsafe { std::ptr::read(mag) }));
-//         self.0(GenIntRef::Big(&*bigint))
-//     }
-// }
-//
-// impl<FB, FS, T> CBigIntFn<T> for GenIntRefFn<(FB, FS)>
-// where
-//     FB: for<'a> FnOnce(&'a BigInt) -> T,
-//     FS: FnOnce(Digit) -> T,
-// {
-//     fn apply(self, arg: CBigInt) -> T {
-//         let (fb, fs) = self.0;
-//         GenIntRefFn(|arg: GenIntRef| match arg {
-//             GenIntRef::Small(x) => fs(x),
-//             GenIntRef::Big(x) => fb(x),
-//         })
-//         .apply(arg)
-//     }
-//
-//     fn apply_ref(self, arg: &CBigInt) -> T {
-//         let (fb, fs) = self.0;
-//         GenIntRefFn(|arg: GenIntRef| match arg {
-//             GenIntRef::Small(x) => fs(x),
-//             GenIntRef::Big(x) => fb(x),
-//         })
-//         .apply_ref(arg)
-//     }
-// }
-
-// impl<T> CBigIntFn<T> for GenIntRefFn<(fn(&BigInt) -> T, fn(Digit) -> T)> {
-//     fn apply(self, arg: CBigInt) -> T {
-//         let (fb, fs) = self.0;
-//         GenIntRefFn(|arg: GenIntRef| -> T {
-//             match arg {
-//                 GenIntRef::Small(x) => fs(x),
-//                 GenIntRef::Big(x) => fb(x),
-//             }
-//         })
-//         .apply(arg)
-//     }
-//
-//     fn apply_ref(self, arg: &CBigInt) -> T {
-//         let (fb, fs) = self.0;
-//         GenIntRefFn(|arg: GenIntRef| -> T {
-//             match arg {
-//                 GenIntRef::Small(x) => fs(x),
-//                 GenIntRef::Big(x) => fb(x),
-//             }
-//         })
-//         .apply_ref(arg)
-//     }
-// }
-
-// impl<F, T> CBigIntFn<T> for GenIntCowFn<F>
-// where
-//     F: for<'a> FnOnce(GenIntCow<'a>) -> T,
-// {
-//     fn apply(self, arg: CBigInt) -> T {
-//         self.0(GenInt::from(arg).into())
-//     }
-//
-//     fn apply_ref(self, arg: &CBigInt) -> T {
-//         GenIntRefFn(|arg: GenIntRef| -> T {
-//             self.0(match arg {
-//                 GenIntRef::Small(x) => GenIntCow::Small(x),
-//                 GenIntRef::Big(x) => GenIntCow::Big(Cow::Borrowed(x)),
-//             })
-//         })
-//         .apply_ref(arg)
-//     }
-// }
-
-// impl<FB, FS, T> CBigIntFn1<T> for (FB, FS)
-// where
-//     FB: FnOnce(BigInt),
-//     FS: FnOnce(Digit),
-// {
-//     fn apply_small(self, arg: CBigInt) -> T {
-//         let (fb, fs) = self;
-//         let (sign, mag) = match arg {
-//             Small(value) => return fs(value),
-//             Positive(mag) => (Plus, mag),
-//             Negative(mag) => (Minus, mag),
-//         };
-//         fb(GenInt::Big(BigInt::from_biguint(sign, mag)))
-//     }
-//
-//     fn apply_big(self, arg: CBigInt) -> T {
-//         let (sign, mag) = match arg {
-//             Small(value) => return f(GenIntRef::Small(*value)),
-//             Positive(mag) => (Plus, mag),
-//             Negative(mag) => (Minus, mag),
-//         };
-//         let bigint = ManuallyDrop::new(BigInt::from_biguint(sign, unsafe { std::ptr::read(mag) }));
-//         f(GenIntRef::Big(&*bigint))
-//     }
-//
-//     fn apply_big_ref(self, arg: &CBigInt) -> T {
-//         unimplemented!()
-//     }
-// }
-
-// trait CBigIntFnArg {
-//     fn apply_to<F, T>(self, f: F) -> T
-//     where
-//         F: CBigIntFn<T>;
-// }
-//
-// impl CBigIntFnArg for CBigInt {
-//     fn apply_to<F, T>(self, f: F) -> T
-//     where
-//         F: CBigIntFn<T>,
-//     {
-//         f.apply(self)
-//     }
-// }
-//
-// impl CBigIntFnArg for &CBigInt {
-//     fn apply_to<F, T>(self, f: F) -> T
-//     where
-//         F: CBigIntFn<T>,
-//     {
-//         f.apply_ref(self)
-//     }
-// }
-//
-// trait CBigIntFn2<T> {
-//     fn apply(arg1: CBigInt, arg2: CBigInt) -> T;
-//     fn apply_ref1(arg1: &CBigInt, arg2: CBigInt) -> T;
-//     fn apply_ref2(arg1: CBigInt, arg2: &CBigInt) -> T;
-//     fn apply_ref_ref(arg1: &CBigInt, arg2: &CBigInt) -> T;
-// }
-
-// fn maybe_bigint_mut<T>(
-//     arg: &mut CBigInt,
-//     f: impl FnOnce(&mut BigInt) -> T,
-//     g: impl FnOnce(&mut Digit) -> T,
-// ) -> T {
-//     let (sign, mag) = match arg {
-//         Small(value) => return g(value),
-//         Positive(mag) => (Plus, mag),
-//         Negative(mag) => (Minus, mag),
-//     };
-//     let mut bigint = ManuallyDrop::new(BigInt::from_biguint(sign, unsafe { std::ptr::read(mag) }));
-//     let result = f(&mut *bigint);
-//     unsafe {
-//         std::ptr::write(arg, ManuallyDrop::take(&mut bigint).into());
-//     }
-//     result
-// }
-//
-// /// Calls [f] if either [lhs] or [rhs] is large, [g] if both are small.  Falls
-// /// back to calling [f] if [g] returns [None].
-// fn maybe_bigint_refs<T>(
-//     lhs: &CBigInt,
-//     rhs: &CBigInt,
-//     f: impl FnOnce(BigOrSmall, BigOrSmall) -> T,
-// ) -> T {
-//     maybe_bigint_ref(
-//         lhs,
-//         |big_lhs| {
-//             maybe_bigint_ref(
-//                 rhs,
-//                 |big_rhs| f(Cow::Borrowed(big_lhs), Cow::Borrowed(big_rhs)),
-//                 |&small_rhs| f(Cow::Borrowed(big_lhs), Cow::Owned(small_rhs.into())),
-//             )
-//         },
-//         |&small_lhs| {
-//             maybe_bigint_ref(
-//                 rhs,
-//                 |big_rhs| f(Cow::Owned(small_lhs.into()), Cow::Borrowed(big_rhs)),
-//                 |&small_rhs| {
-//                     g(&small_lhs, &small_rhs).unwrap_or_else(|| {
-//                         f(
-//                             Cow::Owned(BigInt::from(small_lhs)),
-//                             Cow::Owned(BigInt::from(small_rhs)),
-//                         )
-//                     })
-//                 },
-//             )
-//         },
-//     )
-// }
-//
-// fn maybe_bigint_cows<T>(
-//     lhs: Cow<CBigInt>,
-//     rhs: Cow<CBigInt>,
-//     f: impl FnOnce(BigOrSmall, BigOrSmall) -> T,
-// ) -> T {
-//     maybe_bigint_cow(lhs, |lhs| maybe_bigint_cow(rhs, |rhs| f(lhs, rhs)))
-// }
 
 impl CBigInt {
     #[inline(always)]
@@ -447,7 +156,7 @@ impl CBigInt {
 
     #[inline(always)]
     fn accum_be(bytes: &[u8]) -> Option<Udigit> {
-        if bytes.len() <= 16 {
+        if bytes.len() <= size_of::<Digit>() {
             let mut accum = 0;
             for &byte in bytes {
                 accum = accum << 8 | byte as Udigit;
@@ -460,7 +169,7 @@ impl CBigInt {
 
     #[inline(always)]
     fn accum_le(bytes: &[u8]) -> Option<Udigit> {
-        if bytes.len() <= 16 {
+        if bytes.len() <= size_of::<Digit>() {
             let mut accum = 0;
             for (i, &byte) in bytes.iter().enumerate() {
                 accum |= (byte as Udigit) << 8 * i;
@@ -519,7 +228,7 @@ impl CBigInt {
                 return result;
             }
         }
-        Self::from_biguint(sign, BigUint::from_bytes_be(bytes))
+        BigInt::from_bytes_be(sign, bytes).into()
     }
 
     /// Creates and initializes a `CBigInt`.
@@ -531,7 +240,7 @@ impl CBigInt {
                 return result;
             }
         }
-        Self::from_biguint(sign, BigUint::from_bytes_le(bytes))
+        BigInt::from_bytes_le(sign, bytes).into()
     }
 
     /// Creates and initializes a `CBigInt` from an array of bytes in
@@ -753,7 +462,7 @@ impl CBigInt {
             Decoded::Small(n) => {
                 let bytes = n.to_le_bytes();
                 let to_discard = if n >= 0 { 0 } else { 0xff };
-                let mut i = 16;
+                let mut i = size_of::<Digit>();
                 while i > 0 && bytes[i - 1] == to_discard {
                     i -= 1
                 }
@@ -872,7 +581,7 @@ impl CBigInt {
     #[inline]
     pub fn try_magnitude(&self) -> Option<&BigUint> {
         match self.decode_ref() {
-            Decoded::Small(n) => None,
+            Decoded::Small(_) => None,
             Decoded::Big(n) => Some(n.magnitude()),
         }
     }
@@ -1234,21 +943,10 @@ impl Integer for CBigInt {
 
 #[test]
 fn gcd_test() {
-    // let small = CBigInt::from(5);
-    // let huge = CBigInt::from(i128::MAX).pow(2);
-    // catch_unwind(|| {
-    //     maybe_bigint_ref(
-    //         &huge,
-    //         |_| {
-    //             panic!();
-    //         },
-    //         |_| {},
-    //     );
-    // })
-    // .unwrap_err();
-    // assert_eq!(huge.gcd(&small), CBigInt::from(1));
-    // assert_eq!(small.gcd(&huge), CBigInt::from(1));
-    panic!()
+    let small = CBigInt::from(5);
+    let huge = CBigInt::from(i128::MAX).pow(2);
+    assert_eq!(huge.gcd(&small), CBigInt::from(1));
+    assert_eq!(small.gcd(&huge), CBigInt::from(1));
 }
 
 impl Roots for CBigInt {
@@ -1368,6 +1066,7 @@ macro_rules! each_op {
                     }
                 }
                 BigInt::from(self).$op(BigInt::from(rhs)).into()
+                //dbg!(dbg!(BigInt::from(self)).$op(dbg!(BigInt::from(rhs)))).into()
             }
         }
         assign_op!($trait, $op, $assign_trait, $assign_op);
@@ -1526,30 +1225,16 @@ fn test() {
         for a in &range {
             for b in &range {
                 if !b.is_zero() {
+                    let expected = op(a.clone(), b.clone());
+                    let actual =
+                        BigInt::from(cop(CBigInt::from(a.clone()), CBigInt::from(b.clone())));
                     assert_eq!(
-                        BigInt::from(cop(CBigInt::from(a.clone()), CBigInt::from(b.clone()))),
-                        op(a.clone(), b.clone()),
-                        "failed: {} {} {}",
-                        a,
-                        op_name,
-                        b,
+                        expected, actual,
+                        "failed: {} {} {} == {} (got {})",
+                        a, op_name, b, expected, actual
                     );
                 }
             }
         }
     }
 }
-//
-// #[test]
-// fn macro_test() {
-//     macro_rules! call_macro {
-//         ($name:ident, $init_args:tt, $($final_args:tt),*) => {
-//             $(call_macro!(@internal $name, $init_args, $final_args);)*
-//         };
-//         (@internal $name:ident, [$($init_arg:tt),*], [$($final_arg:tt),*]) => {
-//             $name!($($init_arg,)*$($final_arg),*)
-//         }
-//     }
-//
-//     call_macro!(println, ["{} {} {}", 1], [2, 3], [4, 5]);
-// }

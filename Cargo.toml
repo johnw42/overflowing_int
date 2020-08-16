@@ -10,3 +10,6 @@ edition = "2018"
 num-bigint = "0.3"
 num-traits = "0.2.12"
 num-integer = "0.1.43"
+
+[features]
+unsafe_encoding = []

@@ -1,64 +1,10 @@
 use std::mem::align_of;
-use std::mem::size_of;
 
 use num_bigint::BigInt;
 
+pub use inner::*;
+
 use crate::Digit;
-
-union Bits {
-    digit: Digit,
-    size: usize,
-}
-
-const PREFER_DIGIT: bool = size_of::<Digit>() > size_of::<usize>();
-
-impl Bits {
-    #[inline]
-    fn from_digit(digit: Digit) -> Bits {
-        if PREFER_DIGIT {
-            Bits { digit }
-        } else {
-            Bits {
-                size: digit as usize,
-            }
-        }
-    }
-
-    #[inline]
-    fn from_ptr(ptr: *mut BigInt) -> Bits {
-        if PREFER_DIGIT {
-            Bits {
-                digit: ptr as Digit,
-            }
-        } else {
-            Bits { size: ptr as usize }
-        }
-    }
-
-    #[inline]
-    fn digit(&self) -> Digit {
-        unsafe {
-            if PREFER_DIGIT {
-                self.digit
-            } else {
-                self.size as Digit
-            }
-        }
-    }
-
-    #[inline]
-    fn ptr(&self) -> *mut BigInt {
-        unsafe {
-            if PREFER_DIGIT {
-                self.digit as *mut BigInt
-            } else {
-                self.size as *mut BigInt
-            }
-        }
-    }
-}
-
-pub struct Encoded(Bits);
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Decoded<T> {
@@ -66,64 +12,156 @@ pub enum Decoded<T> {
     Big(T),
 }
 
-impl Encoded {
-    // pub fn new<I>(value: I) -> Encoded
-    // where
-    //     I: Copy,
-    //     Digit: TryFrom<I>,
-    //     BigInt: From<I>,
-    // {
-    //     if let Ok(value) = Digit::try_from(value) {
-    //         Decoded::Small(value).encode()
-    //     } else {
-    //         Decoded::Big(BigInt::from(value)).encode()
-    //     }
-    // }
+#[cfg(feature = "unsafe_encoding")]
+mod inner {
+    use super::*;
 
-    pub fn zero() -> Encoded {
-        Encoded(Bits::from_digit(1))
-    }
+    pub struct Encoded(usize);
 
-    pub fn one() -> Encoded {
-        Encoded(Bits::from_digit(3))
-    }
+    #[cfg(feature = "unsafe_encoding")]
+    impl Encoded {
+        fn is_ptr(&self) -> bool {
+            self.0 & 1 == 0
+        }
 
-    pub fn is_zero(&self) -> bool {
-        self.0.digit() == 1
-    }
+        fn is_digit(&self) -> bool {
+            !self.is_ptr()
+        }
 
-    pub fn is_one(&self) -> bool {
-        self.0.digit() == 3
-    }
+        unsafe fn ptr(&self) -> *mut BigInt {
+            debug_assert!(self.is_ptr());
+            self.0 as *mut BigInt
+        }
 
-    pub fn decode(self) -> Decoded<BigInt> {
-        unsafe {
-            if self.0.digit() & 1 == 0 {
-                let ptr = self.0.ptr();
-                Decoded::Big(*Box::from_raw(ptr))
-            } else {
-                Decoded::Small(self.0.digit() >> 1)
+        unsafe fn digit(&self) -> Digit {
+            debug_assert!(self.is_digit());
+            self.0 as isize >> 1
+        }
+        pub fn zero() -> Encoded {
+            Encoded(1)
+        }
+
+        pub fn one() -> Encoded {
+            Encoded(3)
+        }
+
+        pub fn is_zero(&self) -> bool {
+            self.0 == 1
+        }
+
+        pub fn is_one(&self) -> bool {
+            self.0 == 3
+        }
+
+        pub fn decode(self) -> Decoded<BigInt> {
+            unsafe {
+                if self.is_ptr() {
+                    Decoded::Big(*Box::from_raw(self.ptr()))
+                } else {
+                    Decoded::Small(self.digit())
+                }
+            }
+        }
+
+        pub fn decode_ref(&self) -> Decoded<&BigInt> {
+            unsafe {
+                if self.is_ptr() {
+                    Decoded::Big(&*self.ptr())
+                } else {
+                    Decoded::Small(self.digit())
+                }
+            }
+        }
+
+        pub fn decode_mut(&mut self) -> Decoded<&mut BigInt> {
+            unsafe {
+                if self.is_ptr() {
+                    Decoded::Big(&mut *self.ptr())
+                } else {
+                    Decoded::Small(self.digit())
+                }
             }
         }
     }
 
-    pub fn decode_ref(&self) -> Decoded<&BigInt> {
-        unsafe {
-            if self.0.digit() & 1 == 0 {
-                Decoded::Big(&*self.0.ptr())
-            } else {
-                Decoded::Small(self.0.digit() >> 1)
+    impl Clone for Encoded {
+        fn clone(&self) -> Self {
+            unsafe {
+                if self.is_ptr() {
+                    Encoded(Box::into_raw(Box::new((*self.ptr()).clone())) as usize)
+                } else {
+                    Encoded(self.0)
+                }
             }
         }
     }
 
-    pub fn decode_mut(&mut self) -> Decoded<&mut BigInt> {
-        unsafe {
-            if self.0.digit() & 1 == 0 {
-                Decoded::Big(&mut *self.0.ptr())
-            } else {
-                Decoded::Small(self.0.digit() >> 1)
+    impl Drop for Encoded {
+        fn drop(&mut self) {
+            if self.is_ptr() {
+                unsafe {
+                    drop(Box::from_raw(self.ptr()));
+                }
             }
+        }
+    }
+}
+
+#[cfg(not(feature = "unsafe_encoding"))]
+mod inner {
+    use super::*;
+
+    #[derive(Clone)]
+    pub struct Encoded(pub Decoded<BigInt>);
+
+    impl Encoded {
+        pub fn zero() -> Encoded {
+            Encoded(Decoded::Small(0))
+        }
+
+        pub fn one() -> Encoded {
+            Encoded(Decoded::Small(1))
+        }
+
+        pub fn is_zero(&self) -> bool {
+            self.0 == Self::zero().0
+        }
+
+        pub fn is_one(&self) -> bool {
+            self.0 == Self::one().0
+        }
+
+        pub fn decode(self) -> Decoded<BigInt> {
+            self.0
+        }
+
+        pub fn decode_ref(&self) -> Decoded<&BigInt> {
+            match &self.0 {
+                &Decoded::Small(n) => Decoded::Small(n),
+                Decoded::Big(n) => Decoded::Big(n),
+            }
+        }
+
+        pub fn decode_mut(&mut self) -> Decoded<&mut BigInt> {
+            match &mut self.0 {
+                &mut Decoded::Small(n) => Decoded::Small(n),
+                Decoded::Big(n) => Decoded::Big(n),
+            }
+        }
+    }
+}
+
+impl From<BigInt> for Decoded<BigInt> {
+    fn from(x: BigInt) -> Self {
+        Decoded::Big(x)
+    }
+}
+
+impl From<Decoded<BigInt>> for BigInt {
+    fn from(x: Decoded<BigInt>) -> Self {
+        match x {
+            Decoded::Small(n) => n.into(),
+            Decoded::Big(n) => n,
         }
     }
 }
@@ -139,47 +177,50 @@ impl Encoded {
 //         x.decode_ref()
 //     }
 // }
-
-impl Clone for Encoded {
-    fn clone(&self) -> Self {
-        unsafe {
-            if self.0.digit() & 1 == 0 {
-                let ptr = self.0.ptr();
-                Encoded(Bits::from_ptr(Box::into_raw(Box::new((*ptr).clone()))))
-            } else {
-                Encoded(Bits::from_digit(self.0.digit()))
-            }
-        }
-    }
-}
-
-impl Drop for Encoded {
-    fn drop(&mut self) {
-        unsafe {
-            if self.0.digit() & 1 == 0 {
-                drop(Box::from_raw(self.0.ptr()));
-            }
-        }
-    }
-}
+//
+// impl<'a> From<&'a mut Encoded> for Decoded<&'a mut BigInt> {
+//     fn from(x: &'a mut Encoded) -> Self {
+//         x.decode_mut()
+//     }
+// }
 
 impl Decoded<BigInt> {
+    #[cfg(not(feature = "unsafe_encoding"))]
+    pub fn encode(self) -> Encoded {
+        Encoded(self)
+    }
+
+    #[cfg(feature = "unsafe_encoding")]
     pub fn encode(self) -> Encoded {
         debug_assert!(align_of::<BigInt>() > 1);
         debug_assert!(align_of::<BigInt>().is_power_of_two());
 
-        let bigint = match self {
-            Decoded::Small(value) => {
-                let shifted = value << 1;
-                if shifted >> 1 == value {
-                    return Encoded(Bits::from_digit(shifted | 1));
+        #[cfg(debug_assertions)]
+        let value = BigInt::from(self.clone());
+
+        let do_encode = || {
+            let bigint = match self {
+                Decoded::Small(value) => {
+                    let shifted = value << 1;
+                    if shifted >> 1 == value {
+                        return Encoded(shifted as usize | 1);
+                    }
+                    BigInt::from(value)
                 }
-                BigInt::from(value)
-            }
-            Decoded::Big(x) => x,
+                Decoded::Big(x) => x,
+            };
+            let ptr = Box::into_raw(Box::new(BigInt::from(bigint))) as usize;
+            debug_assert_eq!(ptr & 1, 0);
+            Encoded(ptr)
         };
-        let ptr = Box::into_raw(Box::new(BigInt::from(bigint)));
-        debug_assert_eq!(ptr as usize & 1, 0);
-        Encoded(Bits::from_ptr(ptr))
+        let result = do_encode();
+        #[cfg(debug_assertions)]
+        assert_eq!(
+            BigInt::from(result.clone().decode()),
+            value,
+            "{:x}",
+            result.0
+        );
+        result
     }
 }

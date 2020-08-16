@@ -12,5 +12,5 @@ pub mod cbigint;
 mod encoding;
 mod overflowing;
 
-type Digit = i64;
-type Udigit = u64;
+type Digit = isize;
+type Udigit = usize;
