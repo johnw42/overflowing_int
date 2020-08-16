@@ -684,14 +684,6 @@ impl CBigInt {
             Decoded::Big(n) => n.trailing_zeros(),
         }
     }
-
-    fn bitwise_op(&self, other: &CBigInt, f: fn(Digit, Digit) -> Digit) -> Option<CBigInt> {
-        if let Some((a, b)) = self.to_digit_with(other) {
-            Some(f(a, b).into())
-        } else {
-            None
-        }
-    }
 }
 
 trait ToCow<'a> {
@@ -1112,7 +1104,7 @@ fn try_into_bigint_error() -> TryFromBigIntError<()> {
 }
 
 macro_rules! each_prim {
-    [[int $(, $_1:tt)*], [$prim:ident, $to_prim:ident]] => {
+    [[int $(, $int_attr:tt)*], [$prim:ident, $to_prim:ident]] => {
         impl From<$prim> for CBigInt {
             fn from(value: $prim) -> Self {
                 if let Ok(digit) = Digit::try_from(value) {
@@ -1139,8 +1131,11 @@ macro_rules! each_prim {
                 }
             }
         }
+        with_ops!(each_prim_and_op, [[int $(, $int_attr)*], [$prim, $to_prim]]);
     };
-    [[float $(, $_1:tt)*], $prim_attrs:tt] => {};
+    [[float $(, $float_attr:tt)*], $prim_attrs:tt] => {
+        with_ops!(each_prim_and_op, [[float $(, $float_attr)*], $prim_attrs]);
+    };
 }
 
 macro_rules! to_prim_method {
@@ -1254,37 +1249,37 @@ macro_rules! each_prim_and_op {
             $trait:ident,
             $op:ident,
             $assign_trait:ident,
-            $assign_op:ident,
+            $assign_op:ident
         ]
     ] => {
-        impl $trait<$prim> for CBigInt {
-            type Output = CBigInt;
-            fn $op(self, rhs: $prim) -> Self::Output {
-                if let Small(prim) = &self {
-                    if let Ok(promoted) = Digit::try_from(rhs) {
-                        if let (result, false) = Overflowing::$op(prim, promoted) {
-                            return result.into();
-                        }
-                    }
-                }
-                BigInt::from(self).$op(rhs).into()
-            }
-        }
-        impl $trait<CBigInt> for $prim {
-            type Output = CBigInt;
-            fn $op(self, rhs: CBigInt) -> Self::Output {
-                if let Small(prim) = &rhs {
-                    if let Ok(promoted) = Digit::try_from(self) {
-                        if let (result, false) = Overflowing::$op(promoted, *prim) {
-                            return result.into();
-                        }
-                    }
-                }
-                self.$op(BigInt::from(rhs)).into()
-            }
-        }
-        ref_op!($trait<$prim> for CBigInt, $op);
-        ref_op!($trait<CBigInt> for $prim, $op);
+        // impl $trait<$prim> for CBigInt {
+        //     type Output = CBigInt;
+        //     fn $op(self, rhs: $prim) -> Self::Output {
+        //         if let Small(prim) = &self {
+        //             if let Ok(promoted) = Digit::try_from(rhs) {
+        //                 if let (result, false) = Overflowing::$op(prim, promoted) {
+        //                     return result.into();
+        //                 }
+        //             }
+        //         }
+        //         BigInt::from(self).$op(rhs).into()
+        //     }
+        // }
+        // impl $trait<CBigInt> for $prim {
+        //     type Output = CBigInt;
+        //     fn $op(self, rhs: CBigInt) -> Self::Output {
+        //         if let Small(prim) = &rhs {
+        //             if let Ok(promoted) = Digit::try_from(self) {
+        //                 if let (result, false) = Overflowing::$op(promoted, *prim) {
+        //                     return result.into();
+        //                 }
+        //             }
+        //         }
+        //         self.$op(BigInt::from(rhs)).into()
+        //     }
+        // }
+        // ref_op!($trait<$prim> for CBigInt, $op);
+        // ref_op!($trait<CBigInt> for $prim, $op);
     };
     [
         [int $(, $_1:tt)*], [$prim:ident, $to_prim:ident],
@@ -1292,34 +1287,51 @@ macro_rules! each_prim_and_op {
             $trait:ident,
             $op:ident,
             $assign_trait:ident,
-            $assign_op:ident,
-            $overflowing_op:ident
+            $assign_op:ident
         ]
     ] => {
-        impl $trait<$prim> for CBigInt {
-            type Output = CBigInt;
-            fn $op(self, rhs: $prim) -> Self::Output {
-                if let Small(lhs) = &self {
-                    if let Ok(rhs) = u32::try_from(rhs) {
-                        if let (result, false) = lhs.$overflowing_op(rhs) {
-                            return result.into();
-                        }
-                    }
-                }
-                BigInt::from(self).$op(rhs).into()
-            }
-        }
-        ref_op!($trait<$prim> for CBigInt, $op);
+        // impl $trait<$prim> for CBigInt {
+        //     type Output = CBigInt;
+        //     fn $op(self, rhs: $prim) -> Self::Output {
+        //         if let Small(lhs) = &self {
+        //             if let Ok(rhs) = u32::try_from(rhs) {
+        //                 if let (result, false) = lhs.$overflowing_op(rhs) {
+        //                     return result.into();
+        //                 }
+        //             }
+        //         }
+        //         BigInt::from(self).$op(rhs).into()
+        //     }
+        // }
+        // ref_op!($trait<$prim> for CBigInt, $op);
     };
-    [$($_1:tt),*] => {};
+    [
+        [int $(, $_1:tt)*], [$prim:ident, $to_prim:ident],
+        bit_op, [
+            $trait:ident,
+            $op:ident,
+            $assign_trait:ident,
+            $assign_op:ident
+        ]
+    ] => {};
+    [
+        [float $(, $_1:tt)*], [$prim:ident, $to_prim:ident],
+        $op:tt, $op_attrs:tt
+    ] => {};
 }
+
+each_prim_and_op!(
+    [int, signed],
+    [i8, to_i8],
+    arith_op,
+    [Add, add, AddAssign, add_assign]
+);
 
 impl ToPrimitive for CBigInt {
     with_prims!(to_prim_method, []);
 }
 
 with_prims!(each_prim, []);
-with_prims_and_ops!(each_prim_and_op, []);
 with_ops!(op_traits, []);
 
 #[test]

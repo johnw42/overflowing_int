@@ -48,15 +48,15 @@ macro_rules! with_ops {
         );
     };
 }
-
-macro_rules! with_ops_for_each_prim {
-    [$macro:ident, [$($arg:tt),*] $(, $prim_arg:tt)*] => {
-        with_ops!($macro, [$($arg,)* $($prim_arg,)*]);
-    };
-}
-
-macro_rules! with_prims_and_ops {
-    ($macro:ident, $args:tt) => {
-        with_prims!(with_ops_for_each_prim, [$macro, $args]);
-    };
-}
+//
+// macro_rules! with_ops_for_each_prim {
+//     [$macro:ident, [$($arg:tt),*] $(, $prim_arg:tt)*] => {
+//         with_ops!($macro, [$($arg,)* $($prim_arg,)*]);
+//     };
+// }
+//
+// macro_rules! with_prims_and_ops {
+//     ($macro:ident, $args:tt) => {
+//         with_prims!(with_ops_for_each_prim, [$macro, $args]);
+//     };
+// }

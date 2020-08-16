@@ -6,11 +6,21 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["unsafe_encoding"]
+unsafe_encoding = []
+
 [dependencies]
 num-bigint = "0.3"
 num-traits = "0.2.12"
 num-integer = "0.1.43"
 
-[features]
-default = ["unsafe_encoding"]
-unsafe_encoding = []
+[dev-dependencies]
+rand = "0.7.3"
+rand_distr = "0.2.2"
+criterion = "0.3.3"
+num = "0.3.0"
+
+[[bench]]
+name = "benchmark"
+harness = false
