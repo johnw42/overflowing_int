@@ -16,6 +16,7 @@ mod num_trait_impls;
 mod convert;
 mod decoded;
 mod encoding;
+mod ops;
 mod overflowing;
 mod to_cow;
 

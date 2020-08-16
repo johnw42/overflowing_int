@@ -2,6 +2,7 @@ use crate::cbigint::CBigInt;
 use crate::decoded::Decoded;
 use crate::Digit;
 use num_bigint::{BigInt, BigUint, Sign::*, ToBigInt, ToBigUint, TryFromBigIntError};
+use num_traits::ToPrimitive;
 use std::borrow::Cow;
 use std::convert::{TryFrom, TryInto};
 
@@ -64,3 +65,37 @@ impl TryFrom<&CBigInt> for BigUint {
         value.clone().try_into()
     }
 }
+
+macro_rules! prim_conv {
+    [[int $(, $int_attr:tt)*], [$prim:ident, $to_prim:ident]] => {
+        impl From<$prim> for CBigInt {
+            fn from(value: $prim) -> Self {
+                if let Ok(digit) = Digit::try_from(value) {
+                    CBigInt(Decoded::Digit(digit).encode())
+                } else {
+                    BigInt::from(value).into()
+                }
+            }
+        }
+        impl TryFrom<CBigInt> for $prim {
+            type Error = TryFromBigIntError<BigInt>;
+            fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
+                if let Some(n) = value.to_digit() {
+                    match n.$to_prim() {
+                        Some(prim) => Ok(prim),
+                        None => {
+                            // This is guaranteed to fail; it's done because there's no more
+                            // straightforward way to construct an appropriate TryFromBigIntError.
+                            $prim::try_from(BigInt::from(value))
+                        }
+                    }
+                } else {
+                    $prim::try_from(BigInt::from(value))
+                }
+            }
+        }
+    };
+    [[float $(, $float_attr:tt)*], $prim_attrs:tt] => {};
+}
+
+with_prims!(prim_conv, []);
