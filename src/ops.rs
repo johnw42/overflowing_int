@@ -231,27 +231,21 @@ mod bigint_ops {
 
 macro_rules! bigint_op_traits {
     [arith_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
-        impl $trait<CBigInt> for CBigInt {
+        impl<'a, T> $trait<T> for CBigInt
+        where
+            T: ToDecodedCow<'a>,
+        {
             type Output = CBigInt;
-            fn $op(self, rhs: CBigInt) -> Self::Output {
+            fn $op(self, rhs: T) -> Self::Output {
                 bigint_ops::$op.call(self, rhs)
             }
         }
-        impl $trait<CBigInt> for &CBigInt {
+        impl<'a, T> $trait<T> for &'a CBigInt
+        where
+            T: ToDecodedCow<'a>,
+        {
             type Output = CBigInt;
-            fn $op(self, rhs: CBigInt) -> Self::Output {
-                bigint_ops::$op.call(self, rhs)
-            }
-        }
-        impl $trait<&CBigInt> for CBigInt {
-            type Output = CBigInt;
-            fn $op(self, rhs: &CBigInt) -> Self::Output {
-                bigint_ops::$op.call(self, rhs)
-            }
-        }
-        impl $trait<&CBigInt> for &CBigInt {
-            type Output = CBigInt;
-            fn $op(self, rhs: &CBigInt) -> Self::Output {
+            fn $op(self, rhs: T) -> Self::Output {
                 bigint_ops::$op.call(self, rhs)
             }
         }
@@ -394,13 +388,13 @@ macro_rules! prim_op_traits {
     };
 }
 
-macro_rules! prim_ops {
+macro_rules! prim_op_traits_for_prim {
     [$($arg:tt),*] => {
         with_ops!(prim_op_traits, [$($arg),*]);
     };
 }
 
-with_prims!(prim_ops, []);
+with_prims!(prim_op_traits_for_prim, []);
 with_ops!(bigint_op_traits, []);
 
 #[test]
