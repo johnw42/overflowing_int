@@ -6,11 +6,12 @@ pub trait Overflowing: Sized {
     fn rem(self, rhs: Self) -> (Self, bool);
     fn shl(self, rhs: u32) -> (Self, bool);
     fn shr(self, rhs: u32) -> (Self, bool);
-    // fn neg(self) -> (Self, bool);
-    // fn abs(self) -> (Self, bool);
+    fn bit_and(self, rhs: Self) -> (Self, bool);
+    fn bit_or(self, rhs: Self) -> (Self, bool);
+    fn bit_xor(self, rhs: Self) -> (Self, bool);
 }
 
-macro_rules! each_prim {
+macro_rules! impl_overflowing {
     [[int $(, $_1:tt)*], [$prim:ident, $to_prim:ident]] => {
         impl Overflowing for $prim {
             fn add(self, rhs: Self) -> (Self, bool) { self.overflowing_add(rhs) }
@@ -20,11 +21,12 @@ macro_rules! each_prim {
             fn rem(self, rhs: Self) -> (Self, bool) { self.overflowing_rem(rhs) }
             fn shl(self, rhs: u32) -> (Self, bool) { self.overflowing_shl(rhs) }
             fn shr(self, rhs: u32) -> (Self, bool) { self.overflowing_shr(rhs) }
-            // fn neg(self) -> (Self, bool) { self.overflowing_neg() }
-            // fn abs(self) -> (Self, bool) { self.overflowing_abs() }
+            fn bit_and(self, rhs: Self) -> (Self, bool) { (self & rhs, false) }
+            fn bit_or(self, rhs: Self) -> (Self, bool) { (self | rhs, false) }
+            fn bit_xor(self, rhs: Self) -> (Self, bool) { (self ^ rhs, false) }
         }
     };
     [$($_:tt)*] => {};
 }
 
-with_prims!(each_prim, []);
+with_prims!(impl_overflowing, []);

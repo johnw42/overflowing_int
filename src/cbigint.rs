@@ -8,7 +8,7 @@ use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::{ToPrimitive, Zero};
 
 use crate::accum::*;
-use crate::decoded::Decoded;
+use crate::decoded::{Decoded, DecodedMut};
 use crate::encoding::Encoded;
 use crate::Sign::*;
 use crate::{Digit, Udigit, DIGIT_BITS};
@@ -59,6 +59,14 @@ impl CBigInt {
 
     pub(crate) fn decode_mut(&mut self) -> Decoded<&mut BigInt> {
         self.0.decode_mut()
+    }
+
+    pub(crate) fn decode_mut2<'a>(&'a mut self) -> DecodedMut<'a, CBigInt> {
+        let ptr = self as *mut CBigInt;
+        match self.0.decode_mut() {
+            Decoded::Digit(digit) => DecodedMut::Digit(digit, unsafe { &mut *ptr }),
+            Decoded::Big(big) => DecodedMut::Big(big),
+        }
     }
 
     pub(crate) fn to_digit(&self) -> Option<Digit> {

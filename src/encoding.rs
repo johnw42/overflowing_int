@@ -11,6 +11,7 @@ mod inner {
     use crate::{Digit, Udigit};
 
     use super::*;
+    use crate::decoded::DecodedMut;
 
     pub struct Encoded(pub Udigit);
 
@@ -94,6 +95,7 @@ mod inner {
                 Decoded::Digit(self.digit())
             }
         }
+
         pub fn encode(decoded: Decoded<BigInt>) -> Encoded {
             debug_assert!(align_of::<BigInt>() > 1);
             debug_assert!(align_of::<BigInt>().is_power_of_two());
@@ -148,6 +150,7 @@ mod inner {
 #[cfg(not(feature = "unsafe_encoding"))]
 mod inner {
     use super::*;
+    use crate::decoded::DecodedMut;
 
     #[derive(Clone)]
     pub struct Encoded(pub Decoded<BigInt>);
@@ -186,6 +189,23 @@ mod inner {
                 Decoded::Big(n) => Decoded::Big(n),
             }
         }
+
+        // pub fn decode_mut2<'a, T>(
+        //     whole: &'a mut T,
+        //     extract: fn(&'a mut T) -> &'a mut Encoded,
+        // ) -> DecodedMut<'a, T> {
+        //     let part = extract(whole);
+        //     if let Decoded::Digit(digit) = part.0 {
+        //         todo!()
+        //     }
+        //     return DecodedMut::Digit(0, whole);
+        //
+        //     // match &mut extract(whole).0 {
+        //     //     &mut Decoded::Digit(n) => DecodedMut::Digit(n, whole),
+        //     //     Decoded::Big(n) => DecodedMut::Big(n),
+        //     // }
+        //     todo!()
+        // }
 
         pub fn encode(decoded: Decoded<BigInt>) -> Encoded {
             Encoded(decoded)
