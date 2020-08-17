@@ -17,7 +17,7 @@ mod convert;
 mod decoded;
 mod encoding;
 mod ops;
-mod overflowing;
+mod checked;
 mod to_cow;
 
 #[cfg(feature = "i128_digit")]
