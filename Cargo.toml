@@ -11,6 +11,9 @@ default = ["i128_digit"]
 unsafe_encoding = []
 i128_digit = []
 
+#[build]
+#rustflags = ["-Z", "macro-backtrace"]
+
 [dependencies]
 num-bigint = "0.3"
 num-traits = "0.2.12"
