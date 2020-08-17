@@ -1,5 +1,5 @@
 use crate::cbigint::CBigInt;
-use crate::decoded::{Decoded, DecodedMut};
+use crate::decoded::Decoded;
 use crate::overflowing::Overflowing;
 use crate::to_cow::{ToCow, ToDecodedCow};
 use crate::Digit;
@@ -7,8 +7,8 @@ use num_bigint::BigInt;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::ops::{
-    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, DerefMut, Div,
-    DivAssign, Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
+    Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 
 struct BinaryOp {
@@ -60,22 +60,54 @@ impl BinaryOp {
             }
         }
 
-        match (lhs.decode_mut(), rhs.to_cow()) {
-            (Decoded::Digit(_), Owned(rhs)) => {
-                *lhs = (self.owned)(BigInt::from(std::mem::take(lhs)), rhs).into();
+        let target = lhs;
+        let lhs = std::mem::take(target);
+        *target = match (lhs.decode(), rhs.to_cow()) {
+            (Decoded::Digit(digit), Owned(rhs)) => (self.owned)(BigInt::from(digit), rhs),
+            (Decoded::Digit(digit), Borrowed(rhs)) => {
+                (self.owned_borrowed)(BigInt::from(digit), rhs)
             }
-            (Decoded::Digit(_), Borrowed(rhs)) => {
-                *lhs = (self.owned_borrowed)(BigInt::from(std::mem::take(lhs)), rhs).into();
+            (Decoded::Big(mut big), Owned(rhs)) => {
+                (self.update_owned)(&mut big, rhs);
+                big
             }
-            (Decoded::Big(big), Owned(rhs)) => {
-                (self.update_owned)(big, rhs);
-                *lhs = std::mem::take(big).into()
-            }
-            (Decoded::Big(big), Borrowed(rhs)) => {
-                (self.update_borrowed)(big, rhs);
-                *lhs = std::mem::take(big).into()
+            (Decoded::Big(mut big), Borrowed(rhs)) => {
+                (self.update_borrowed)(&mut big, rhs);
+                big
             }
         }
+        .into();
+    }
+
+    fn call_update_prim<'a, R>(
+        &self,
+        lhs: &mut CBigInt,
+        rhs: R,
+        big_op: fn(BigInt, R) -> BigInt,
+        big_assign_op: for<'b> fn(&'b mut BigInt, R),
+    ) where
+        R: Copy,
+        Digit: TryFrom<R>,
+    {
+        if let Decoded::Digit(lhs) = &mut lhs.decode_mut() {
+            if let Ok(rhs) = Digit::try_from(rhs) {
+                if let Some(out) = (self.digits)(*lhs, rhs) {
+                    *lhs = out;
+                    return;
+                }
+            }
+        }
+
+        let target = lhs;
+        let lhs = std::mem::take(target);
+        *target = match lhs.decode() {
+            Decoded::Digit(digit) => big_op(BigInt::from(digit), rhs),
+            Decoded::Big(mut big) => {
+                big_assign_op(&mut big, rhs);
+                big
+            }
+        }
+        .into();
     }
 
     fn call_prim_rhs<'a, L, R>(
@@ -197,7 +229,7 @@ mod bigint_ops {
     with_ops!(bigint_op, []);
 }
 
-macro_rules! op_traits {
+macro_rules! bigint_op_traits {
     [arith_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
         impl $trait<CBigInt> for CBigInt {
             type Output = CBigInt;
@@ -223,60 +255,25 @@ macro_rules! op_traits {
                 bigint_ops::$op.call(self, rhs)
             }
         }
-        assign_op!($trait, $op, $assign_trait, $assign_op);
+        impl<'a, T> $assign_trait<T> for CBigInt
+        where
+            T: ToDecodedCow<'a>
+        {
+            fn $assign_op(&mut self, rhs: T) {
+                bigint_ops::$op.call_update(self, rhs);
+            }
+        }
     };
     [bit_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
         // Bit ops work the same as other ops.
-        op_traits!(arith_op, [$trait, $op, $assign_trait, $assign_op]);
+        bigint_op_traits!(arith_op, [$trait, $op, $assign_trait, $assign_op]);
     };
     [shift_op, [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident]] => {
         // Can't shift a BigInt by a BigInt.
     };
 }
 
-macro_rules! assign_op {
-    [$trait:ident, $op:ident, $assign_trait:ident, $assign_op:ident] => {
-        // impl<T> $assign_trait<T> for CBigInt
-        // where
-        //     CBigInt: $trait<T, Output = CBigInt>,
-        //     BigInt: From<T>,
-        //     BigInt: $assign_trait,
-        // {
-        //     fn $assign_op(&mut self, rhs: T) {
-        //         match self.decode_mut() {
-        //             Decoded::Digit(_) => {
-        //                 let lhs = std::mem::take(self);
-        //                 *self = lhs.$op(rhs);
-        //             }
-        //             Decoded::Big(big) => {
-        //                 big.$assign_op(BigInt::from(rhs));
-        //             }
-        //         }
-        //     }
-        // }
-
-        // impl<'a, T> $assign_trait<T> for CBigInt
-        // where
-        //     CBigInt: $trait<T, Output = CBigInt>,
-        //     T: ToDecodedCow<'a>,
-        //     BigInt: $assign_trait,
-        // {
-        //     fn $assign_op(&mut self, rhs: T) {
-        //         match self.decode_mut() {
-        //             Decoded::Digit(_) => {
-        //                 let lhs = std::mem::take(self);
-        //                 *self = lhs.$op(rhs);
-        //             }
-        //             Decoded::Big(big) => {
-        //                 big.$assign_op(BigInt::from(rhs));
-        //             }
-        //         }
-        //     }
-        // }
-    };
-}
-
-macro_rules! prim_op {
+macro_rules! prim_op_traits {
     [
         [int $(, $_1:tt)*], [$prim:ident, $to_prim:ident],
         arith_op, [
@@ -316,10 +313,7 @@ macro_rules! prim_op {
 
         impl $assign_trait<$prim> for CBigInt {
             fn $assign_op(&mut self, rhs: $prim) {
-                match self.decode_mut() {
-                    Decoded::Digit(_) => *self = self.clone().$op(rhs),
-                    Decoded::Big(big) => big.$assign_op(rhs),
-                }
+                bigint_ops::$op.call_update_prim(self, rhs, BigInt::$op, BigInt::$assign_op);
             }
         }
 
@@ -328,35 +322,6 @@ macro_rules! prim_op {
                 self.$assign_op(*rhs);
             }
         }
-
-        // impl $trait<$prim> for CBigInt {
-        //     type Output = CBigInt;
-        //     fn $op(self, rhs: $prim) -> Self::Output {
-        //         if let Small(prim) = &self {
-        //             if let Ok(promoted) = Digit::try_from(rhs) {
-        //                 if let (result, false) = Overflowing::$op(prim, promoted) {
-        //                     return result.into();
-        //                 }
-        //             }
-        //         }
-        //         BigInt::from(self).$op(rhs).into()
-        //     }
-        // }
-        // impl $trait<CBigInt> for $prim {
-        //     type Output = CBigInt;
-        //     fn $op(self, rhs: CBigInt) -> Self::Output {
-        //         if let Small(prim) = &rhs {
-        //             if let Ok(promoted) = Digit::try_from(self) {
-        //                 if let (result, false) = Overflowing::$op(promoted, *prim) {
-        //                     return result.into();
-        //                 }
-        //             }
-        //         }
-        //         self.$op(BigInt::from(rhs)).into()
-        //     }
-        // }
-        // ref_op!($trait<$prim> for CBigInt, $op);
-        // ref_op!($trait<CBigInt> for $prim, $op);
     };
     [
         [int $(, $_1:tt)*], [$prim:ident, $to_prim:ident],
@@ -411,7 +376,7 @@ macro_rules! prim_op {
         }
     };
     [
-        [int $(, $_1:tt)*], [$prim:ident, $to_prim:ident],
+        [int $(, $int_attr:tt)*], [$prim:ident, $to_prim:ident],
         bit_op, [
             $trait:ident,
             $op:ident,
@@ -419,28 +384,24 @@ macro_rules! prim_op {
             $assign_op:ident
         ]
     ] => {
+        // No bitwise operations on primitives.
     };
     [
         [float $(, $_1:tt)*], [$prim:ident, $to_prim:ident],
         $op:tt, $op_attrs:tt
-    ] => {};
+    ] => {
+        // For operations on float primitives.
+    };
 }
-
-// impl Shl<i8> for CBigInt {
-//     type Output = CBigInt;
-//     fn shl(self, rhs: i8) -> CBigInt {
-//         bigint_ops::shl.call(&self, rhs, BigInt::shl, |x, y| x.shl(y))
-//     }
-// }
 
 macro_rules! prim_ops {
     [$($arg:tt),*] => {
-        with_ops!(prim_op, [$($arg),*]);
+        with_ops!(prim_op_traits, [$($arg),*]);
     };
 }
 
 with_prims!(prim_ops, []);
-with_ops!(op_traits, []);
+with_ops!(bigint_op_traits, []);
 
 #[test]
 fn test() {

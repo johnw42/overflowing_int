@@ -3,17 +3,12 @@ use std::borrow::Cow;
 use num_bigint::BigInt;
 
 use crate::encoding::Encoded;
-use crate::{CBigInt, Digit};
+use crate::Digit;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Decoded<T> {
     Digit(Digit),
     Big(T),
-}
-
-pub enum DecodedMut<'a, T> {
-    Digit(Digit, &'a mut T),
-    Big(&'a mut BigInt),
 }
 
 impl From<BigInt> for Decoded<BigInt> {
