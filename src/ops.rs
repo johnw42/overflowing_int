@@ -435,6 +435,7 @@ with_ops!(bigint_op_traits, []);
 #[cfg(test)]
 mod test {
     use super::*;
+    use foreach_macro::for_each;
     use num_traits::Zero;
 
     fn always(_lhs: &BigInt, _rhs: &BigInt) -> bool {
@@ -445,159 +446,216 @@ mod test {
         !rhs.is_zero()
     }
 
-    fn test_bin_op(
+    fn test_bin_op<L, R>(
         predicate: fn(&BigInt, &BigInt) -> bool,
-        cbigint_op1: fn(CBigInt, CBigInt) -> CBigInt,
-        cbigint_op2: fn(CBigInt, &CBigInt) -> CBigInt,
-        cbigint_op3: fn(&CBigInt, CBigInt) -> CBigInt,
-        cbigint_op4: fn(&CBigInt, &CBigInt) -> CBigInt,
+        cbigint_op1: fn(L, R) -> CBigInt,
+        cbigint_op2: fn(L, &R) -> CBigInt,
+        cbigint_op3: fn(&L, R) -> CBigInt,
+        cbigint_op4: fn(&L, &R) -> CBigInt,
         bigint_op: fn(&BigInt, &BigInt) -> BigInt,
-    ) {
-        let mut small_range = vec![Digit::MIN, Digit::MAX, -Digit::MAX];
+    ) where
+        L: TryFrom<BigInt> + Clone,
+        R: TryFrom<BigInt> + Clone,
+    {
+        let mut small_range: Vec<i128> = vec![Digit::MIN, Digit::MAX, -Digit::MAX];
         small_range.extend((-10..=10).into_iter());
-        let mut range: Vec<_> = small_range.into_iter().map(BigInt::from).collect();
-        let huge = BigInt::from(i128::MAX).pow(2);
+        let mut range: Vec<BigInt> = small_range.into_iter().map(From::from).collect();
+        let huge: BigInt = <BigInt as From<i128>>::from(i128::MAX).pow(2);
         range.push(huge.clone());
         range.push(-huge);
 
-        for a in &range {
-            for b in &range {
-                if predicate(a, b) {
-                    let expected = bigint_op(a, b);
-                    let actual1 = BigInt::from(cbigint_op1(
-                        CBigInt::from(a.clone()),
-                        CBigInt::from(b.clone()),
-                    ));
-                    let actual2 = BigInt::from(cbigint_op2(
-                        CBigInt::from(a.clone()),
-                        &CBigInt::from(b.clone()),
-                    ));
-                    let actual3 = BigInt::from(cbigint_op3(
-                        &CBigInt::from(a.clone()),
-                        CBigInt::from(b.clone()),
-                    ));
-                    let actual4 = BigInt::from(cbigint_op4(
-                        &CBigInt::from(a.clone()),
-                        &CBigInt::from(b.clone()),
-                    ));
-                    assert_eq!(
-                        expected, actual1,
-                        "failed: f({}, {}) == {} (got {})",
-                        a, b, expected, actual1
-                    );
-                    assert_eq!(
-                        expected, actual2,
-                        "failed: f({}, {}) == {} (got {})",
-                        a, b, expected, actual2
-                    );
-                    assert_eq!(
-                        expected, actual3,
-                        "failed: f({}, {}) == {} (got {})",
-                        a, b, expected, actual3
-                    );
-                    assert_eq!(
-                        expected, actual4,
-                        "failed: f({}, {}) == {} (got {})",
-                        a, b, expected, actual4
-                    );
+        for big_lhs in &range {
+            for big_rhs in &range {
+                if predicate(big_lhs, big_rhs) {
+                    if let (Ok(ref lhs), Ok(ref rhs)) =
+                        (L::try_from(big_lhs.clone()), R::try_from(big_rhs.clone()))
+                    {
+                        let expected = bigint_op(big_lhs, big_rhs);
+                        let actual1 =
+                            BigInt::from(cbigint_op1(L::from(lhs.clone()), R::from(rhs.clone())));
+                        let actual2 =
+                            BigInt::from(cbigint_op2(L::from(lhs.clone()), &R::from(rhs.clone())));
+                        let actual3 =
+                            BigInt::from(cbigint_op3(&L::from(lhs.clone()), R::from(rhs.clone())));
+                        let actual4 =
+                            BigInt::from(cbigint_op4(&L::from(lhs.clone()), &R::from(rhs.clone())));
+                        assert_eq!(
+                            expected, actual1,
+                            "failed: f({}, {}) == {} (got {})",
+                            big_lhs, big_rhs, expected, actual1
+                        );
+                        assert_eq!(
+                            expected, actual2,
+                            "failed: f({}, {}) == {} (got {})",
+                            big_lhs, big_rhs, expected, actual2
+                        );
+                        assert_eq!(
+                            expected, actual3,
+                            "failed: f({}, {}) == {} (got {})",
+                            big_lhs, big_rhs, expected, actual3
+                        );
+                        assert_eq!(
+                            expected, actual4,
+                            "failed: f({}, {}) == {} (got {})",
+                            big_lhs, big_rhs, expected, actual4
+                        );
+                    }
                 }
             }
         }
     }
 
-    #[test]
-    fn test_add() {
-        test_bin_op(
-            always,
-            |x, y| Add::add(x, y),
-            |x, y| Add::add(x, y),
-            |x, y| Add::add(x, y),
-            |x, y| Add::add(x, y),
-            |x, y| Add::add(x, y),
-        );
-    }
-
-    #[test]
-    fn test_sub() {
-        test_bin_op(
-            always,
-            |x, y| Sub::sub(x, y),
-            |x, y| Sub::sub(x, y),
-            |x, y| Sub::sub(x, y),
-            |x, y| Sub::sub(x, y),
-            |x, y| Sub::sub(x, y),
-        );
-    }
-
-    #[test]
-    fn test_mul() {
-        test_bin_op(
-            always,
-            |x, y| Mul::mul(x, y),
-            |x, y| Mul::mul(x, y),
-            |x, y| Mul::mul(x, y),
-            |x, y| Mul::mul(x, y),
-            |x, y| Mul::mul(x, y),
-        );
-    }
-
-    #[test]
-    fn test_div() {
-        test_bin_op(
-            nonzero_rhs,
-            |x, y| Div::div(x, y),
-            |x, y| Div::div(x, y),
-            |x, y| Div::div(x, y),
-            |x, y| Div::div(x, y),
-            |x, y| Div::div(x, y),
-        );
-    }
-
-    #[test]
-    fn test_rem() {
-        test_bin_op(
-            nonzero_rhs,
-            |x, y| Rem::rem(x, y),
-            |x, y| Rem::rem(x, y),
-            |x, y| Rem::rem(x, y),
-            |x, y| Rem::rem(x, y),
-            |x, y| Rem::rem(x, y),
-        );
-    }
-
-    #[test]
-    fn test_bitand() {
-        test_bin_op(
-            always,
-            |x, y| BitAnd::bitand(x, y),
-            |x, y| BitAnd::bitand(x, y),
-            |x, y| BitAnd::bitand(x, y),
-            |x, y| BitAnd::bitand(x, y),
-            |x, y| BitAnd::bitand(x, y),
-        );
-    }
-
-    #[test]
-    fn test_bitor() {
-        test_bin_op(
-            always,
-            |x, y| BitOr::bitor(x, y),
-            |x, y| BitOr::bitor(x, y),
-            |x, y| BitOr::bitor(x, y),
-            |x, y| BitOr::bitor(x, y),
-            |x, y| BitOr::bitor(x, y),
-        );
-    }
-
-    #[test]
-    fn test_bitxor() {
-        test_bin_op(
-            always,
-            |x, y| BitXor::bitxor(x, y),
-            |x, y| BitXor::bitxor(x, y),
-            |x, y| BitXor::bitxor(x, y),
-            |x, y| BitXor::bitxor(x, y),
-            |x, y| BitXor::bitxor(x, y),
-        );
-    }
+    for_each!([$trait, $op, $pred] in [
+        [Add, add, always]
+        [Sub, sub, always]
+        [Mul, mul, always]
+        [Div, div, nonzero_rhs]
+        [Rem, rem, nonzero_rhs]
+        [BitAnd, bitand, always]
+        [BitOr,  bitor,  always]
+        [BitXor, bitxor, always]
+    ] {
+        #[test]
+        fn $(test_ $op)() {
+            test_bin_op::<CBigInt, CBigInt>(
+                $pred,
+                |x, y| $trait::$op(x, y),
+                |x, y| $trait::$op(x, y),
+                |x, y| $trait::$op(x, y),
+                |x, y| $trait::$op(x, y),
+                |x, y| $trait::$op(x, y),
+            );
+        }
+    });
+    for_each!([$trait, $op, $pred] in [
+        [Add, add, always]
+        [Sub, sub, always]
+        [Mul, mul, always]
+        [Div, div, nonzero_rhs]
+        [Rem, rem, nonzero_rhs]
+    ] {
+        for_each!($other_type in [
+            i8 i16 i32 i64 i128 isize
+            u8 u16 u32 u64 u128 usize
+        ] {
+            #[test]
+            fn $(test_ $op _ $other_type _lhs)() {
+                test_bin_op::<$other_type, CBigInt>(
+                    $pred,
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                );
+            }
+            #[test]
+            fn $(test_ $op _ $other_type _rhs)() {
+                test_bin_op::<CBigInt, $other_type>(
+                    $pred,
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                );
+            }
+        });
+    });
+    //
+    // #[test]
+    // fn test_add() {
+    //     test_bin_op(
+    //         always,
+    //         |x, y| Add::add(x, y),
+    //         |x, y| Add::add(x, y),
+    //         |x, y| Add::add(x, y),
+    //         |x, y| Add::add(x, y),
+    //         |x, y| Add::add(x, y),
+    //     );
+    // }
+    //
+    // #[test]
+    // fn test_sub() {
+    //     test_bin_op(
+    //         always,
+    //         |x, y| Sub::sub(x, y),
+    //         |x, y| Sub::sub(x, y),
+    //         |x, y| Sub::sub(x, y),
+    //         |x, y| Sub::sub(x, y),
+    //         |x, y| Sub::sub(x, y),
+    //     );
+    // }
+    //
+    // #[test]
+    // fn test_mul() {
+    //     test_bin_op(
+    //         always,
+    //         |x, y| Mul::mul(x, y),
+    //         |x, y| Mul::mul(x, y),
+    //         |x, y| Mul::mul(x, y),
+    //         |x, y| Mul::mul(x, y),
+    //         |x, y| Mul::mul(x, y),
+    //     );
+    // }
+    //
+    // #[test]
+    // fn test_div() {
+    //     test_bin_op(
+    //         nonzero_rhs,
+    //         |x, y| Div::div(x, y),
+    //         |x, y| Div::div(x, y),
+    //         |x, y| Div::div(x, y),
+    //         |x, y| Div::div(x, y),
+    //         |x, y| Div::div(x, y),
+    //     );
+    // }
+    //
+    // #[test]
+    // fn test_rem() {
+    //     test_bin_op(
+    //         nonzero_rhs,
+    //         |x, y| Rem::rem(x, y),
+    //         |x, y| Rem::rem(x, y),
+    //         |x, y| Rem::rem(x, y),
+    //         |x, y| Rem::rem(x, y),
+    //         |x, y| Rem::rem(x, y),
+    //     );
+    // }
+    //
+    // #[test]
+    // fn test_bitand() {
+    //     test_bin_op(
+    //         always,
+    //         |x, y| BitAnd::bitand(x, y),
+    //         |x, y| BitAnd::bitand(x, y),
+    //         |x, y| BitAnd::bitand(x, y),
+    //         |x, y| BitAnd::bitand(x, y),
+    //         |x, y| BitAnd::bitand(x, y),
+    //     );
+    // }
+    //
+    // #[test]
+    // fn test_bitor() {
+    //     test_bin_op(
+    //         always,
+    //         |x, y| BitOr::bitor(x, y),
+    //         |x, y| BitOr::bitor(x, y),
+    //         |x, y| BitOr::bitor(x, y),
+    //         |x, y| BitOr::bitor(x, y),
+    //         |x, y| BitOr::bitor(x, y),
+    //     );
+    // }
+    //
+    // #[test]
+    // fn test_bitxor() {
+    //     test_bin_op(
+    //         always,
+    //         |x, y| BitXor::bitxor(x, y),
+    //         |x, y| BitXor::bitxor(x, y),
+    //         |x, y| BitXor::bitxor(x, y),
+    //         |x, y| BitXor::bitxor(x, y),
+    //         |x, y| BitXor::bitxor(x, y),
+    //     );
+    // }
 }
