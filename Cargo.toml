@@ -21,7 +21,7 @@ rand = "0.7.3"
 criterion = "0.3.3"
 num = "0.3.0"
 num-bigint = {version="0.3", features=["rand"]}
-foreach_macro = {path = "../foreach_macro"}
+expand_macro = {path = "../expand_macro"}
 
 [[bench]]
 name = "benchmark"

@@ -435,7 +435,7 @@ with_ops!(bigint_op_traits, []);
 #[cfg(test)]
 mod test {
     use super::*;
-    use foreach_macro::for_each;
+    use expand_macro::expand;
     use num_traits::Zero;
 
     fn always(_lhs: &BigInt, _rhs: &BigInt) -> bool {
@@ -505,8 +505,8 @@ mod test {
         }
     }
 
-    for_each! {
-        [$trait, $op, $pred] in [
+    expand! {
+        for [$trait, $op, $pred] in [
             [Add, add, always]
             [Sub, sub, always]
             [Mul, mul, always]
@@ -528,41 +528,41 @@ mod test {
             );
         }
     }
-    for_each! {
-        [$trait, $op, $pred] in [
+    expand! {
+        for [$trait, $op, $pred] in [
             [Add, add, always]
             [Sub, sub, always]
             [Mul, mul, always]
             [Div, div, nonzero_rhs]
             [Rem, rem, nonzero_rhs]
         ] =>
-        for_each! {
-            $other_type in [
+        expand! {
+            for $other_type in [
                 i8 i16 i32 i64 i128 isize
                 u8 u16 u32 u64 u128 usize
             ] =>
             #[test]
             fn ${test_ $op _ $other_type _lhs}() {
-                // test_bin_op::<$other_type, CBigInt>(
-                //     $pred,
-                //     |x, y| $trait::$op(x, y),
-                //     |x, y| $trait::$op(x, y),
-                //     |x, y| $trait::$op(x, y),
-                //     |x, y| $trait::$op(x, y),
-                //     |x, y| $trait::$op(x, y),
-                // );
+                test_bin_op::<$other_type, CBigInt>(
+                    $pred,
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                );
             }
-    //         #[test]
-    //         fn ${test_ $op _ $other_type _rhs}() {
-    //             test_bin_op::<CBigInt, $other_type>(
-    //                 $pred,
-    //                 |x, y| $trait::$op(x, y),
-    //                 |x, y| $trait::$op(x, y),
-    //                 |x, y| $trait::$op(x, y),
-    //                 |x, y| $trait::$op(x, y),
-    //                 |x, y| $trait::$op(x, y),
-    //             );
-    //         }
+            #[test]
+            fn ${test_ $op _ $other_type _rhs}() {
+                test_bin_op::<CBigInt, $other_type>(
+                    $pred,
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                );
+            }
         }
     }
 }
