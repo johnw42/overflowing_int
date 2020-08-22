@@ -446,6 +446,47 @@ mod test {
         !rhs.is_zero()
     }
 
+    fn make_range() -> Vec<BigInt> {
+        let mut small_range: Vec<i128> = vec![Digit::MIN, Digit::MAX, -Digit::MAX];
+        small_range.extend((-10..=10).into_iter());
+        let mut range: Vec<BigInt> = small_range.into_iter().map(From::from).collect();
+        let huge: BigInt = <BigInt as From<i128>>::from(i128::MAX).pow(2);
+        range.push(huge.clone());
+        range.push(-huge);
+        range
+    }
+
+    fn test_shift_op<R>(
+        cbigint_op1: fn(CBigInt, R) -> CBigInt,
+        cbigint_op2: fn(CBigInt, &R) -> CBigInt,
+        cbigint_op3: fn(&CBigInt, R) -> CBigInt,
+        cbigint_op4: fn(&CBigInt, &R) -> CBigInt,
+        bigint_op: fn(&BigInt, R) -> BigInt,
+    ) where
+        R: TryFrom<u32>,
+        R: Copy,
+    {
+        let range = make_range();
+
+        for big_lhs in &range {
+            for big_rhs in (0..128).chain((150..500).step_by(10)) {
+                let lhs = CBigInt::from(big_lhs.clone());
+                if let Ok(rhs) = R::try_from(big_rhs) {
+                    let expected = bigint_op(big_lhs, rhs);
+                    let actual1 = BigInt::from(cbigint_op1(lhs.clone(), rhs));
+                    let actual2 = BigInt::from(cbigint_op2(lhs.clone(), &rhs));
+                    let actual3 = BigInt::from(cbigint_op3(&lhs, rhs));
+                    let actual4 = BigInt::from(cbigint_op4(&lhs, &rhs));
+                    let label = format!("failed with inputs {}, {}", big_lhs, big_rhs);
+                    assert_eq!(expected, actual1, "{}", label);
+                    assert_eq!(expected, actual2, "{}", label);
+                    assert_eq!(expected, actual3, "{}", label);
+                    assert_eq!(expected, actual4, "{}", label);
+                }
+            }
+        }
+    }
+
     fn test_bin_op<L, R>(
         predicate: fn(&BigInt, &BigInt) -> bool,
         cbigint_op1: fn(L, R) -> CBigInt,
@@ -457,48 +498,24 @@ mod test {
         L: TryFrom<BigInt> + Clone,
         R: TryFrom<BigInt> + Clone,
     {
-        let mut small_range: Vec<i128> = vec![Digit::MIN, Digit::MAX, -Digit::MAX];
-        small_range.extend((-10..=10).into_iter());
-        let mut range: Vec<BigInt> = small_range.into_iter().map(From::from).collect();
-        let huge: BigInt = <BigInt as From<i128>>::from(i128::MAX).pow(2);
-        range.push(huge.clone());
-        range.push(-huge);
+        let range = make_range();
 
         for big_lhs in &range {
             for big_rhs in &range {
                 if predicate(big_lhs, big_rhs) {
-                    if let (Ok(ref lhs), Ok(ref rhs)) =
+                    if let (Ok(lhs), Ok(rhs)) =
                         (L::try_from(big_lhs.clone()), R::try_from(big_rhs.clone()))
                     {
                         let expected = bigint_op(big_lhs, big_rhs);
-                        let actual1 =
-                            BigInt::from(cbigint_op1(L::from(lhs.clone()), R::from(rhs.clone())));
-                        let actual2 =
-                            BigInt::from(cbigint_op2(L::from(lhs.clone()), &R::from(rhs.clone())));
-                        let actual3 =
-                            BigInt::from(cbigint_op3(&L::from(lhs.clone()), R::from(rhs.clone())));
-                        let actual4 =
-                            BigInt::from(cbigint_op4(&L::from(lhs.clone()), &R::from(rhs.clone())));
-                        assert_eq!(
-                            expected, actual1,
-                            "failed: f({}, {}) == {} (got {})",
-                            big_lhs, big_rhs, expected, actual1
-                        );
-                        assert_eq!(
-                            expected, actual2,
-                            "failed: f({}, {}) == {} (got {})",
-                            big_lhs, big_rhs, expected, actual2
-                        );
-                        assert_eq!(
-                            expected, actual3,
-                            "failed: f({}, {}) == {} (got {})",
-                            big_lhs, big_rhs, expected, actual3
-                        );
-                        assert_eq!(
-                            expected, actual4,
-                            "failed: f({}, {}) == {} (got {})",
-                            big_lhs, big_rhs, expected, actual4
-                        );
+                        let actual1 = BigInt::from(cbigint_op1(lhs.clone(), rhs.clone()));
+                        let actual2 = BigInt::from(cbigint_op2(lhs.clone(), &rhs));
+                        let actual3 = BigInt::from(cbigint_op3(&lhs, rhs.clone()));
+                        let actual4 = BigInt::from(cbigint_op4(&lhs, &rhs));
+                        let label = format!("failed with inputs {}, {}", big_lhs, big_rhs);
+                        assert_eq!(expected, actual1, "{}", label);
+                        assert_eq!(expected, actual2, "{}", label);
+                        assert_eq!(expected, actual3, "{}", label);
+                        assert_eq!(expected, actual4, "{}", label);
                     }
                 }
             }
@@ -529,17 +546,33 @@ mod test {
         }
     }
     expand! {
-        for [$trait, $op, $pred] in [
-            [Add, add, always]
-            [Sub, sub, always]
-            [Mul, mul, always]
-            [Div, div, nonzero_rhs]
-            [Rem, rem, nonzero_rhs]
+        for $other_type in [
+            i8 i16 i32 i64 i128 isize
+            u8 u16 u32 u64 u128 usize
         ] =>
         expand! {
-            for $other_type in [
-                i8 i16 i32 i64 i128 isize
-                u8 u16 u32 u64 u128 usize
+            for [$trait, $op] in [
+                [Shl, shl]
+                [Shr, shr]
+            ] =>
+            #[test]
+            fn ${test_ $op _ $other_type _rhs}() {
+                test_shift_op::<$other_type>(
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                    |x, y| $trait::$op(x, y),
+                );
+            }
+        }
+        expand! {
+            for [$trait, $op, $pred] in [
+                [Add, add, always]
+                [Sub, sub, always]
+                [Mul, mul, always]
+                [Div, div, nonzero_rhs]
+                [Rem, rem, nonzero_rhs]
             ] =>
             #[test]
             fn ${test_ $op _ $other_type _lhs}() {

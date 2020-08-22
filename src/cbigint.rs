@@ -529,11 +529,11 @@ impl CBigInt {
         match self.decode_ref() {
             Decoded::Digit(n) => {
                 if n >= 0 {
-                    DIGIT_BITS as u32 - 1 - n.leading_zeros()
+                    DIGIT_BITS as u32 - n.leading_zeros()
                 } else if n == Digit::MIN {
                     DIGIT_BITS as u32
                 } else {
-                    (-n).leading_zeros()
+                    DIGIT_BITS as u32 - (-n).leading_zeros()
                 }
             }
             .into(),
@@ -641,5 +641,18 @@ impl Display for CBigInt {
             Decoded::Digit(n) => write!(f, "{}", n),
             Decoded::Big(n) => write!(f, "{}", n),
         }
+    }
+}
+
+#[test]
+fn bits_test() {
+    use num_traits::One;
+
+    let mut nums: Vec<BigInt> = vec![0.into(), Digit::MAX.into(), Digit::MIN.into()];
+    nums.extend((0..200).step_by(20).map(|x| BigInt::one() << x));
+
+    for big in nums {
+        assert_eq!(big.bits(), CBigInt::from(big.clone()).bits());
+        assert_eq!((-big.clone()).bits(), CBigInt::from((-big).clone()).bits());
     }
 }
