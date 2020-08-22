@@ -649,7 +649,7 @@ fn bits_test() {
     use num_traits::One;
 
     let mut nums: Vec<BigInt> = vec![0.into(), Digit::MAX.into(), Digit::MIN.into()];
-    nums.extend((0..200).step_by(20).map(|x| BigInt::one() << x));
+    nums.extend((0..200).map(|x| BigInt::one() << x));
 
     for big in nums {
         assert_eq!(big.bits(), CBigInt::from(big.clone()).bits());

@@ -461,6 +461,8 @@ mod test {
         cbigint_op2: fn(CBigInt, &R) -> CBigInt,
         cbigint_op3: fn(&CBigInt, R) -> CBigInt,
         cbigint_op4: fn(&CBigInt, &R) -> CBigInt,
+        op_assign1: fn(&mut CBigInt, R),
+        op_assign2: fn(&mut CBigInt, &R),
         bigint_op: fn(&BigInt, R) -> BigInt,
     ) where
         R: TryFrom<u32>,
@@ -477,11 +479,17 @@ mod test {
                     let actual2 = BigInt::from(cbigint_op2(lhs.clone(), &rhs));
                     let actual3 = BigInt::from(cbigint_op3(&lhs, rhs));
                     let actual4 = BigInt::from(cbigint_op4(&lhs, &rhs));
+                    let mut actual5 = lhs.clone();
+                    op_assign1(&mut actual5, rhs);
+                    let mut actual6 = lhs.clone();
+                    op_assign2(&mut actual6, &rhs);
                     let label = format!("failed with inputs {}, {}", big_lhs, big_rhs);
                     assert_eq!(expected, actual1, "{}", label);
                     assert_eq!(expected, actual2, "{}", label);
                     assert_eq!(expected, actual3, "{}", label);
                     assert_eq!(expected, actual4, "{}", label);
+                    assert_eq!(expected, BigInt::from(actual5), "{}", label);
+                    assert_eq!(expected, BigInt::from(actual6), "{}", label);
                 }
             }
         }
@@ -493,6 +501,8 @@ mod test {
         cbigint_op2: fn(L, &R) -> CBigInt,
         cbigint_op3: fn(&L, R) -> CBigInt,
         cbigint_op4: fn(&L, &R) -> CBigInt,
+        op_assign1: fn(&mut CBigInt, R),
+        op_assign2: fn(&mut CBigInt, &R),
         bigint_op: fn(&BigInt, &BigInt) -> BigInt,
     ) where
         L: TryFrom<BigInt> + Clone,
@@ -511,11 +521,17 @@ mod test {
                         let actual2 = BigInt::from(cbigint_op2(lhs.clone(), &rhs));
                         let actual3 = BigInt::from(cbigint_op3(&lhs, rhs.clone()));
                         let actual4 = BigInt::from(cbigint_op4(&lhs, &rhs));
+                        let mut actual5 = big_lhs.clone().into();
+                        op_assign1(&mut actual5, rhs.clone());
+                        let mut actual6 = big_lhs.clone().into();
+                        op_assign2(&mut actual6, &rhs);
                         let label = format!("failed with inputs {}, {}", big_lhs, big_rhs);
                         assert_eq!(expected, actual1, "{}", label);
                         assert_eq!(expected, actual2, "{}", label);
                         assert_eq!(expected, actual3, "{}", label);
                         assert_eq!(expected, actual4, "{}", label);
+                        assert_eq!(expected, BigInt::from(actual5), "{}", label);
+                        assert_eq!(expected, BigInt::from(actual6), "{}", label);
                     }
                 }
             }
@@ -541,6 +557,8 @@ mod test {
                 |x, y| $trait::$op(x, y),
                 |x, y| $trait::$op(x, y),
                 |x, y| $trait::$op(x, y),
+                |x, y| ${$trait Assign}::${$op _assign}(x, y),
+                |x, y| ${$trait Assign}::${$op _assign}(x, y),
                 |x, y| $trait::$op(x, y),
             );
         }
@@ -562,6 +580,8 @@ mod test {
                     |x, y| $trait::$op(x, y),
                     |x, y| $trait::$op(x, y),
                     |x, y| $trait::$op(x, y),
+                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
+                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
                     |x, y| $trait::$op(x, y),
                 );
             }
@@ -582,6 +602,8 @@ mod test {
                     |x, y| $trait::$op(x, y),
                     |x, y| $trait::$op(x, y),
                     |x, y| $trait::$op(x, y),
+                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
+                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
                     |x, y| $trait::$op(x, y),
                 );
             }
@@ -593,6 +615,8 @@ mod test {
                     |x, y| $trait::$op(x, y),
                     |x, y| $trait::$op(x, y),
                     |x, y| $trait::$op(x, y),
+                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
+                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
                     |x, y| $trait::$op(x, y),
                 );
             }
