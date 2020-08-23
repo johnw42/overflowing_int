@@ -82,6 +82,7 @@ impl CBigInt {
     /// Creates and initializes a BigInt.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
+    #[cfg(not(feature = "tiny_digit"))]
     pub fn new(sign: Sign, digits: Vec<u32>) -> CBigInt {
         if sign == NoSign {
             return CBigInt(Encoded::zero());
@@ -112,6 +113,7 @@ impl CBigInt {
     /// Creates and initializes a `CBigInt`.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
+    #[cfg(not(feature = "tiny_digit"))]
     pub fn from_slice(sign: Sign, slice: &[u32]) -> CBigInt {
         if slice.len() <= size_of::<Udigit>() / size_of::<u32>() {
             let mut accum = 0;
@@ -129,6 +131,7 @@ impl CBigInt {
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
+    #[cfg(not(feature = "tiny_digit"))]
     pub fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
         *self = Self::from_slice(sign, slice);
     }
@@ -320,6 +323,7 @@ impl CBigInt {
     /// assert_eq!(CBigInt::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
     /// assert_eq!(CBigInt::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
     /// ```
+    #[cfg(not(feature = "tiny_digit"))]
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
         match self.decode_ref() {
             Decoded::Digit(n) => match make_accum(n) {

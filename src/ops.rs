@@ -54,9 +54,9 @@ impl BinaryOp {
         use Cow::*;
         let rhs = rhs.to_decoded_cow();
 
-        if let (Decoded::Digit(lhs), &Decoded::Digit(rhs)) = (&mut lhs.decode_mut(), &rhs) {
-            if let Some(out) = (self.digits)(*lhs, rhs) {
-                *lhs = out;
+        if let (Decoded::Digit(lhs_digit), &Decoded::Digit(rhs)) = (lhs.decode_mut(), &rhs) {
+            if let Some(out) = (self.digits)(lhs_digit, rhs) {
+                *lhs = out.into();
                 return;
             }
         }
@@ -90,10 +90,10 @@ impl BinaryOp {
         R: Copy,
         Digit: TryFrom<R>,
     {
-        if let Decoded::Digit(lhs) = &mut lhs.decode_mut() {
+        if let Decoded::Digit(lhs_digit) = lhs.decode_mut() {
             if let Ok(rhs) = Digit::try_from(rhs) {
-                if let Some(out) = (self.digits)(*lhs, rhs) {
-                    *lhs = out;
+                if let Some(out) = (self.digits)(lhs_digit, rhs) {
+                    *lhs = out.into();
                     return;
                 }
             }
@@ -239,12 +239,12 @@ expand! {
                             None
                         }
                     },
-                    owned: |lhs: BigInt, rhs: BigInt| $trait::$op(lhs, rhs),
-                    owned_borrowed: |lhs: BigInt, rhs: &BigInt| $trait::$op(lhs, rhs),
-                    borrowed_owned: |lhs: &BigInt, rhs: BigInt| $trait::$op(lhs, rhs),
-                    borrowed: |lhs: &BigInt, rhs: &BigInt| $trait::$op(lhs, rhs),
-                    update_owned: $assign_trait::$assign_op,
-                    update_borrowed: |lhs: &mut BigInt, rhs: &BigInt| $assign_trait::$assign_op(lhs, rhs),
+                    owned: |lhs, rhs| $trait::$op(lhs, rhs),
+                    owned_borrowed: |lhs, rhs| $trait::$op(lhs, rhs),
+                    borrowed_owned: |lhs, rhs| $trait::$op(lhs, rhs),
+                    borrowed: |lhs, rhs| $trait::$op(lhs, rhs),
+                    update_owned: |lhs, rhs| $assign_trait::$assign_op(lhs, rhs),
+                    update_borrowed: |lhs, rhs| $assign_trait::$assign_op(lhs, rhs),
                 };
             }
             expand! {
@@ -445,7 +445,7 @@ mod test {
     }
 
     fn make_range() -> Vec<BigInt> {
-        let mut small_range: Vec<i128> = vec![Digit::MIN, Digit::MAX, -Digit::MAX];
+        let mut small_range: Vec<Digit> = vec![Digit::MIN, Digit::MAX, -Digit::MAX];
         small_range.extend((-10..=10).into_iter());
         let mut range: Vec<BigInt> = small_range.into_iter().map(From::from).collect();
         let huge: BigInt = <BigInt as From<i128>>::from(i128::MAX).pow(2);

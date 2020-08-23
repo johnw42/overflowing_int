@@ -23,7 +23,13 @@ mod digits {
     pub type Udigit = u128;
 }
 
-#[cfg(not(feature = "i128_digit"))]
+#[cfg(feature = "tiny_digit")]
+mod digits {
+    pub type Digit = i16;
+    pub type Udigit = u16;
+}
+
+#[cfg(not(any(feature = "i128_digit", feature = "tiny_digit")))]
 mod digits {
     pub type Digit = isize;
     pub type Udigit = usize;

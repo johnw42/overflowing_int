@@ -35,7 +35,7 @@ where
     T: Eq,
     T: Copy,
 {
-    if (rhs as usize) <= 8 * size_of::<T>() {
+    if (rhs as usize) < 8 * size_of::<T>() {
         let shifted = lhs << rhs;
         let unshifted = shifted >> rhs;
         if unshifted == lhs {
@@ -52,7 +52,7 @@ pub fn shr<T>(lhs: T, rhs: u32) -> Option<T>
 where
     T: Shr<u32, Output = T>,
 {
-    if (rhs as usize) <= 8 * size_of::<T>() {
+    if (rhs as usize) < 8 * size_of::<T>() {
         Some(lhs >> rhs)
     } else {
         None
