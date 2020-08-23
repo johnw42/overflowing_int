@@ -1,6 +1,7 @@
 use core::cmp::Ordering;
 use core::ops::{Neg, Not};
 
+use expand_macro::expand;
 use num_bigint::{BigInt, ParseBigIntError, Sign::*};
 use num_integer::{Integer, Roots};
 use num_traits::{Num, One, Signed, ToPrimitive, Zero};
@@ -245,17 +246,16 @@ impl Not for &CBigInt {
     }
 }
 
-macro_rules! to_prim_method {
-    [$_1:tt, [$prim:ident, $to_prim:ident]] => {
+impl ToPrimitive for CBigInt {
+    expand! {
+        for $prim in [i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize f32 f64]
+        let $to_prim = ${to_ $prim}
+        =>
         fn $to_prim(&self) -> Option<$prim> {
             match self.decode_ref() {
                 Decoded::Digit(value) => value.$to_prim(),
                 Decoded::Big(value) => value.$to_prim(),
             }
         }
-    };
-}
-
-impl ToPrimitive for CBigInt {
-    with_prims!(to_prim_method, []);
+    }
 }

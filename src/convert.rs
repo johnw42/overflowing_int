@@ -1,6 +1,7 @@
 use crate::cbigint::CBigInt;
 use crate::decoded::Decoded;
 use crate::Digit;
+use expand_macro::expand;
 use num_bigint::{BigInt, BigUint, Sign::*, ToBigInt, ToBigUint, TryFromBigIntError};
 use num_traits::ToPrimitive;
 use std::borrow::Cow;
@@ -66,36 +67,33 @@ impl TryFrom<&CBigInt> for BigUint {
     }
 }
 
-macro_rules! prim_conv {
-    [[int $(, $int_attr:tt)*], [$prim:ident, $to_prim:ident]] => {
-        impl From<$prim> for CBigInt {
-            fn from(value: $prim) -> Self {
-                if let Ok(digit) = Digit::try_from(value) {
-                    CBigInt(Decoded::Digit(digit).encode())
-                } else {
-                    BigInt::from(value).into()
-                }
+expand! {
+    for $prim in [i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize]
+    =>
+    impl From<$prim> for CBigInt {
+        fn from(value: $prim) -> Self {
+            if let Ok(digit) = Digit::try_from(value) {
+                CBigInt(Decoded::Digit(digit).encode())
+            } else {
+                BigInt::from(value).into()
             }
         }
-        impl TryFrom<CBigInt> for $prim {
-            type Error = TryFromBigIntError<BigInt>;
-            fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
-                if let Some(n) = value.to_digit() {
-                    match n.$to_prim() {
-                        Some(prim) => Ok(prim),
-                        None => {
-                            // This is guaranteed to fail; it's done because there's no more
-                            // straightforward way to construct an appropriate TryFromBigIntError.
-                            $prim::try_from(BigInt::from(value))
-                        }
+    }
+    impl TryFrom<CBigInt> for $prim {
+        type Error = TryFromBigIntError<BigInt>;
+        fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
+            if let Some(n) = value.to_digit() {
+                match n.${to_ $prim}() {
+                    Some(prim) => Ok(prim),
+                    None => {
+                        // This is guaranteed to fail; it's done because there's no more
+                        // straightforward way to construct an appropriate TryFromBigIntError.
+                        $prim::try_from(BigInt::from(value))
                     }
-                } else {
-                    $prim::try_from(BigInt::from(value))
                 }
+            } else {
+                $prim::try_from(BigInt::from(value))
             }
         }
-    };
-    [[float $(, $float_attr:tt)*], $prim_attrs:tt] => {};
+    }
 }
-
-with_prims!(prim_conv, []);

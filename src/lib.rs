@@ -6,18 +6,15 @@ pub use cbigint::*;
 use digits::*;
 pub use num_trait_impls::*;
 
-#[macro_use]
-mod macros;
-
 mod accum;
 pub mod cbigint;
 mod num_trait_impls;
 //pub mod clever;
+mod checked;
 mod convert;
 mod decoded;
 mod encoding;
 mod ops;
-mod checked;
 mod to_cow;
 
 #[cfg(feature = "i128_digit")]

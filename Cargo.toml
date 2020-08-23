@@ -15,13 +15,13 @@ i128_digit = []
 num-bigint = "0.3"
 num-traits = "0.2.12"
 num-integer = "0.1.43"
+expand_macro = {path = "../expand_macro"}
 
 [dev-dependencies]
 rand = "0.7.3"
 criterion = "0.3.3"
 num = "0.3.0"
 num-bigint = {version="0.3", features=["rand"]}
-expand_macro = {path = "../expand_macro"}
 
 [[bench]]
 name = "benchmark"
