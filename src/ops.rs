@@ -23,6 +23,7 @@ struct BinaryOp {
 }
 
 impl BinaryOp {
+    #[inline(always)]
     fn call<'a, L, R>(&self, lhs: L, rhs: R) -> CBigInt
     where
         L: ToDecodedCow<'a>,
@@ -47,6 +48,7 @@ impl BinaryOp {
         .into()
     }
 
+    #[inline(always)]
     fn call_update<'a, R>(&self, lhs: &mut CBigInt, rhs: R)
     where
         R: ToDecodedCow<'a>,
@@ -80,6 +82,7 @@ impl BinaryOp {
         .into();
     }
 
+    #[inline(always)]
     fn call_update_prim<'a, R>(
         &self,
         lhs: &mut CBigInt,
@@ -111,6 +114,7 @@ impl BinaryOp {
         .into();
     }
 
+    #[inline(always)]
     fn call_prim_lhs<'a, L, R>(
         &self,
         lhs: L,
@@ -140,6 +144,7 @@ impl BinaryOp {
         }
     }
 
+    #[inline(always)]
     fn call_prim_rhs<'a, L, R>(
         &self,
         lhs: L,
@@ -174,6 +179,7 @@ struct ShiftOp(fn(Digit, u32) -> Option<Digit>);
 
 impl ShiftOp {
     // Very similar to BinaryOp::call_prim_rhs.
+    #[inline(always)]
     fn call<'a, L, R>(
         &self,
         lhs: L,
@@ -270,6 +276,7 @@ expand! {
                     T: ToDecodedCow<'a>,
                 {
                     type Output = CBigInt;
+                    #[inline(never)]
                     fn $op(self, rhs: T) -> Self::Output {
                         bigint_ops::$op.call(self, rhs)
                     }
@@ -279,6 +286,7 @@ expand! {
                     T: ToDecodedCow<'a>,
                 {
                     type Output = CBigInt;
+                    #[inline(never)]
                     fn $op(self, rhs: T) -> Self::Output {
                         bigint_ops::$op.call(self, rhs)
                     }
@@ -287,6 +295,7 @@ expand! {
                 where
                     T: ToDecodedCow<'a>
                 {
+                    #[inline(never)]
                     fn $assign_op(&mut self, rhs: T) {
                         bigint_ops::$op.call_update(self, rhs);
                     }
@@ -314,6 +323,7 @@ expand! {
                 =>
                 impl $trait<$prim> for CBigInt {
                     type Output = CBigInt;
+                    #[inline(never)]
                     fn $op(self, rhs: $prim) -> CBigInt {
                         bigint_ops::$op.call_prim_rhs(self, rhs, $trait::$op, |x: &BigInt, y| x.$op(y))
                     }
@@ -328,6 +338,7 @@ expand! {
 
                 impl<'a> $trait<$prim> for &'a CBigInt {
                     type Output = CBigInt;
+                    #[inline(never)]
                     fn $op(self, rhs: $prim) -> CBigInt {
                         bigint_ops::$op.call_prim_rhs(self, rhs, $trait::$op, |x: &BigInt, y| x.$op(y))
                     }
@@ -342,6 +353,7 @@ expand! {
 
                 impl $trait<CBigInt> for $prim {
                     type Output = CBigInt;
+                    #[inline(never)]
                     fn $op(self, rhs: CBigInt) -> CBigInt {
                         bigint_ops::$op.call_prim_lhs(self, rhs, $trait::$op, |x, y: &BigInt| x.$op(y))
                     }
@@ -356,6 +368,7 @@ expand! {
 
                 impl<'a> $trait<&'a CBigInt> for $prim {
                     type Output = CBigInt;
+                    #[inline(never)]
                     fn $op(self, rhs: &'a CBigInt) -> CBigInt {
                         bigint_ops::$op.call_prim_lhs(self, rhs, $trait::$op, |x, y: &BigInt| x.$op(y))
                     }
@@ -369,6 +382,7 @@ expand! {
                 }
 
                 impl $assign_trait<$prim> for CBigInt {
+                    #[inline(never)]
                     fn $assign_op(&mut self, rhs: $prim) {
                         bigint_ops::$op.call_update_prim(self, rhs, BigInt::$op, BigInt::$assign_op);
                     }
