@@ -16,12 +16,6 @@ use crate::{Digit, Udigit, DIGIT_BITS};
 #[derive(Clone)]
 pub struct CBigInt(pub(crate) Encoded);
 
-impl Debug for CBigInt {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.decode_ref().fmt(f)
-    }
-}
-
 impl PartialEq for CBigInt {
     fn eq(&self, other: &Self) -> bool {
         self.decode_ref().eq(&other.decode_ref())
@@ -640,10 +634,20 @@ impl Default for CBigInt {
 }
 
 impl Display for CBigInt {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.decode_ref() {
-            Decoded::Digit(n) => write!(f, "{}", n),
-            Decoded::Big(n) => write!(f, "{}", n),
+            Decoded::Digit(n) => Display::fmt(&n, f),
+            Decoded::Big(n) => Display::fmt(n, f),
+        }
+    }
+}
+
+impl Debug for CBigInt {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        if cfg!(fature = "debug_structure") {
+            Debug::fmt(&self.decode_ref(), f)
+        } else {
+            Display::fmt(self, f)
         }
     }
 }

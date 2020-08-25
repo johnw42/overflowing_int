@@ -12,6 +12,7 @@ default = ["i128_digit"]
 unsafe_encoding = []
 i128_digit = []
 tiny_digit = []
+debug_structure = []
 
 [dependencies]
 num-bigint = "0.3"
