@@ -210,7 +210,27 @@ impl ShiftOp {
     }
 }
 
-expand! {
+// Hack based on https://github.com/rust-lang/rust/issues/35853#issuecomment-415993963
+macro_rules! expand_template_impl {
+    (($d:tt) $name:ident; $($expand_rule:tt)+) => {
+        macro_rules! $name {
+            ($d ($to_expand:tt)+) => {
+                expand_macro::expand! {
+                    $($expand_rule)+ => $d ($to_expand)+
+                }
+            }
+        }
+    }
+}
+
+macro_rules! expand_template {
+    ($($body:tt)+) => {
+        expand_template_impl!(($) $($body)+);
+    }
+}
+
+expand_template! {
+    expand_ops;
     let $ops = [
         [arith Add add]
         [arith Sub sub]
@@ -223,7 +243,44 @@ expand! {
         [bit BitOr bitor]
         [bit BitXor bitxor]
     ]
-    =>
+}
+
+// macro_rules! expand_ops {
+//     ($($x:tt)*) => {
+//         expand_macro::expand! {
+//             let $ops = [
+//                 [arith Add add]
+//                 [arith Sub sub]
+//                 [arith Mul mul]
+//                 [arith Div div]
+//                 [arith Rem rem]
+//                 [shift Shl shl]
+//                 [shift Shr shr]
+//                 [bit BitAnd bitand]
+//                 [bit BitOr bitor]
+//                 [bit BitXor bitxor]
+//             ]
+//             =>
+//             $($x)*
+//         }
+//     };
+// }
+
+expand_ops! {
+// expand! {
+//     let $ops = [
+//         [arith Add add]
+//         [arith Sub sub]
+//         [arith Mul mul]
+//         [arith Div div]
+//         [arith Rem rem]
+//         [shift Shl shl]
+//         [shift Shr shr]
+//         [bit BitAnd bitand]
+//         [bit BitOr bitor]
+//         [bit BitXor bitxor]
+//     ]
+//     =>
 
     #[allow(non_upper_case_globals)]
     mod bigint_ops {

@@ -1,7 +1,6 @@
 use core::cmp::Ordering;
 use core::ops::{Neg, Not};
 
-use expand_macro::expand;
 use num_bigint::{BigInt, ParseBigIntError, Sign::*};
 use num_integer::{Integer, Roots};
 use num_traits::{Num, One, Signed, ToPrimitive, Zero};
@@ -247,15 +246,27 @@ impl Not for &CBigInt {
 }
 
 impl ToPrimitive for CBigInt {
-    expand! {
-        for $prim in [i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize f32 f64]
-        let $to_prim = ${to_ $prim}
-        =>
-        fn $to_prim(&self) -> Option<$prim> {
-            match self.decode_ref() {
-                Decoded::Digit(value) => value.$to_prim(),
-                Decoded::Big(value) => value.$to_prim(),
-            }
+    #[duplicate::duplicate(
+        prim    to_prim;
+        [i8]    [to_i8];
+        [i16]   [to_i16];
+        [i32]   [to_i32];
+        [i64]   [to_i64];
+        [i128]  [to_i128];
+        [isize] [to_isize];
+        [u8]    [to_u8];
+        [u16]   [to_u16];
+        [u32]   [to_u32];
+        [u64]   [to_u64];
+        [u128]  [to_u128];
+        [usize] [to_usize];
+        [f32]   [to_f32];
+        [f64]   [to_f64];
+    )]
+    fn to_prim(&self) -> Option<prim> {
+        match self.decode_ref() {
+            Decoded::Digit(value) => value.to_prim(),
+            Decoded::Big(value) => value.to_prim(),
         }
     }
 }
