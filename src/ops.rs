@@ -210,6 +210,24 @@ impl ShiftOp {
     }
 }
 
+macro_rules! duplicate_template_impl {
+    (($dollar:tt) $name:ident; $($spec:tt)+) => {
+        macro_rules! $name {
+            ($dollar ($to_expand:tt)+) => {
+                duplicate::inline_duplicate! {
+                    [$($spec)+] $dollar ($to_expand)+
+                }
+            }
+        }
+    }
+}
+
+macro_rules! duplicate_template {
+    ($($body:tt)+) => {
+        duplicate_template_impl!(($) $($body)+);
+    }
+}
+
 // Hack based on https://github.com/rust-lang/rust/issues/35853#issuecomment-415993963
 macro_rules! expand_template_impl {
     (($d:tt) $name:ident; $($expand_rule:tt)+) => {
@@ -231,6 +249,30 @@ macro_rules! expand_template {
 
 expand_template! {
     expand_ops;
+    let $ops = [
+        [arith Add add]
+        [arith Sub sub]
+        [arith Mul mul]
+        [arith Div div]
+        [arith Rem rem]
+        [shift Shl shl]
+        [shift Shr shr]
+        [bit BitAnd bitand]
+        [bit BitOr bitor]
+        [bit BitXor bitxor]
+    ]
+}
+
+duplicate_template! {
+    duplicate_bit_ops;
+    Op op;
+    [BitAnd] [bitand];
+    [BitOr]  [bitor];
+    [BitXor] [bitxor]
+}
+
+duplicate_template! {
+    duplicate_ops;
     let $ops = [
         [arith Add add]
         [arith Sub sub]
