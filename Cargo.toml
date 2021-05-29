@@ -18,7 +18,7 @@ debug_structure = []
 num-bigint = "0.3"
 num-traits = "0.2.12"
 num-integer = "0.1.43"
-expand_macro = {path = "../expand_macro"}
+match_ident = {path = "../match_ident"}
 duplicate = "0.2.9"
 paste = "1.0.5"
 

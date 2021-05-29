@@ -4,7 +4,7 @@ use crate::decoded::Decoded;
 use crate::to_cow::{ToCow, ToDecodedCow};
 use crate::Digit;
 use duplicate::duplicate_inline;
-use expand_macro::expand;
+use match_ident::match_ident;
 use num_bigint::BigInt;
 use paste::paste;
 use std::borrow::Cow;
@@ -231,152 +231,12 @@ impl ShiftOp {
 // }
 
 // Hack based on https://github.com/rust-lang/rust/issues/35853#issuecomment-415993963
-macro_rules! expand_template_impl {
-    (($d:tt) $name:ident; $($expand_rule:tt)+) => {
-        macro_rules! $name {
-            ($d ($to_expand:tt)+) => {
-                expand_macro::expand! {
-                    $($expand_rule)+ => $d ($to_expand)+
-                }
-            }
-        }
-    }
-}
 
-macro_rules! expand_template {
-    ($($body:tt)+) => {
-        expand_template_impl!(($) $($body)+);
-    }
-}
-
-expand_template! {
-    expand_ops;
-    let $ops = [
-        [arith Add add]
-        [arith Sub sub]
-        [arith Mul mul]
-        [arith Div div]
-        [arith Rem rem]
-        [shift Shl shl]
-        [shift Shr shr]
-        [bit BitAnd bitand]
-        [bit BitOr bitor]
-        [bit BitXor bitxor]
-    ]
-}
-
-// duplicate_template! {
-//     duplicate_bit_ops;
-//     Op op;
-//     [BitAnd] [bitand];
-//     [BitOr]  [bitor];
-//     [BitXor] [bitxor]
-// }
-
-// duplicate_template! {
-//     duplicate_ops;
-//     op_type Op op;
-//     [arith] [Add] [add];
-//     [arith] [Sub] [sub];
-//     [arith] [Mul] [mul];
-//     [arith] [Div] [div];
-//     [arith] [Rem] [rem];
-//     [shift] [Shl] [shl];
-//     [shift] [Shr] [shr];
-//     [bit] [BitAnd] [bitand];
-//     [bit] [BitOr] [bitor];
-//     [bit] [BitXor] [bitxor]
-// }
-
-// macro_rules! expand_ops {
-//     ($($x:tt)*) => {
-//         expand_macro::expand! {
-//             let $ops = [
-//                 [arith Add add]
-//                 [arith Sub sub]
-//                 [arith Mul mul]
-//                 [arith Div div]
-//                 [arith Rem rem]
-//                 [shift Shl shl]
-//                 [shift Shr shr]
-//                 [bit BitAnd bitand]
-//                 [bit BitOr bitor]
-//                 [bit BitXor bitxor]
-//             ]
-//             =>
-//             $($x)*
-//         }
-//     };
-// }
-
-macro_rules! match_ident {
-    (arith; arith | bit => { $($body:tt)* }) => { $($body)* };
-    (bit; arith | bit => { $($body:tt)* }) => { $($body)* };
-    (shift; shift => { $($body:tt)* }) => { $($body)* };
-    ($_1:ident; $($_2:ident)|+ => { $($_body:tt)* }) => {};
-}
-//
-// match_ident! {
-//     foo;
-//     foo | bar => {}
-// }
-
-// mod dummy {
-//     use duplicate::duplicate_inline;
-//     use paste::paste;
-//
-//
-//     match_op_type! {
-//         a b; struct Foo;
-//     }
-//
-//     duplicate_inline! {
-//             [
-//                 op_type trait op;
-//                 [arith] [Add] [add];
-//                 [arith] [Sub] [sub];
-//                 [arith] [Mul] [mul];
-//                 [arith] [Div] [div];
-//                 [arith] [Rem] [rem];
-//                 [shift] [Shl] [shl];
-//                 [shift] [Shr] [shr];
-//                 [bit] [BitAnd] [bitand];
-//                 [bit] [BitOr] [bitor];
-//                 [bit] [BitXor] [bitxor]
-//             ]
-//         paste! {
-//             static [< op 1 >]: &str = stringify!(op_type trait);
-//             match_op_type! {
-//                 op_type bit;
-//                 static [< op 2 >]: &str = stringify!(op_type trait);
-//             }
-//         }
-//     }
-// }
-
-expand_ops! {
-    // expand! {
-    //     let $ops = [
-    //         [arith Add add]
-    //         [arith Sub sub]
-    //         [arith Mul mul]
-    //         [arith Div div]
-    //         [arith Rem rem]
-    //         [shift Shl shl]
-    //         [shift Shr shr]
-    //         [bit BitAnd bitand]
-    //         [bit BitOr bitor]
-    //         [bit BitXor bitxor]
-    //     ]
-    //     =>
-
-    #[allow(non_upper_case_globals)]
-    mod bigint_ops {
-        use super::*;
-
+macro_rules! duplicate_ops {
+    ($($body:tt)*) => {
         duplicate_inline! {
             [
-                op_type trait op;
+                op_type op_trait op_fn;
                 [arith] [Add] [add];
                 [arith] [Sub] [sub];
                 [arith] [Mul] [mul];
@@ -389,34 +249,52 @@ expand_ops! {
                 [bit] [BitXor] [bitxor]
             ]
             paste! {
-                match_ident! {
-                    op_type;
-                    arith | bit => {
-                        pub(super) const op: BinaryOp = BinaryOp {
-                            digits: |lhs, rhs| {
-                                if let Some(out) = checked::op(lhs, rhs) {
-                                    Some(out)
-                                } else {
-                                    None
-                                }
-                            },
-                            owned: |lhs, rhs| trait::op(lhs, rhs),
-                            owned_borrowed: |lhs, rhs| trait::op(lhs, rhs),
-                            borrowed_owned: |lhs, rhs| trait::op(lhs, rhs),
-                            borrowed: |lhs, rhs| trait::op(lhs, rhs),
-                            update_owned: |lhs, rhs| [< trait Assign >]::[< op _assign >](lhs, rhs),
-                            update_borrowed: |lhs, rhs| [< trait Assign >]::[< op _assign >](lhs, rhs),
-                        };
-                    }
-                }
-            }
-            match_ident! {
-                op_type;
-                shift => {
-                    pub(super) const op: ShiftOp = ShiftOp(|lhs: Digit, rhs: u32| checked::op(lhs, rhs));
+                duplicate_inline! {
+                    [
+                        assign_trait assign_fn;
+                        [[< op_trait Assign >]] [[< op_fn _assign >]]
+                    ]
+                    $($body)*
                 }
             }
         }
+    }
+}
+
+#[allow(non_upper_case_globals)]
+mod bigint_ops {
+    use super::*;
+
+    duplicate_ops! {
+        match_ident! {
+            op_type;
+            arith | bit => {
+                pub(super) const op_fn: BinaryOp = BinaryOp {
+                    digits: |lhs, rhs| {
+                        if let Some(out) = checked::op_fn(lhs, rhs) {
+                            Some(out)
+                        } else {
+                            None
+                        }
+                    },
+                    owned: |lhs, rhs| op_trait::op_fn(lhs, rhs),
+                    owned_borrowed: |lhs, rhs| op_trait::op_fn(lhs, rhs),
+                    borrowed_owned: |lhs, rhs| op_trait::op_fn(lhs, rhs),
+                    borrowed: |lhs, rhs| op_trait::op_fn(lhs, rhs),
+                    update_owned: |lhs, rhs| assign_trait::assign_fn(lhs, rhs),
+                    update_borrowed: |lhs, rhs| assign_trait::assign_fn(lhs, rhs),
+                };
+            }
+            _ => {}
+        }
+        match_ident! {
+            op_type;
+            shift => {
+                pub(super) const op_fn: ShiftOp = ShiftOp(|lhs: Digit, rhs: u32| checked::op_fn(lhs, rhs));
+            }
+            _ => {}
+        }
+    }
 
     //     expand! {
     //         for [$op_type $trait $op] in $ops
@@ -448,187 +326,181 @@ expand_ops! {
     //             pub(super) const $op: ShiftOp = ShiftOp(|lhs: Digit, rhs: u32| checked::$op(lhs, rhs));
     //         }
     //     }
-    }
+}
 
-    expand! {
-        for [$op_type $trait $op] in $ops
-        let $assign_trait = ${$trait Assign}
-        let $assign_op = ${$op _assign}
-        =>
-        expand! {
-            if let arith | bit = $op_type
-            =>
-            expand! {
-                =>
-                impl<'a, T> $trait<T> for CBigInt
-                where
-                    T: ToDecodedCow<'a>,
-                {
-                    type Output = CBigInt;
-                    #[inline(never)]
-                    fn $op(self, rhs: T) -> Self::Output {
-                        bigint_ops::$op.call(self, rhs)
-                    }
+duplicate_ops! {
+    match_ident! {
+        op_type;
+        arith | bit => {
+            impl<'a, T> op_trait<T> for CBigInt
+            where
+                T: ToDecodedCow<'a>,
+            {
+                type Output = CBigInt;
+                #[inline(never)]
+                fn op_fn(self, rhs: T) -> Self::Output {
+                    bigint_ops::op_fn.call(self, rhs)
                 }
-                impl<'a, T> $trait<T> for &'a CBigInt
-                where
-                    T: ToDecodedCow<'a>,
-                {
-                    type Output = CBigInt;
-                    #[inline(never)]
-                    fn $op(self, rhs: T) -> Self::Output {
-                        bigint_ops::$op.call(self, rhs)
-                    }
+            }
+            impl<'a, T> op_trait<T> for &'a CBigInt
+            where
+                T: ToDecodedCow<'a>,
+            {
+                type Output = CBigInt;
+                #[inline(never)]
+                fn op_fn(self, rhs: T) -> Self::Output {
+                    bigint_ops::op_fn.call(self, rhs)
                 }
-                impl<'a, T> $assign_trait<T> for CBigInt
-                where
-                    T: ToDecodedCow<'a>
-                {
-                    #[inline(never)]
-                    fn $assign_op(&mut self, rhs: T) {
-                        bigint_ops::$op.call_update(self, rhs);
-                    }
+            }
+            impl<'a, T> assign_trait<T> for CBigInt
+            where
+                T: ToDecodedCow<'a>
+            {
+                #[inline(never)]
+                fn assign_fn(&mut self, rhs: T) {
+                    bigint_ops::op_fn.call_update(self, rhs);
                 }
             }
         }
-        expand! {
-            for [$prim_type $prim] in [
-                [signed i8]
-                [signed i16]
-                [signed i32]
-                [signed i64]
-                [signed i128]
-                [signed isize]
-                [unsigned u8]
-                [unsigned u16]
-                [unsigned u32]
-                [unsigned u64]
-                [unsigned u128]
-                [unsigned usize]
-            ]
-            =>
-            expand! {
-                if let arith = $op_type
-                =>
-                impl $trait<$prim> for CBigInt {
+        _ => {}
+    }
+    duplicate_inline! {
+        [
+            prim_type prim;
+            [signed] [i8];
+            [signed] [i16];
+            [signed] [i32];
+            [signed] [i64];
+            [signed] [i128];
+            [signed] [isize];
+            [unsigned] [u8];
+            [unsigned] [u16];
+            [unsigned] [u32];
+            [unsigned] [u64];
+            [unsigned] [u128];
+            [unsigned] [usize];
+        ]
+        match_ident! {
+            op_type;
+            arith => {
+                impl op_trait<prim> for CBigInt {
                     type Output = CBigInt;
                     #[inline(never)]
-                    fn $op(self, rhs: $prim) -> CBigInt {
-                        bigint_ops::$op.call_prim_rhs(self, rhs, $trait::$op, |x: &BigInt, y| x.$op(y))
+                    fn op_fn(self, rhs: prim) -> CBigInt {
+                        bigint_ops::op_fn.call_prim_rhs(self, rhs, op_trait::op_fn, |x: &BigInt, y| x.op_fn(y))
                     }
                 }
 
-                impl<'a> $trait<&'a $prim> for CBigInt {
+                impl<'a> op_trait<&'a prim> for CBigInt {
                     type Output = CBigInt;
-                    fn $op(self, rhs: &'a $prim) -> CBigInt {
-                        self.$op(*rhs)
+                    fn op_fn(self, rhs: &'a prim) -> CBigInt {
+                        self.op_fn(*rhs)
                     }
                 }
 
-                impl<'a> $trait<$prim> for &'a CBigInt {
-                    type Output = CBigInt;
-                    #[inline(never)]
-                    fn $op(self, rhs: $prim) -> CBigInt {
-                        bigint_ops::$op.call_prim_rhs(self, rhs, $trait::$op, |x: &BigInt, y| x.$op(y))
-                    }
-                }
-
-                impl<'a, 'b> $trait<&'a $prim> for &'b CBigInt {
-                    type Output = CBigInt;
-                    fn $op(self, rhs: &'a $prim) -> CBigInt {
-                        self.$op(*rhs)
-                    }
-                }
-
-                impl $trait<CBigInt> for $prim {
+                impl<'a> op_trait<prim> for &'a CBigInt {
                     type Output = CBigInt;
                     #[inline(never)]
-                    fn $op(self, rhs: CBigInt) -> CBigInt {
-                        bigint_ops::$op.call_prim_lhs(self, rhs, $trait::$op, |x, y: &BigInt| x.$op(y))
+                    fn op_fn(self, rhs: prim) -> CBigInt {
+                        bigint_ops::op_fn.call_prim_rhs(self, rhs, op_trait::op_fn, |x: &BigInt, y| x.op_fn(y))
                     }
                 }
 
-                impl<'a> $trait<CBigInt> for &'a $prim {
+                impl<'a, 'b> op_trait<&'a prim> for &'b CBigInt {
                     type Output = CBigInt;
-                    fn $op(self, rhs: CBigInt) -> CBigInt {
-                        (*self).$op(rhs)
+                    fn op_fn(self, rhs: &'a prim) -> CBigInt {
+                        self.op_fn(*rhs)
                     }
                 }
 
-                impl<'a> $trait<&'a CBigInt> for $prim {
+                impl op_trait<CBigInt> for prim {
                     type Output = CBigInt;
                     #[inline(never)]
-                    fn $op(self, rhs: &'a CBigInt) -> CBigInt {
-                        bigint_ops::$op.call_prim_lhs(self, rhs, $trait::$op, |x, y: &BigInt| x.$op(y))
+                    fn op_fn(self, rhs: CBigInt) -> CBigInt {
+                        bigint_ops::op_fn.call_prim_lhs(self, rhs, op_trait::op_fn, |x, y: &BigInt| x.op_fn(y))
                     }
                 }
 
-                impl<'a, 'b> $trait<&'b CBigInt> for &'a $prim {
+                impl<'a> op_trait<CBigInt> for &'a prim {
                     type Output = CBigInt;
-                    fn $op(self, rhs: &'b CBigInt) -> CBigInt {
-                        (*self).$op(rhs)
+                    fn op_fn(self, rhs: CBigInt) -> CBigInt {
+                        (*self).op_fn(rhs)
                     }
                 }
 
-                impl $assign_trait<$prim> for CBigInt {
+                impl<'a> op_trait<&'a CBigInt> for prim {
+                    type Output = CBigInt;
                     #[inline(never)]
-                    fn $assign_op(&mut self, rhs: $prim) {
-                        bigint_ops::$op.call_update_prim(self, rhs, BigInt::$op, BigInt::$assign_op);
+                    fn op_fn(self, rhs: &'a CBigInt) -> CBigInt {
+                        bigint_ops::op_fn.call_prim_lhs(self, rhs, op_trait::op_fn, |x, y: &BigInt| x.op_fn(y))
                     }
                 }
 
-                impl<'a> $assign_trait<&'a $prim> for CBigInt {
-                    fn $assign_op(&mut self, rhs: &'a $prim) {
-                        self.$assign_op(*rhs);
+                impl<'a, 'b> op_trait<&'b CBigInt> for &'a prim {
+                    type Output = CBigInt;
+                    fn op_fn(self, rhs: &'b CBigInt) -> CBigInt {
+                        (*self).op_fn(rhs)
+                    }
+                }
+
+                impl assign_trait<prim> for CBigInt {
+                    #[inline(never)]
+                    fn assign_fn(&mut self, rhs: prim) {
+                        bigint_ops::op_fn.call_update_prim(self, rhs, BigInt::op_fn, BigInt::assign_fn);
+                    }
+                }
+
+                impl<'a> assign_trait<&'a prim> for CBigInt {
+                    fn assign_fn(&mut self, rhs: &'a prim) {
+                        self.assign_fn(*rhs);
                     }
                 }
             }
-            expand! {
-                if let shift = $op_type
-                =>
-                impl $trait<$prim> for CBigInt {
+            shift => {
+                impl op_trait<prim> for CBigInt {
                     type Output = CBigInt;
-                    fn $op(self, rhs: $prim) -> CBigInt {
-                        bigint_ops::$op.call(self, rhs, BigInt::$op, |x: &BigInt, y| x.$op(y))
+                    fn op_fn(self, rhs: prim) -> CBigInt {
+                        bigint_ops::op_fn.call(self, rhs, BigInt::op_fn, |x: &BigInt, y| x.op_fn(y))
                     }
                 }
 
-                impl<'a> $trait<&'a $prim> for CBigInt {
+                impl<'a> op_trait<&'a prim> for CBigInt {
                     type Output = CBigInt;
-                    fn $op(self, rhs: &'a $prim) -> CBigInt {
-                        self.$op(*rhs)
+                    fn op_fn(self, rhs: &'a prim) -> CBigInt {
+                        self.op_fn(*rhs)
                     }
                 }
 
-                impl<'a> $trait<$prim> for &'a CBigInt {
+                impl<'a> op_trait<prim> for &'a CBigInt {
                     type Output = CBigInt;
-                    fn $op(self, rhs: $prim) -> CBigInt {
-                        bigint_ops::$op.call(self, rhs, BigInt::$op, |x: &BigInt, y| x.$op(y))
+                    fn op_fn(self, rhs: prim) -> CBigInt {
+                        bigint_ops::op_fn.call(self, rhs, BigInt::op_fn, |x: &BigInt, y| x.op_fn(y))
                     }
                 }
 
-                impl<'a, 'b> $trait<&'a $prim> for &'b CBigInt {
+                impl<'a, 'b> op_trait<&'a prim> for &'b CBigInt {
                     type Output = CBigInt;
-                    fn $op(self, rhs: &'a $prim) -> CBigInt {
-                        self.$op(*rhs)
+                    fn op_fn(self, rhs: &'a prim) -> CBigInt {
+                        self.op_fn(*rhs)
                     }
                 }
 
-                impl $assign_trait<$prim> for CBigInt {
-                    fn $assign_op(&mut self, rhs: $prim) {
+                impl assign_trait<prim> for CBigInt {
+                    fn assign_fn(&mut self, rhs: prim) {
                         match self.decode_mut() {
-                            Decoded::Digit(_) => *self = self.clone().$op(rhs),
-                            Decoded::Big(big) => big.$assign_op(rhs),
+                            Decoded::Digit(_) => *self = self.clone().op_fn(rhs),
+                            Decoded::Big(big) => big.assign_fn(rhs),
                         }
                     }
                 }
 
-                impl<'a> $assign_trait<&'a $prim> for CBigInt {
-                    fn $assign_op(&mut self, rhs: &'a $prim) {
-                        self.$assign_op(*rhs);
+                impl<'a> assign_trait<&'a prim> for CBigInt {
+                    fn assign_fn(&mut self, rhs: &'a prim) {
+                        self.assign_fn(*rhs);
                     }
                 }
             }
+            _ => {}
         }
     }
 }
@@ -636,7 +508,6 @@ expand_ops! {
 #[cfg(test)]
 mod test {
     use super::*;
-    use expand_macro::expand;
     use num_traits::Zero;
 
     fn always(_lhs: &BigInt, _rhs: &BigInt) -> bool {
@@ -739,87 +610,106 @@ mod test {
         }
     }
 
-    expand! {
-        for [$trait, $op, $pred] in [
-            [Add, add, always]
-            [Sub, sub, always]
-            [Mul, mul, always]
-            [Div, div, nonzero_rhs]
-            [Rem, rem, nonzero_rhs]
-            [BitAnd, bitand, always]
-            [BitOr,  bitor,  always]
-            [BitXor, bitxor, always]
-        ] =>
-        #[test]
-        fn ${test_ $op}() {
-            test_bin_op::<CBigInt, CBigInt>(
-                $pred,
-                |x, y| $trait::$op(x, y),
-                |x, y| $trait::$op(x, y),
-                |x, y| $trait::$op(x, y),
-                |x, y| $trait::$op(x, y),
-                |x, y| ${$trait Assign}::${$op _assign}(x, y),
-                |x, y| ${$trait Assign}::${$op _assign}(x, y),
-                |x, y| $trait::$op(x, y),
-            );
+    duplicate_inline! {
+        [
+            op_trait op_fn pred;
+            [Add] [add] [always];
+            [Sub] [sub] [always];
+            [Mul] [mul] [always];
+            [Div] [div] [nonzero_rhs];
+            [Rem] [rem] [nonzero_rhs];
+            [BitAnd] [bitand] [always];
+            [BitOr] [ bitor] [always];
+            [BitXor] [bitxor] [always];
+        ]
+        paste! {
+            #[test]
+            fn [< test_ op_fn >]() {
+                test_bin_op::<CBigInt, CBigInt>(
+                    pred,
+                    |x, y| op_trait::op_fn(x, y),
+                    |x, y| op_trait::op_fn(x, y),
+                    |x, y| op_trait::op_fn(x, y),
+                    |x, y| op_trait::op_fn(x, y),
+                    |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                    |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                    |x, y| op_trait::op_fn(x, y),
+                );
+            }
         }
     }
-    expand! {
-        for $other_type in [
-            i8 i16 i32 i64 i128 isize
-            u8 u16 u32 u64 u128 usize
-        ] =>
-        expand! {
-            for [$trait, $op] in [
-                [Shl, shl]
-                [Shr, shr]
-            ] =>
-            #[test]
-            fn ${test_ $op _ $other_type _rhs}() {
-                test_shift_op::<$other_type>(
-                    |x, y| $trait::$op(x, y),
-                    |x, y| $trait::$op(x, y),
-                    |x, y| $trait::$op(x, y),
-                    |x, y| $trait::$op(x, y),
-                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
-                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
-                    |x, y| $trait::$op(x, y),
-                );
+    duplicate_inline! {
+        [
+            other_type;
+            [i8];
+            [i16];
+            [i32];
+            [i64];
+            [i128];
+            [isize];
+            [u8];
+            [u16];
+            [u32];
+            [u64];
+            [u128];
+            [usize];
+        ]
+        duplicate_inline! {
+            [
+                op_trait op_fn;
+                [Shl] [shl];
+                [Shr] [shr];
+            ]
+            paste! {
+                fn [< test_ op_fn _ other_type _rhs >]() {
+                    test_shift_op::<other_type>(
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                    );
+                }
             }
         }
-        expand! {
-            for [$trait, $op, $pred] in [
-                [Add, add, always]
-                [Sub, sub, always]
-                [Mul, mul, always]
-                [Div, div, nonzero_rhs]
-                [Rem, rem, nonzero_rhs]
-            ] =>
-            #[test]
-            fn ${test_ $op _ $other_type _lhs}() {
-                test_bin_op::<$other_type, CBigInt>(
-                    $pred,
-                    |x, y| $trait::$op(x, y),
-                    |x, y| $trait::$op(x, y),
-                    |x, y| $trait::$op(x, y),
-                    |x, y| $trait::$op(x, y),
-                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
-                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
-                    |x, y| $trait::$op(x, y),
-                );
-            }
-            #[test]
-            fn ${test_ $op _ $other_type _rhs}() {
-                test_bin_op::<CBigInt, $other_type>(
-                    $pred,
-                    |x, y| $trait::$op(x, y),
-                    |x, y| $trait::$op(x, y),
-                    |x, y| $trait::$op(x, y),
-                    |x, y| $trait::$op(x, y),
-                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
-                    |x, y| ${$trait Assign}::${$op _assign}(x, y),
-                    |x, y| $trait::$op(x, y),
-                );
+        duplicate_inline! {
+            [
+                op_trait op_fn pred;
+                [Add] [add] [always];
+                [Sub] [sub] [always];
+                [Mul] [mul] [always];
+                [Div] [div] [nonzero_rhs];
+                [Rem] [rem] [nonzero_rhs];
+            ]
+            paste! {
+                #[test]
+                fn [< test_ op_fn _ other_type _lhs >]() {
+                    test_bin_op::<other_type, CBigInt>(
+                        pred,
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                    );
+                }
+                #[test]
+                fn [< test_ op_fn _ other_type _rhs >]() {
+                    test_bin_op::<CBigInt, other_type>(
+                        pred,
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                        |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        |x, y| op_trait::op_fn(x, y),
+                    );
+                }
             }
         }
     }
