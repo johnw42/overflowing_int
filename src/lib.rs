@@ -13,6 +13,7 @@ mod num_trait_impls;
 mod checked;
 mod convert;
 mod decoded;
+mod dummy;
 mod encoding;
 mod ops;
 mod to_cow;

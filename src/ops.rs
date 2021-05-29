@@ -3,8 +3,10 @@ use crate::checked;
 use crate::decoded::Decoded;
 use crate::to_cow::{ToCow, ToDecodedCow};
 use crate::Digit;
+use duplicate::duplicate_inline;
 use expand_macro::expand;
 use num_bigint::BigInt;
+use paste::paste;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::ops::{
@@ -210,23 +212,23 @@ impl ShiftOp {
     }
 }
 
-macro_rules! duplicate_template_impl {
-    (($dollar:tt) $name:ident; $($spec:tt)+) => {
-        macro_rules! $name {
-            ($dollar ($to_expand:tt)+) => {
-                duplicate::inline_duplicate! {
-                    [$($spec)+] $dollar ($to_expand)+
-                }
-            }
-        }
-    }
-}
-
-macro_rules! duplicate_template {
-    ($($body:tt)+) => {
-        duplicate_template_impl!(($) $($body)+);
-    }
-}
+// macro_rules! duplicate_template_impl {
+//     (($dollar:tt) $name:ident; $($spec:tt)+) => {
+//         macro_rules! $name {
+//             ($dollar ($to_expand:tt)+) => {
+//                 duplicate::inline_duplicate! {
+//                     [$($spec)+] $dollar ($to_expand)+
+//                 }
+//             }
+//         }
+//     }
+// }
+//
+// macro_rules! duplicate_template {
+//     ($($body:tt)+) => {
+//         duplicate_template_impl!(($) $($body)+);
+//     }
+// }
 
 // Hack based on https://github.com/rust-lang/rust/issues/35853#issuecomment-415993963
 macro_rules! expand_template_impl {
@@ -263,29 +265,28 @@ expand_template! {
     ]
 }
 
-duplicate_template! {
-    duplicate_bit_ops;
-    Op op;
-    [BitAnd] [bitand];
-    [BitOr]  [bitor];
-    [BitXor] [bitxor]
-}
+// duplicate_template! {
+//     duplicate_bit_ops;
+//     Op op;
+//     [BitAnd] [bitand];
+//     [BitOr]  [bitor];
+//     [BitXor] [bitxor]
+// }
 
-duplicate_template! {
-    duplicate_ops;
-    let $ops = [
-        [arith Add add]
-        [arith Sub sub]
-        [arith Mul mul]
-        [arith Div div]
-        [arith Rem rem]
-        [shift Shl shl]
-        [shift Shr shr]
-        [bit BitAnd bitand]
-        [bit BitOr bitor]
-        [bit BitXor bitxor]
-    ]
-}
+// duplicate_template! {
+//     duplicate_ops;
+//     op_type Op op;
+//     [arith] [Add] [add];
+//     [arith] [Sub] [sub];
+//     [arith] [Mul] [mul];
+//     [arith] [Div] [div];
+//     [arith] [Rem] [rem];
+//     [shift] [Shl] [shl];
+//     [shift] [Shr] [shr];
+//     [bit] [BitAnd] [bitand];
+//     [bit] [BitOr] [bitor];
+//     [bit] [BitXor] [bitxor]
+// }
 
 // macro_rules! expand_ops {
 //     ($($x:tt)*) => {
@@ -308,56 +309,145 @@ duplicate_template! {
 //     };
 // }
 
+macro_rules! match_ident {
+    (arith; arith | bit => { $($body:tt)* }) => { $($body)* };
+    (bit; arith | bit => { $($body:tt)* }) => { $($body)* };
+    (shift; shift => { $($body:tt)* }) => { $($body)* };
+    ($_1:ident; $($_2:ident)|+ => { $($_body:tt)* }) => {};
+}
+//
+// match_ident! {
+//     foo;
+//     foo | bar => {}
+// }
+
+// mod dummy {
+//     use duplicate::duplicate_inline;
+//     use paste::paste;
+//
+//
+//     match_op_type! {
+//         a b; struct Foo;
+//     }
+//
+//     duplicate_inline! {
+//             [
+//                 op_type trait op;
+//                 [arith] [Add] [add];
+//                 [arith] [Sub] [sub];
+//                 [arith] [Mul] [mul];
+//                 [arith] [Div] [div];
+//                 [arith] [Rem] [rem];
+//                 [shift] [Shl] [shl];
+//                 [shift] [Shr] [shr];
+//                 [bit] [BitAnd] [bitand];
+//                 [bit] [BitOr] [bitor];
+//                 [bit] [BitXor] [bitxor]
+//             ]
+//         paste! {
+//             static [< op 1 >]: &str = stringify!(op_type trait);
+//             match_op_type! {
+//                 op_type bit;
+//                 static [< op 2 >]: &str = stringify!(op_type trait);
+//             }
+//         }
+//     }
+// }
+
 expand_ops! {
-// expand! {
-//     let $ops = [
-//         [arith Add add]
-//         [arith Sub sub]
-//         [arith Mul mul]
-//         [arith Div div]
-//         [arith Rem rem]
-//         [shift Shl shl]
-//         [shift Shr shr]
-//         [bit BitAnd bitand]
-//         [bit BitOr bitor]
-//         [bit BitXor bitxor]
-//     ]
-//     =>
+    // expand! {
+    //     let $ops = [
+    //         [arith Add add]
+    //         [arith Sub sub]
+    //         [arith Mul mul]
+    //         [arith Div div]
+    //         [arith Rem rem]
+    //         [shift Shl shl]
+    //         [shift Shr shr]
+    //         [bit BitAnd bitand]
+    //         [bit BitOr bitor]
+    //         [bit BitXor bitxor]
+    //     ]
+    //     =>
 
     #[allow(non_upper_case_globals)]
     mod bigint_ops {
         use super::*;
 
-        expand! {
-            for [$op_type $trait $op] in $ops
-            let $assign_trait = ${$trait Assign}
-            let $assign_op = ${$op _assign}
-            =>
-            expand! {
-                if let arith | bit = $op_type
-                =>
-                pub(super) const $op: BinaryOp = BinaryOp {
-                    digits: |lhs, rhs| {
-                        if let Some(out) = checked::$op(lhs, rhs) {
-                            Some(out)
-                        } else {
-                            None
-                        }
-                    },
-                    owned: |lhs, rhs| $trait::$op(lhs, rhs),
-                    owned_borrowed: |lhs, rhs| $trait::$op(lhs, rhs),
-                    borrowed_owned: |lhs, rhs| $trait::$op(lhs, rhs),
-                    borrowed: |lhs, rhs| $trait::$op(lhs, rhs),
-                    update_owned: |lhs, rhs| $assign_trait::$assign_op(lhs, rhs),
-                    update_borrowed: |lhs, rhs| $assign_trait::$assign_op(lhs, rhs),
-                };
+        duplicate_inline! {
+            [
+                op_type trait op;
+                [arith] [Add] [add];
+                [arith] [Sub] [sub];
+                [arith] [Mul] [mul];
+                [arith] [Div] [div];
+                [arith] [Rem] [rem];
+                [shift] [Shl] [shl];
+                [shift] [Shr] [shr];
+                [bit] [BitAnd] [bitand];
+                [bit] [BitOr] [bitor];
+                [bit] [BitXor] [bitxor]
+            ]
+            paste! {
+                match_ident! {
+                    op_type;
+                    arith | bit => {
+                        pub(super) const op: BinaryOp = BinaryOp {
+                            digits: |lhs, rhs| {
+                                if let Some(out) = checked::op(lhs, rhs) {
+                                    Some(out)
+                                } else {
+                                    None
+                                }
+                            },
+                            owned: |lhs, rhs| trait::op(lhs, rhs),
+                            owned_borrowed: |lhs, rhs| trait::op(lhs, rhs),
+                            borrowed_owned: |lhs, rhs| trait::op(lhs, rhs),
+                            borrowed: |lhs, rhs| trait::op(lhs, rhs),
+                            update_owned: |lhs, rhs| [< trait Assign >]::[< op _assign >](lhs, rhs),
+                            update_borrowed: |lhs, rhs| [< trait Assign >]::[< op _assign >](lhs, rhs),
+                        };
+                    }
+                }
             }
-            expand! {
-                if let shift = $op_type
-                =>
-                pub(super) const $op: ShiftOp = ShiftOp(|lhs: Digit, rhs: u32| checked::$op(lhs, rhs));
+            match_ident! {
+                op_type;
+                shift => {
+                    pub(super) const op: ShiftOp = ShiftOp(|lhs: Digit, rhs: u32| checked::op(lhs, rhs));
+                }
             }
         }
+
+    //     expand! {
+    //         for [$op_type $trait $op] in $ops
+    //         let $assign_trait = ${$trait Assign}
+    //         let $assign_op = ${$op _assign}
+    //         =>
+    //         expand! {
+    //             if let arith | bit = $op_type
+    //             =>
+    //             pub(super) const $op: BinaryOp = BinaryOp {
+    //                 digits: |lhs, rhs| {
+    //                     if let Some(out) = checked::$op(lhs, rhs) {
+    //                         Some(out)
+    //                     } else {
+    //                         None
+    //                     }
+    //                 },
+    //                 owned: |lhs, rhs| $trait::$op(lhs, rhs),
+    //                 owned_borrowed: |lhs, rhs| $trait::$op(lhs, rhs),
+    //                 borrowed_owned: |lhs, rhs| $trait::$op(lhs, rhs),
+    //                 borrowed: |lhs, rhs| $trait::$op(lhs, rhs),
+    //                 update_owned: |lhs, rhs| $assign_trait::$assign_op(lhs, rhs),
+    //                 update_borrowed: |lhs, rhs| $assign_trait::$assign_op(lhs, rhs),
+    //             };
+    //         }
+    //         expand! {
+    //             if let shift = $op_type
+    //             =>
+    //             pub(super) const $op: ShiftOp = ShiftOp(|lhs: Digit, rhs: u32| checked::$op(lhs, rhs));
+    //         }
+    //     }
     }
 
     expand! {
