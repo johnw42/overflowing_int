@@ -15,18 +15,18 @@ tiny_digit = []
 debug_structure = []
 
 [dependencies]
-num-bigint = "0.3"
+num-bigint = "0.4.0"
 num-traits = "0.2.12"
 num-integer = "0.1.43"
-match_ident = {path = "../match_ident"}
-duplicate = "0.2.9"
+match_ident = { path="../match_ident" }
+duplicate = "0.3.0"
 paste = "1.0.5"
 
 [dev-dependencies]
-rand = "0.7.3"
+rand = "0.8 "
 criterion = "0.3.3"
-num = "0.3.0"
-num-bigint = {version="0.3", features=["rand"]}
+num = "0.4.0"
+num-bigint = { version="0.4", features=["rand"] }
 
 [[bench]]
 name = "benchmark"

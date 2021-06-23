@@ -478,6 +478,7 @@ mod test {
         range
     }
 
+    #[allow(dead_code)]
     fn test_shift_op<R>(
         cbigint_op1: fn(CBigInt, R) -> CBigInt,
         cbigint_op2: fn(CBigInt, &R) -> CBigInt,
