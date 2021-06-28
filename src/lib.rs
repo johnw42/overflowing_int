@@ -18,19 +18,19 @@ mod ops;
 mod to_cow;
 
 #[cfg(feature = "i128_digit")]
-mod digits {
+pub mod digits {
     pub type Digit = i128;
     pub type Udigit = u128;
 }
 
 #[cfg(feature = "tiny_digit")]
-mod digits {
+pub mod digits {
     pub type Digit = i16;
     pub type Udigit = u16;
 }
 
 #[cfg(not(any(feature = "i128_digit", feature = "tiny_digit")))]
-mod digits {
+pub mod digits {
     pub type Digit = isize;
     pub type Udigit = usize;
 }
