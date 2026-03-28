@@ -1,33 +1,43 @@
 [package]
 name = "compact_bigint"
 version = "0.1.0"
-authors = ["John Williams <jrw@pobox.com>"]
+authors = [
+  "John Williams <jrw@pobox.com>",
+]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
-#default = ["tiny_digit"]
-#default = ["i128_digit"]
-unsafe_encoding = []
-i128_digit = []
-tiny_digit = []
-debug_structure = []
+default = [
+]
+unsafe_encoding = [
+]
+i128_digit = [
+]
+# For testing and benchmarking only. Not intended for general use.
+tiny_digit = [
+]
+debug_structure = [
+]
 
 [dependencies]
-num-bigint = "^0.4.0"
+num-bigint = { version = "^0.4.0" }
 num-traits = "^0.2.12"
 num-integer = "^0.1.43"
-match_ident = { path="../match_ident" }
-duplicate = "^0.3.0"
+match_ident = { path = "../match_ident" }
+duplicate = "^2.0.1"
 paste = "^1.0.5"
 
 [dev-dependencies]
-rand = "^0.8 "
-criterion = { version="^0.3.3", features=["html_reports"] }
+num-bigint = { version = "^0.4.0", features = [
+  "rand",
+] }
+rand = { version = "^0.8.4" }
+criterion = { version = "^0.8.2", features = [
+  "html_reports",
+] }
 num = "^0.4.0"
-num-bigint = { version="^0.4", features=["rand"] }
 
 [[bench]]
 name = "benchmark"

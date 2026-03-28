@@ -45,7 +45,7 @@ pub fn accum_le(bytes: &[u8]) -> Option<Udigit> {
     if bytes.len() <= size_of::<Digit>() {
         let mut accum = 0;
         for (i, &byte) in bytes.iter().enumerate() {
-            accum |= (byte as Udigit) << 8 * i;
+            accum |= (byte as Udigit) << (8 * i);
         }
         Some(accum)
     } else {

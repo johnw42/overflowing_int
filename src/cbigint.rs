@@ -112,7 +112,7 @@ impl CBigInt {
         if slice.len() <= size_of::<Udigit>() / size_of::<u32>() {
             let mut accum = 0;
             for (i, &word) in slice.iter().enumerate() {
-                accum |= (word as Udigit) << i * 8;
+                accum |= (word as Udigit) << (i * 8);
             }
             if let Some(result) = Self::from_accum(sign, accum) {
                 return result;
@@ -484,7 +484,7 @@ impl CBigInt {
     /// assert!(CBigInt::zero().magnitude().is_zero());
     /// ```
     #[inline]
-    pub fn magnitude(&self) -> Cow<BigUint> {
+    pub fn magnitude(&self) -> Cow<'_, BigUint> {
         match self.decode_ref() {
             Decoded::Digit(n) => Cow::Owned(BigInt::from(n).into_parts().1),
             Decoded::Big(n) => Cow::Borrowed(n.magnitude()),
@@ -540,7 +540,7 @@ impl CBigInt {
     }
 
     /// Converts this `CBigInt` into a `BigInt`.
-    pub fn to_bigint(&self) -> Cow<BigInt> {
+    pub fn to_bigint(&self) -> Cow<'_, BigInt> {
         match self.decode_ref() {
             Decoded::Digit(n) => Cow::Owned(BigInt::from(n)),
             Decoded::Big(n) => Cow::Borrowed(n),
@@ -596,7 +596,7 @@ impl CBigInt {
     /// Panics if the exponent is negative or the modulus is zero.
     pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         self.to_bigint()
-            .modpow(&*exponent.to_bigint(), &*modulus.to_bigint())
+            .modpow(&exponent.to_bigint(), &modulus.to_bigint())
             .into()
     }
 
@@ -644,7 +644,7 @@ impl Display for CBigInt {
 
 impl Debug for CBigInt {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        if cfg!(fature = "debug_structure") {
+        if cfg!(feature = "debug_structure") {
             Debug::fmt(&self.decode_ref(), f)
         } else {
             Display::fmt(self, f)

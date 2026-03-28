@@ -1,10 +1,13 @@
+use std::hint::black_box;
+
 use criterion::measurement::WallTime;
 use criterion::{
-    black_box, criterion_group, criterion_main, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId,
-    Criterion, PlotConfiguration,
+    criterion_group, criterion_main, AxisScale, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
+    PlotConfiguration,
 };
-use rand::distributions::Uniform;
-use rand::prelude::*;
+use num_bigint::UniformBigInt;
+use rand::distributions::uniform::UniformSampler;
+use rand::thread_rng;
 
 use compact_bigint::*;
 
@@ -14,16 +17,16 @@ where
     T: From<BigInt>,
     F: Fn(&T, &T) -> T,
 {
-    let mut rng = thread_rng();
+    let rng = &mut thread_rng();
     let limit = BigInt::from(1) << (bit_size - 2);
-    let sampler = Uniform::new(-limit.clone(), limit.clone());
+    let sampler = UniformBigInt::new(-limit.clone(), limit.clone());
 
     group.bench_with_input(
         BenchmarkId::new(name, bit_size),
         &bit_size,
         |b, &_bit_size| {
             b.iter_batched_ref(
-                || (T::from(rng.sample(&sampler)), T::from(rng.sample(&sampler))),
+                || (T::from(sampler.sample(rng)), T::from(sampler.sample(rng))),
                 |(r1, r2)| {
                     black_box(f(&*r1, &*r2));
                 },

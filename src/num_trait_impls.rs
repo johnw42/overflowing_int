@@ -4,6 +4,7 @@ use core::ops::{Neg, Not};
 use num_bigint::{BigInt, ParseBigIntError, Sign::*};
 use num_integer::{Integer, Roots};
 use num_traits::{Num, One, Signed, ToPrimitive, Zero};
+use paste::paste;
 
 use crate::cbigint::CBigInt;
 use crate::decoded::Decoded;
@@ -111,7 +112,7 @@ impl Integer for CBigInt {
     fn div_floor(&self, other: &Self) -> Self {
         if let Some((lhs, rhs)) = self.to_digit_with(other) {
             if (lhs, rhs) != (Digit::MIN, -1) {
-                return lhs.div_floor(&rhs).into();
+                return Integer::div_floor(&lhs, &rhs).into();
             }
         }
         self.to_bigint().div_floor(&*other.to_bigint()).into()
@@ -120,7 +121,7 @@ impl Integer for CBigInt {
     fn mod_floor(&self, other: &Self) -> Self {
         if let Some((lhs, rhs)) = self.to_digit_with(other) {
             if (lhs, rhs) != (Digit::MIN, -1) {
-                return lhs.mod_floor(&rhs).into();
+                return Integer::mod_floor(&lhs, &rhs).into();
             }
         }
         self.to_bigint().mod_floor(&*other.to_bigint()).into()
@@ -142,16 +143,16 @@ impl Integer for CBigInt {
 
     fn divides(&self, other: &Self) -> bool {
         if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            return lhs.divides(&rhs).into();
+            return lhs.is_multiple_of(&rhs);
         }
-        self.to_bigint().divides(&*other.to_bigint()).into()
+        self.to_bigint().is_multiple_of(&*other.to_bigint())
     }
 
     fn is_multiple_of(&self, other: &Self) -> bool {
         if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            return lhs.is_multiple_of(&rhs).into();
+            return lhs.is_multiple_of(&rhs);
         }
-        self.to_bigint().is_multiple_of(&*other.to_bigint()).into()
+        self.to_bigint().is_multiple_of(&*other.to_bigint())
     }
 
     fn is_even(&self) -> bool {
@@ -176,7 +177,7 @@ impl Integer for CBigInt {
             }
         }
         let (q, r) = self.to_bigint().div_rem(&*other.to_bigint());
-        return (q.into(), r.into());
+        (q.into(), r.into())
     }
 }
 
@@ -246,27 +247,29 @@ impl Not for &CBigInt {
 }
 
 impl ToPrimitive for CBigInt {
-    #[duplicate::duplicate(
-        prim    to_prim;
-        [i8]    [to_i8];
-        [i16]   [to_i16];
-        [i32]   [to_i32];
-        [i64]   [to_i64];
-        [i128]  [to_i128];
-        [isize] [to_isize];
-        [u8]    [to_u8];
-        [u16]   [to_u16];
-        [u32]   [to_u32];
-        [u64]   [to_u64];
-        [u128]  [to_u128];
-        [usize] [to_usize];
-        [f32]   [to_f32];
-        [f64]   [to_f64];
+    #[duplicate::duplicate_item(
+        prim;
+        [i8];
+        [i16];
+        [i32];
+        [i64];
+        [i128];
+        [isize];
+        [u8];
+        [u16];
+        [u32];
+        [u64];
+        [u128];
+        [usize];
+        [f32];
+        [f64];
     )]
-    fn to_prim(&self) -> Option<prim> {
-        match self.decode_ref() {
-            Decoded::Digit(value) => value.to_prim(),
-            Decoded::Big(value) => value.to_prim(),
+    paste! {
+        fn [< to_ prim >](&self) -> Option<prim> {
+            match self.decode_ref() {
+                Decoded::Digit(value) => value.[< to_ prim >](),
+                Decoded::Big(value) => value.[< to_ prim >](),
+            }
         }
     }
 }

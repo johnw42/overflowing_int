@@ -3,7 +3,7 @@ use crate::checked;
 use crate::decoded::Decoded;
 use crate::to_cow::{ToCow, ToDecodedCow};
 use crate::Digit;
-use duplicate::duplicate_inline;
+use duplicate::duplicate;
 use match_ident::match_ident;
 use num_bigint::BigInt;
 use paste::paste;
@@ -14,17 +14,27 @@ use std::ops::{
     Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 
+/// A struct containing all the relevant implementions of a particular binary operator,
 struct BinaryOp {
+    /// A version of the operator that combines two digits, returning [None] if
+    /// the result doesn't fit in a digit.
     digits: fn(Digit, Digit) -> Option<Digit>,
+    /// A version of the operator that consumes both arguments.
     owned: fn(BigInt, BigInt) -> BigInt,
+    /// A version of the operator that consumes the first argument and borrows the second.
     owned_borrowed: fn(BigInt, &BigInt) -> BigInt,
+    /// A version of the operator that borrows the first argument and consumes the second.
     borrowed_owned: for<'a> fn(&'a BigInt, BigInt) -> BigInt,
+    /// A version of the operator that borrows both arguments.
     borrowed: for<'a> fn(&'a BigInt, &'a BigInt) -> BigInt,
+    /// A version of the operator that updates the first argument in place, consuming the second.
     update_owned: for<'a> fn(&'a mut BigInt, BigInt),
+    /// A version of the operator that updates the first argument in place, borrowing the second.
     update_borrowed: fn(&mut BigInt, &BigInt),
 }
 
 impl BinaryOp {
+    /// Calls a version of the binary operator that returns a new number.
     #[inline(always)]
     fn call<'a, L, R>(&self, lhs: L, rhs: R) -> CBigInt
     where
@@ -50,6 +60,7 @@ impl BinaryOp {
         .into()
     }
 
+    /// Calls a version of the binary operator that updates a bigint argument in place..
     #[inline(always)]
     fn call_update<'a, R>(&self, lhs: &mut CBigInt, rhs: R)
     where
@@ -84,8 +95,9 @@ impl BinaryOp {
         .into();
     }
 
+    /// Calls a version of the binary operator that updates a primitive in place.
     #[inline(always)]
-    fn call_update_prim<'a, R>(
+    fn call_update_prim<R>(
         &self,
         lhs: &mut CBigInt,
         rhs: R,
@@ -214,7 +226,7 @@ impl ShiftOp {
 
 macro_rules! duplicate_ops {
     ($($body:tt)*) => {
-        duplicate_inline! {
+        duplicate! {
             [
                 op_type op_trait op_fn op_test_pred;
                 [arith] [Add] [add] [always];
@@ -235,7 +247,7 @@ macro_rules! duplicate_ops {
 
 macro_rules! duplicate_prims {
     ($($body:tt)*) => {
-        duplicate_inline! {
+        duplicate! {
             [
                 prim_type prim;
                 [signed] [i8];
@@ -265,13 +277,7 @@ mod bigint_ops {
             arith | bit => {
                 paste! {
                     pub(super) const op_fn: BinaryOp = BinaryOp {
-                        digits: |lhs, rhs| {
-                            if let Some(out) = checked::op_fn(lhs, rhs) {
-                                Some(out)
-                            } else {
-                                None
-                            }
-                        },
+                        digits: |lhs, rhs| { checked::op_fn(lhs, rhs) },
                         owned: |lhs, rhs| op_trait::op_fn(lhs, rhs),
                         owned_borrowed: |lhs, rhs| op_trait::op_fn(lhs, rhs),
                         borrowed_owned: |lhs, rhs| op_trait::op_fn(lhs, rhs),
@@ -345,7 +351,7 @@ duplicate_ops! {
                     }
                 }
 
-                impl<'a> op_trait<prim> for &'a CBigInt {
+                impl op_trait<prim> for &CBigInt {
                     type Output = CBigInt;
                     #[inline(never)]
                     fn op_fn(self, rhs: prim) -> CBigInt {
@@ -353,7 +359,7 @@ duplicate_ops! {
                     }
                 }
 
-                impl<'a, 'b> op_trait<&'a prim> for &'b CBigInt {
+                impl<'a> op_trait<&'a prim> for &CBigInt {
                     type Output = CBigInt;
                     fn op_fn(self, rhs: &'a prim) -> CBigInt {
                         self.op_fn(*rhs)
@@ -368,7 +374,7 @@ duplicate_ops! {
                     }
                 }
 
-                impl<'a> op_trait<CBigInt> for &'a prim {
+                impl op_trait<CBigInt> for &prim {
                     type Output = CBigInt;
                     fn op_fn(self, rhs: CBigInt) -> CBigInt {
                         (*self).op_fn(rhs)
@@ -383,7 +389,7 @@ duplicate_ops! {
                     }
                 }
 
-                impl<'a, 'b> op_trait<&'b CBigInt> for &'a prim {
+                impl<'b> op_trait<&'b CBigInt> for &prim {
                     type Output = CBigInt;
                     fn op_fn(self, rhs: &'b CBigInt) -> CBigInt {
                         (*self).op_fn(rhs)
@@ -419,16 +425,16 @@ duplicate_ops! {
                     }
                 }
 
-                impl<'a> op_trait<prim> for &'a CBigInt {
+                impl op_trait<prim> for &CBigInt {
                     type Output = CBigInt;
                     fn op_fn(self, rhs: prim) -> CBigInt {
                         bigint_ops::op_fn.call(self, rhs, BigInt::op_fn, |x: &BigInt, y| x.op_fn(y))
                     }
                 }
 
-                impl<'a, 'b> op_trait<&'a prim> for &'b CBigInt {
+                impl op_trait<&prim> for &CBigInt {
                     type Output = CBigInt;
-                    fn op_fn(self, rhs: &'a prim) -> CBigInt {
+                    fn op_fn(self, rhs: &prim) -> CBigInt {
                         self.op_fn(*rhs)
                     }
                 }
@@ -443,8 +449,8 @@ duplicate_ops! {
                         }
                     }
 
-                    impl<'a> [< op_trait Assign >]<&'a prim> for CBigInt {
-                        fn [< op_fn _assign >](&mut self, rhs: &'a prim) {
+                    impl [< op_trait Assign >]<&prim> for CBigInt {
+                        fn [< op_fn _assign >](&mut self, rhs: &prim) {
                             self.[< op_fn _assign >](*rhs);
                         }
                     }
@@ -470,7 +476,7 @@ mod test {
 
     fn make_range() -> Vec<BigInt> {
         let mut small_range: Vec<Digit> = vec![Digit::MIN, Digit::MAX, -Digit::MAX];
-        small_range.extend((-10..=10).into_iter());
+        small_range.extend(-10..=10);
         let mut range: Vec<BigInt> = small_range.into_iter().map(From::from).collect();
         let huge: BigInt = <BigInt as From<i128>>::from(i128::MAX).pow(2);
         range.push(huge.clone());
@@ -478,8 +484,7 @@ mod test {
         range
     }
 
-    #[allow(dead_code)]
-    fn test_shift_op<R>(
+    struct ShiftOpsForType<R> {
         cbigint_op1: fn(CBigInt, R) -> CBigInt,
         cbigint_op2: fn(CBigInt, &R) -> CBigInt,
         cbigint_op3: fn(&CBigInt, R) -> CBigInt,
@@ -487,7 +492,11 @@ mod test {
         op_assign1: fn(&mut CBigInt, R),
         op_assign2: fn(&mut CBigInt, &R),
         bigint_op: fn(&BigInt, R) -> BigInt,
-    ) where
+    }
+
+    #[allow(dead_code)]
+    fn test_shift_op<R>(ops: ShiftOpsForType<R>)
+    where
         R: TryFrom<u32>,
         R: Copy,
     {
@@ -497,15 +506,15 @@ mod test {
             for big_rhs in (0..128).chain((150..500).step_by(10)) {
                 let lhs = CBigInt::from(big_lhs.clone());
                 if let Ok(rhs) = R::try_from(big_rhs) {
-                    let expected = bigint_op(big_lhs, rhs);
-                    let actual1 = BigInt::from(cbigint_op1(lhs.clone(), rhs));
-                    let actual2 = BigInt::from(cbigint_op2(lhs.clone(), &rhs));
-                    let actual3 = BigInt::from(cbigint_op3(&lhs, rhs));
-                    let actual4 = BigInt::from(cbigint_op4(&lhs, &rhs));
+                    let expected = (ops.bigint_op)(big_lhs, rhs);
+                    let actual1 = BigInt::from((ops.cbigint_op1)(lhs.clone(), rhs));
+                    let actual2 = BigInt::from((ops.cbigint_op2)(lhs.clone(), &rhs));
+                    let actual3 = BigInt::from((ops.cbigint_op3)(&lhs, rhs));
+                    let actual4 = BigInt::from((ops.cbigint_op4)(&lhs, &rhs));
                     let mut actual5 = lhs.clone();
-                    op_assign1(&mut actual5, rhs);
+                    (ops.op_assign1)(&mut actual5, rhs);
                     let mut actual6 = lhs.clone();
-                    op_assign2(&mut actual6, &rhs);
+                    (ops.op_assign2)(&mut actual6, &rhs);
                     let label = format!("failed with inputs {}, {}", big_lhs, big_rhs);
                     assert_eq!(expected, actual1, "{}", label);
                     assert_eq!(expected, actual2, "{}", label);
@@ -518,7 +527,7 @@ mod test {
         }
     }
 
-    fn test_bin_op<L, R>(
+    struct BinOpsForTypes<L, R> {
         predicate: fn(&BigInt, &BigInt) -> bool,
         cbigint_op1: fn(L, R) -> CBigInt,
         cbigint_op2: fn(L, &R) -> CBigInt,
@@ -527,7 +536,10 @@ mod test {
         op_assign1: fn(&mut CBigInt, R),
         op_assign2: fn(&mut CBigInt, &R),
         bigint_op: fn(&BigInt, &BigInt) -> BigInt,
-    ) where
+    }
+
+    fn test_bin_op<L, R>(ops: BinOpsForTypes<L, R>)
+    where
         L: TryFrom<BigInt> + Clone,
         R: TryFrom<BigInt> + Clone,
     {
@@ -535,19 +547,19 @@ mod test {
 
         for big_lhs in &range {
             for big_rhs in &range {
-                if predicate(big_lhs, big_rhs) {
+                if (ops.predicate)(big_lhs, big_rhs) {
                     if let (Ok(lhs), Ok(rhs)) =
                         (L::try_from(big_lhs.clone()), R::try_from(big_rhs.clone()))
                     {
-                        let expected = bigint_op(big_lhs, big_rhs);
-                        let actual1 = BigInt::from(cbigint_op1(lhs.clone(), rhs.clone()));
-                        let actual2 = BigInt::from(cbigint_op2(lhs.clone(), &rhs));
-                        let actual3 = BigInt::from(cbigint_op3(&lhs, rhs.clone()));
-                        let actual4 = BigInt::from(cbigint_op4(&lhs, &rhs));
+                        let expected = (ops.bigint_op)(big_lhs, big_rhs);
+                        let actual1 = BigInt::from((ops.cbigint_op1)(lhs.clone(), rhs.clone()));
+                        let actual2 = BigInt::from((ops.cbigint_op2)(lhs.clone(), &rhs));
+                        let actual3 = BigInt::from((ops.cbigint_op3)(&lhs, rhs.clone()));
+                        let actual4 = BigInt::from((ops.cbigint_op4)(&lhs, &rhs));
                         let mut actual5 = big_lhs.clone().into();
-                        op_assign1(&mut actual5, rhs.clone());
+                        (ops.op_assign1)(&mut actual5, rhs.clone());
                         let mut actual6 = big_lhs.clone().into();
-                        op_assign2(&mut actual6, &rhs);
+                        (ops.op_assign2)(&mut actual6, &rhs);
                         let label = format!("failed with inputs {}, {}", big_lhs, big_rhs);
                         assert_eq!(expected, actual1, "{}", label);
                         assert_eq!(expected, actual2, "{}", label);
@@ -568,16 +580,16 @@ mod test {
                 paste! {
                     #[test]
                     fn [< test_ op_fn >]() {
-                        test_bin_op::<CBigInt, CBigInt>(
-                            op_test_pred,
-                            |x, y| op_trait::op_fn(x, y),
-                            |x, y| op_trait::op_fn(x, y),
-                            |x, y| op_trait::op_fn(x, y),
-                            |x, y| op_trait::op_fn(x, y),
-                            |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                            |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                            |x, y| op_trait::op_fn(x, y),
-                        );
+                        test_bin_op::<CBigInt, CBigInt>(BinOpsForTypes {
+                            predicate: op_test_pred,
+                            cbigint_op1: |x, y| op_trait::op_fn(x, y),
+                            cbigint_op2: |x, y| op_trait::op_fn(x, y),
+                            cbigint_op3: |x, y| op_trait::op_fn(x, y),
+                            cbigint_op4: |x, y| op_trait::op_fn(x, y),
+                            op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                            op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                            bigint_op: |x, y| op_trait::op_fn(x, y),
+                        });
                     }
                 }
             }
@@ -588,44 +600,45 @@ mod test {
                 match_ident! {
                     op_type;
                     shift => {
+                        #[test]
                         fn [< test_ op_fn _ prim _rhs >]() {
-                            test_shift_op::<prim>(
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                            );
+                            test_shift_op::<prim>(ShiftOpsForType {
+                                cbigint_op1: |x, y| op_trait::op_fn(x, y),
+                                cbigint_op2: |x, y| op_trait::op_fn(x, y),
+                                cbigint_op3: |x, y| op_trait::op_fn(x, y),
+                                cbigint_op4: |x, y| op_trait::op_fn(x, y),
+                                op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                                op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                                bigint_op: |x, y| op_trait::op_fn(x, y),
+                            });
                         }
                     }
                     arith => {
                         #[test]
                         fn [< test_ op_fn _ prim _lhs >]() {
-                            test_bin_op::<prim, CBigInt>(
-                                op_test_pred,
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                            );
+                            test_bin_op::<prim, CBigInt>(BinOpsForTypes {
+                                predicate: op_test_pred,
+                                cbigint_op1: |x, y| op_trait::op_fn(x, y),
+                                cbigint_op2: |x, y| op_trait::op_fn(x, y),
+                                cbigint_op3: |x, y| op_trait::op_fn(x, y),
+                                cbigint_op4: |x, y| op_trait::op_fn(x, y),
+                                op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                                op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                                bigint_op: |x, y| op_trait::op_fn(x, y),
+                        });
                         }
                         #[test]
                         fn [< test_ op_fn _ prim _rhs >]() {
-                            test_bin_op::<CBigInt, prim>(
-                                op_test_pred,
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                                |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                |x, y| op_trait::op_fn(x, y),
-                            );
+                            test_bin_op::<CBigInt, prim>(BinOpsForTypes {
+                                predicate: op_test_pred,
+                                cbigint_op1: |x, y| op_trait::op_fn(x, y),
+                                cbigint_op2: |x, y| op_trait::op_fn(x, y),
+                                cbigint_op3: |x, y| op_trait::op_fn(x, y),
+                                cbigint_op4: |x, y| op_trait::op_fn(x, y),
+                                op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                                op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                                bigint_op: |x, y| op_trait::op_fn(x, y),
+                            });
                         }
                     }
                     _ => {}
