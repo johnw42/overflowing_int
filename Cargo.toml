@@ -13,9 +13,6 @@ unsafe_encoding = [
 ]
 i128_digit = [
 ]
-# For testing and benchmarking only. Not intended for general use.
-tiny_digit = [
-]
 debug_structure = [
 ]
 

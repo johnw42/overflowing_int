@@ -1,6 +1,6 @@
-use crate::cbigint::CBigInt;
-use crate::decoded::Decoded;
 use crate::Digit;
+use crate::cbigint::CBigInt;
+use crate::encoding::Encoded;
 use num_bigint::{BigInt, BigUint, Sign::*, ToBigInt, ToBigUint, TryFromBigIntError};
 use num_traits::ToPrimitive;
 use paste::paste;
@@ -21,11 +21,11 @@ impl ToBigUint for CBigInt {
 
 impl From<BigInt> for CBigInt {
     fn from(value: BigInt) -> Self {
-        let decoded = match Digit::try_from(value) {
-            Ok(digit) => Decoded::Digit(digit),
-            Err(err) => Decoded::Big(err.into_original()),
+        let encoded = match Digit::try_from(value) {
+            Ok(digit) => Encoded::Digit(digit),
+            Err(err) => Encoded::Big(err.into_original()),
         };
-        CBigInt(decoded.encode())
+        CBigInt(encoded)
     }
 }
 
@@ -37,9 +37,9 @@ impl From<BigUint> for CBigInt {
 
 impl From<CBigInt> for BigInt {
     fn from(value: CBigInt) -> Self {
-        match value.decode() {
-            Decoded::Digit(n) => BigInt::from(n),
-            Decoded::Big(n) => n,
+        match value.0 {
+            Encoded::Digit(n) => BigInt::from(n),
+            Encoded::Big(n) => n,
         }
     }
 }
@@ -52,9 +52,9 @@ fn try_into_bigint_error() -> TryFromBigIntError<()> {
 impl TryFrom<CBigInt> for BigUint {
     type Error = TryFromBigIntError<()>;
     fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
-        match value.0.decode() {
-            Decoded::Digit(n) => n.to_biguint(),
-            Decoded::Big(n) => n.to_biguint(),
+        match value.0 {
+            Encoded::Digit(n) => n.to_biguint(),
+            Encoded::Big(n) => n.to_biguint(),
         }
         .ok_or_else(try_into_bigint_error)
     }
@@ -89,7 +89,7 @@ duplicate::duplicate! {
                 #[allow(irrefutable_let_patterns)]
                 #[allow(clippy::unnecessary_fallible_conversions)]
                 if let Ok(digit) = Digit::try_from(value) {
-                    CBigInt(Decoded::Digit(digit).encode())
+                    CBigInt(Encoded::Digit(digit))
                 } else {
                     BigInt::from(value).into()
                 }

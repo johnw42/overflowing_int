@@ -1,8 +1,8 @@
+use crate::Digit;
 use crate::cbigint::CBigInt;
 use crate::checked;
-use crate::decoded::Decoded;
+use crate::encoding::Encoded;
 use crate::to_cow::{ToCow, ToDecodedCow};
-use crate::Digit;
 use duplicate::duplicate;
 use match_ident::match_ident;
 use num_bigint::BigInt;
@@ -45,7 +45,7 @@ impl BinaryOp {
         let lhs = lhs.to_decoded_cow();
         let rhs = rhs.to_decoded_cow();
 
-        if let (&Decoded::Digit(lhs), &Decoded::Digit(rhs)) = (&lhs, &rhs) {
+        if let (&Encoded::Digit(lhs), &Encoded::Digit(rhs)) = (&lhs, &rhs) {
             if let Some(out) = (self.digits)(lhs, rhs) {
                 return out.into();
             }
@@ -69,7 +69,7 @@ impl BinaryOp {
         use Cow::*;
         let rhs = rhs.to_decoded_cow();
 
-        if let (Decoded::Digit(lhs_digit), &Decoded::Digit(rhs)) = (lhs.decode_mut(), &rhs) {
+        if let (&Encoded::Digit(lhs_digit), &Encoded::Digit(rhs)) = (&lhs.0, &rhs) {
             if let Some(out) = (self.digits)(lhs_digit, rhs) {
                 *lhs = out.into();
                 return;
@@ -78,16 +78,16 @@ impl BinaryOp {
 
         let target = lhs;
         let lhs = std::mem::take(target);
-        *target = match (lhs.decode(), rhs.to_cow()) {
-            (Decoded::Digit(digit), Owned(rhs)) => (self.owned)(BigInt::from(digit), rhs),
-            (Decoded::Digit(digit), Borrowed(rhs)) => {
+        *target = match (lhs.0, rhs.to_cow()) {
+            (Encoded::Digit(digit), Owned(rhs)) => (self.owned)(BigInt::from(digit), rhs),
+            (Encoded::Digit(digit), Borrowed(rhs)) => {
                 (self.owned_borrowed)(BigInt::from(digit), rhs)
             }
-            (Decoded::Big(mut big), Owned(rhs)) => {
+            (Encoded::Big(mut big), Owned(rhs)) => {
                 (self.update_owned)(&mut big, rhs);
                 big
             }
-            (Decoded::Big(mut big), Borrowed(rhs)) => {
+            (Encoded::Big(mut big), Borrowed(rhs)) => {
                 (self.update_borrowed)(&mut big, rhs);
                 big
             }
@@ -107,7 +107,7 @@ impl BinaryOp {
         R: Copy,
         Digit: TryFrom<R>,
     {
-        if let Decoded::Digit(lhs_digit) = lhs.decode_mut() {
+        if let Encoded::Digit(lhs_digit) = lhs.0 {
             if let Ok(rhs) = Digit::try_from(rhs) {
                 if let Some(out) = (self.digits)(lhs_digit, rhs) {
                     *lhs = out.into();
@@ -118,9 +118,9 @@ impl BinaryOp {
 
         let target = lhs;
         let lhs = std::mem::take(target);
-        *target = match lhs.decode() {
-            Decoded::Digit(digit) => big_op(BigInt::from(digit), rhs),
-            Decoded::Big(mut big) => {
+        *target = match lhs.0 {
+            Encoded::Digit(digit) => big_op(BigInt::from(digit), rhs),
+            Encoded::Big(mut big) => {
                 big_assign_op(&mut big, rhs);
                 big
             }
@@ -142,7 +142,7 @@ impl BinaryOp {
         Digit: TryFrom<L>,
     {
         match rhs.to_decoded_cow() {
-            Decoded::Digit(rhs) => {
+            Encoded::Digit(rhs) => {
                 if let Ok(lhs) = Digit::try_from(lhs) {
                     if let Some(out) = (self.digits)(lhs, rhs) {
                         return out.into();
@@ -150,7 +150,7 @@ impl BinaryOp {
                 }
                 big_op(lhs, BigInt::from(rhs)).into()
             }
-            Decoded::Big(big) => match big {
+            Encoded::Big(big) => match big {
                 Cow::Owned(big) => big_op(lhs, big),
                 Cow::Borrowed(big) => big_ref_op(lhs, big),
             }
@@ -172,7 +172,7 @@ impl BinaryOp {
         Digit: TryFrom<R>,
     {
         match lhs.to_decoded_cow() {
-            Decoded::Digit(lhs) => {
+            Encoded::Digit(lhs) => {
                 if let Ok(rhs) = Digit::try_from(rhs) {
                     if let Some(out) = (self.digits)(lhs, rhs) {
                         return out.into();
@@ -180,7 +180,7 @@ impl BinaryOp {
                 }
                 big_op(BigInt::from(lhs), rhs).into()
             }
-            Decoded::Big(big) => match big {
+            Encoded::Big(big) => match big {
                 Cow::Owned(big) => big_op(big, rhs),
                 Cow::Borrowed(big) => big_ref_op(big, rhs),
             }
@@ -207,7 +207,7 @@ impl ShiftOp {
         u32: TryFrom<R>,
     {
         match lhs.to_decoded_cow() {
-            Decoded::Digit(lhs) => {
+            Encoded::Digit(lhs) => {
                 if let Ok(rhs) = u32::try_from(rhs) {
                     if let Some(out) = (self.0)(lhs, rhs) {
                         return out.into();
@@ -215,7 +215,7 @@ impl ShiftOp {
                 }
                 big_op(BigInt::from(lhs), rhs).into()
             }
-            Decoded::Big(big) => match big {
+            Encoded::Big(big) => match big {
                 Cow::Owned(big) => big_op(big, rhs),
                 Cow::Borrowed(big) => big_ref_op(big, rhs),
             }
@@ -442,9 +442,9 @@ duplicate_ops! {
                 paste! {
                     impl [< op_trait Assign >]<prim> for CBigInt {
                         fn [< op_fn _assign >](&mut self, rhs: prim) {
-                            match self.decode_mut() {
-                                Decoded::Digit(_) => *self = self.clone().op_fn(rhs),
-                                Decoded::Big(big) => big.[< op_fn _assign >](rhs),
+                            match &mut self.0 {
+                                Encoded::Digit(_) => *self = self.clone().op_fn(rhs),
+                                Encoded::Big(big) => big.[< op_fn _assign >](rhs),
                             }
                         }
                     }

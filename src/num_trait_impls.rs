@@ -6,10 +6,9 @@ use num_integer::{Integer, Roots};
 use num_traits::{Num, One, Signed, ToPrimitive, Zero};
 use paste::paste;
 
-use crate::cbigint::CBigInt;
-use crate::decoded::Decoded;
-use crate::encoding::Encoded;
 use crate::Digit;
+use crate::cbigint::CBigInt;
+use crate::encoding::Encoded;
 
 impl Zero for CBigInt {
     fn zero() -> Self {
@@ -55,15 +54,15 @@ impl Num for CBigInt {
 
 impl Signed for CBigInt {
     fn abs(&self) -> Self {
-        match self.decode_ref() {
-            Decoded::Digit(a) => {
+        match &self.0 {
+            Encoded::Digit(a) => {
                 if let (b, false) = a.overflowing_abs() {
                     b.into()
                 } else {
-                    BigInt::from(a).abs().into()
+                    BigInt::from(*a).abs().into()
                 }
             }
-            Decoded::Big(a) => a.abs().into(),
+            Encoded::Big(a) => a.abs().into(),
         }
     }
 
@@ -97,9 +96,9 @@ impl PartialOrd for CBigInt {
 
 impl Ord for CBigInt {
     fn cmp(&self, other: &Self) -> Ordering {
-        match (self.decode_ref(), other.decode_ref()) {
-            (Decoded::Digit(a), Decoded::Digit(b)) => a.cmp(&b),
-            (Decoded::Big(a), Decoded::Big(b)) => a.cmp(b),
+        match (&self.0, &other.0) {
+            (Encoded::Digit(a), Encoded::Digit(b)) => a.cmp(b),
+            (Encoded::Big(a), Encoded::Big(b)) => a.cmp(b),
             _ => self
                 .sign()
                 .cmp(&other.sign())
@@ -156,16 +155,16 @@ impl Integer for CBigInt {
     }
 
     fn is_even(&self) -> bool {
-        match self.decode_ref() {
-            Decoded::Digit(n) => n.is_even(),
-            Decoded::Big(n) => n.is_even(),
+        match &self.0 {
+            Encoded::Digit(n) => n.is_even(),
+            Encoded::Big(n) => n.is_even(),
         }
     }
 
     fn is_odd(&self) -> bool {
-        match self.decode_ref() {
-            Decoded::Digit(n) => n.is_odd(),
-            Decoded::Big(n) => n.is_odd(),
+        match &self.0 {
+            Encoded::Digit(n) => n.is_odd(),
+            Encoded::Big(n) => n.is_odd(),
         }
     }
 
@@ -191,9 +190,9 @@ fn gcd_test() {
 
 impl Roots for CBigInt {
     fn nth_root(&self, n: u32) -> Self {
-        match self.decode_ref() {
-            Decoded::Digit(a) => a.nth_root(n).into(),
-            Decoded::Big(a) => a.nth_root(n).into(),
+        match &self.0 {
+            Encoded::Digit(a) => a.nth_root(n).into(),
+            Encoded::Big(a) => a.nth_root(n).into(),
         }
     }
 }
@@ -228,9 +227,9 @@ impl Not for CBigInt {
     type Output = CBigInt;
 
     fn not(self) -> Self::Output {
-        match self.decode() {
-            Decoded::Digit(n) => n.not().into(),
-            Decoded::Big(n) => n.not().into(),
+        match self.0 {
+            Encoded::Digit(n) => n.not().into(),
+            Encoded::Big(n) => n.not().into(),
         }
     }
 }
@@ -239,9 +238,9 @@ impl Not for &CBigInt {
     type Output = CBigInt;
 
     fn not(self) -> Self::Output {
-        match self.decode_ref() {
-            Decoded::Digit(n) => n.not().into(),
-            Decoded::Big(n) => n.not().into(),
+        match &self.0 {
+            Encoded::Digit(n) => n.not().into(),
+            Encoded::Big(n) => n.not().into(),
         }
     }
 }
@@ -266,9 +265,9 @@ impl ToPrimitive for CBigInt {
     )]
     paste! {
         fn [< to_ prim >](&self) -> Option<prim> {
-            match self.decode_ref() {
-                Decoded::Digit(value) => value.[< to_ prim >](),
-                Decoded::Big(value) => value.[< to_ prim >](),
+            match &self.0 {
+                Encoded::Digit(value) => value.[< to_ prim >](),
+                Encoded::Big(value) => value.[< to_ prim >](),
             }
         }
     }

@@ -9,10 +9,8 @@ pub fn make_accum(value: Digit) -> (Sign, Udigit) {
         (NoSign, 0)
     } else if value >= 0 {
         (Plus, value as Udigit)
-    } else if value == Digit::MIN {
-        (Minus, value as Udigit)
     } else {
-        (Minus, (-value) as Udigit)
+        (Minus, value.unsigned_abs() as Udigit)
     }
 }
 

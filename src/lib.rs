@@ -11,7 +11,6 @@ mod num_trait_impls;
 //pub mod clever;
 mod checked;
 mod convert;
-mod decoded;
 mod encoding;
 mod ops;
 mod to_cow;
@@ -22,13 +21,7 @@ pub mod digits {
     pub type Udigit = u128;
 }
 
-#[cfg(feature = "tiny_digit")]
-pub mod digits {
-    pub type Digit = i16;
-    pub type Udigit = u16;
-}
-
-#[cfg(not(any(feature = "i128_digit", feature = "tiny_digit")))]
+#[cfg(not(feature = "i128_digit"))]
 pub mod digits {
     pub type Digit = isize;
     pub type Udigit = usize;
