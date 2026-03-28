@@ -12,28 +12,8 @@ use crate::accum::*;
 use crate::encoding::Encoded;
 use crate::{DIGIT_BITS, Digit, Udigit};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct CBigInt(pub(crate) Encoded<BigInt>);
-
-impl PartialEq for CBigInt {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl Eq for CBigInt {}
-
-impl From<CBigInt> for Encoded<BigInt> {
-    fn from(arg: CBigInt) -> Self {
-        arg.0
-    }
-}
-
-impl From<Encoded<BigInt>> for CBigInt {
-    fn from(value: Encoded<BigInt>) -> Self {
-        Self(value)
-    }
-}
 
 impl CBigInt {
     pub(crate) fn to_digit(&self) -> Option<Digit> {
@@ -51,7 +31,7 @@ impl CBigInt {
     }
 
     fn from_accum(sign: Sign, accum: Udigit) -> Option<Self> {
-        accum_to_digit(sign, accum).map(|digit| Encoded::Digit(digit).into())
+        accum_to_digit(sign, accum).map(|digit| CBigInt(Encoded::Digit(digit)))
     }
 
     /// Creates and initializes a BigInt.

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use num_bigint::BigInt;
 
-use crate::digits::Digit;
+use crate::Digit;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Encoded<T> {

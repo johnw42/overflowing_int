@@ -109,19 +109,19 @@ impl Ord for CBigInt {
 
 impl Integer for CBigInt {
     fn div_floor(&self, other: &Self) -> Self {
-        if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            if (lhs, rhs) != (Digit::MIN, -1) {
-                return Integer::div_floor(&lhs, &rhs).into();
-            }
+        if let Some((lhs, rhs)) = self.to_digit_with(other)
+            && (lhs, rhs) != (Digit::MIN, -1)
+        {
+            return Integer::div_floor(&lhs, &rhs).into();
         }
         self.to_bigint().div_floor(&*other.to_bigint()).into()
     }
 
     fn mod_floor(&self, other: &Self) -> Self {
-        if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            if (lhs, rhs) != (Digit::MIN, -1) {
-                return Integer::mod_floor(&lhs, &rhs).into();
-            }
+        if let Some((lhs, rhs)) = self.to_digit_with(other)
+            && (lhs, rhs) != (Digit::MIN, -1)
+        {
+            return Integer::mod_floor(&lhs, &rhs).into();
         }
         self.to_bigint().mod_floor(&*other.to_bigint()).into()
     }
@@ -169,11 +169,11 @@ impl Integer for CBigInt {
     }
 
     fn div_rem(&self, other: &Self) -> (Self, Self) {
-        if let Some((lhs, rhs)) = self.to_digit_with(other) {
-            if (lhs, rhs) != (Digit::MIN, -1) {
-                let (q, r) = lhs.div_rem(&rhs);
-                return (q.into(), r.into());
-            }
+        if let Some((lhs, rhs)) = self.to_digit_with(other)
+            && (lhs, rhs) != (Digit::MIN, -1)
+        {
+            let (q, r) = lhs.div_rem(&rhs);
+            return (q.into(), r.into());
         }
         let (q, r) = self.to_bigint().div_rem(&*other.to_bigint());
         (q.into(), r.into())
@@ -201,10 +201,10 @@ impl Neg for CBigInt {
     type Output = CBigInt;
 
     fn neg(self) -> Self::Output {
-        if let Some(a) = self.to_digit() {
-            if let (b, false) = a.overflowing_neg() {
-                return b.into();
-            }
+        if let Some(a) = self.to_digit()
+            && let (b, false) = a.overflowing_neg()
+        {
+            return b.into();
         }
         BigInt::from(self).neg().into()
     }
@@ -214,10 +214,10 @@ impl Neg for &CBigInt {
     type Output = CBigInt;
 
     fn neg(self) -> Self::Output {
-        if let Some(a) = self.to_digit() {
-            if let (b, false) = a.overflowing_neg() {
-                return b.into();
-            }
+        if let Some(a) = self.to_digit()
+            && let (b, false) = a.overflowing_neg()
+        {
+            return b.into();
         }
         (&*self.to_bigint()).neg().into()
     }

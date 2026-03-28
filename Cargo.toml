@@ -9,10 +9,6 @@ authors.workspace = true
 [features]
 default = [
 ]
-unsafe_encoding = [
-]
-i128_digit = [
-]
 debug_structure = [
 ]
 
