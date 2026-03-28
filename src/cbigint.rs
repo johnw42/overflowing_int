@@ -30,8 +30,8 @@ impl CBigInt {
         }
     }
 
-    fn from_accum(sign: Sign, accum: Udigit) -> Option<Self> {
-        accum_to_digit(sign, accum).map(|digit| CBigInt(Encoded::Digit(digit)))
+    fn try_apply_sign(sign: Sign, magnitude: Udigit) -> Option<Self> {
+        try_apply_sign(sign, magnitude).map(|digit| CBigInt(Encoded::Digit(digit)))
     }
 
     /// Creates and initializes a BigInt.
@@ -41,7 +41,9 @@ impl CBigInt {
         if sign == NoSign {
             return CBigInt(Encoded::zero());
         }
-        if digits.len() <= 4 {
+
+        // If the u32 digits fit into one Digit, we can avoid the overhead of creating a BigInt.
+        if digits.len() <= size_of::<Udigit>() / size_of::<u32>() {
             let mut value: Digit = 0;
             for &digit in &digits {
                 value = (value << 32) | digit as Digit;
@@ -53,6 +55,7 @@ impl CBigInt {
                 return value.into();
             }
         }
+
         CBigInt(Encoded::Big(BigInt::new(sign, digits)))
     }
 
@@ -73,7 +76,7 @@ impl CBigInt {
             for (i, &word) in slice.iter().enumerate() {
                 accum |= (word as Udigit) << (i * 8);
             }
-            if let Some(result) = Self::from_accum(sign, accum) {
+            if let Some(result) = Self::try_apply_sign(sign, accum) {
                 return result;
             }
         }
@@ -107,8 +110,8 @@ impl CBigInt {
     ///            CBigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> CBigInt {
-        if let Some(accum) = accum_be(bytes)
-            && let Some(result) = Self::from_accum(sign, accum)
+        if let Some(accum) = bytes_to_digit_be(bytes)
+            && let Some(result) = Self::try_apply_sign(sign, accum)
         {
             return result;
         }
@@ -119,8 +122,8 @@ impl CBigInt {
     ///
     /// The bytes are in little-endian byte order.
     pub fn from_bytes_le(sign: Sign, bytes: &[u8]) -> CBigInt {
-        if let Some(accum) = accum_le(bytes)
-            && let Some(result) = Self::from_accum(sign, accum)
+        if let Some(accum) = bytes_to_digit_le(bytes)
+            && let Some(result) = Self::try_apply_sign(sign, accum)
         {
             return result;
         }
@@ -132,7 +135,7 @@ impl CBigInt {
     ///
     /// The digits are in big-endian base 2<sup>8</sup>.
     pub fn from_signed_bytes_be(digits: &[u8]) -> CBigInt {
-        if let Some(accum) = accum_be(digits) {
+        if let Some(accum) = bytes_to_digit_be(digits) {
             (accum as Digit).into()
         } else {
             BigInt::from_signed_bytes_be(digits).into()
@@ -143,7 +146,7 @@ impl CBigInt {
     ///
     /// The digits are in little-endian base 2<sup>8</sup>.
     pub fn from_signed_bytes_le(digits: &[u8]) -> CBigInt {
-        if let Some(accum) = accum_le(digits) {
+        if let Some(accum) = bytes_to_digit_le(digits) {
             (accum as Digit).into()
         } else {
             BigInt::from_signed_bytes_le(digits).into()
@@ -218,7 +221,7 @@ impl CBigInt {
     /// ```
     pub fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
         match &self.0 {
-            Encoded::Digit(n) => match make_accum(*n) {
+            Encoded::Digit(n) => match sign_and_magnitude(*n) {
                 (NoSign, _) => (NoSign, Vec::new()),
                 (sign, accum) => {
                     let bytes = accum.to_be_bytes();
@@ -246,7 +249,7 @@ impl CBigInt {
     pub fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
         match &self.0 {
             Encoded::Digit(n) => {
-                let (sign, accum) = make_accum(*n);
+                let (sign, accum) = sign_and_magnitude(*n);
                 if sign == NoSign {
                     (sign, Vec::new())
                 } else {
@@ -277,7 +280,7 @@ impl CBigInt {
     /// ```
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
         match &self.0 {
-            Encoded::Digit(n) => match make_accum(*n) {
+            Encoded::Digit(n) => match sign_and_magnitude(*n) {
                 (NoSign, _) => (NoSign, Vec::new()),
                 (sign, mut accum) => {
                     let mut digits = Vec::with_capacity(4);
