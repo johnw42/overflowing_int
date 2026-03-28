@@ -4,8 +4,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::mem::size_of;
 
 use num_bigint::{BigInt, BigUint, Sign};
-#[allow(unused_imports)]
-use num_traits::{ToPrimitive, Zero};
 
 use crate::Sign::*;
 use crate::accum::*;

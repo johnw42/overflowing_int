@@ -494,7 +494,6 @@ mod test {
         bigint_op: fn(&BigInt, R) -> BigInt,
     }
 
-    #[allow(dead_code)]
     fn test_shift_op<R>(ops: ShiftOpsForType<R>)
     where
         R: TryFrom<u32>,
