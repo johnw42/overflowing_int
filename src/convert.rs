@@ -1,8 +1,9 @@
 use crate::Digit;
+use crate::big_integer::BigInteger as _;
 use crate::cbigint::CBigInt;
 use crate::encoding::Encoded;
 use num_bigint::{BigInt, BigUint, Sign::*, ToBigInt, ToBigUint, TryFromBigIntError};
-use num_traits::ToPrimitive;
+use num_traits::{Pow, ToPrimitive};
 use paste::paste;
 use std::borrow::Cow;
 use std::convert::{TryFrom, TryInto};
@@ -16,6 +17,30 @@ impl ToBigInt for CBigInt {
 impl ToBigUint for CBigInt {
     fn to_biguint(&self) -> Option<BigUint> {
         self.clone().try_into().ok()
+    }
+}
+
+impl From<&BigInt> for CBigInt {
+    fn from(big: &BigInt) -> Self {
+        CBigInt::from(big.clone())
+    }
+}
+
+impl From<&CBigInt> for BigInt {
+    fn from(cbig: &CBigInt) -> Self {
+        match cbig.0 {
+            Encoded::Digit(n) => BigInt::from(n),
+            Encoded::Big(ref big) => big.clone(),
+        }
+    }
+}
+
+impl<'a> From<&'a CBigInt> for Cow<'a, BigInt> {
+    fn from(cbig: &'a CBigInt) -> Self {
+        match cbig.0 {
+            Encoded::Digit(n) => Cow::Owned(BigInt::from(n)),
+            Encoded::Big(ref big) => Cow::Borrowed(big),
+        }
     }
 }
 
@@ -67,6 +92,12 @@ impl TryFrom<&CBigInt> for BigUint {
     }
 }
 
+impl From<bool> for CBigInt {
+    fn from(value: bool) -> Self {
+        CBigInt(Encoded::Digit(Digit::from(value)))
+    }
+}
+
 duplicate::duplicate! {
     [
         prim;
@@ -95,9 +126,28 @@ duplicate::duplicate! {
                 }
             }
         }
+
         impl TryFrom<CBigInt> for prim {
             type Error = TryFromBigIntError<BigInt>;
             fn try_from(value: CBigInt) -> Result<Self, Self::Error> {
+                if let Some(n) = value.to_digit() {
+                    match n.[< to_ prim >]() {
+                        Some(prim) => Ok(prim),
+                        None => {
+                            // This is guaranteed to fail; it's done because there's no more
+                            // straightforward way to construct an appropriate TryFromBigIntError.
+                            prim::try_from(BigInt::from(value))
+                        }
+                    }
+                } else {
+                    prim::try_from(BigInt::from(value))
+                }
+            }
+        }
+
+        impl TryFrom<&CBigInt> for prim {
+            type Error = TryFromBigIntError<BigInt>;
+            fn try_from(value: &CBigInt) -> Result<Self, Self::Error> {
                 if let Some(n) = value.to_digit() {
                     match n.[< to_ prim >]() {
                         Some(prim) => Ok(prim),

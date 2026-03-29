@@ -11,11 +11,11 @@ pub enum Encoded<T> {
 }
 
 impl Encoded<BigInt> {
-    pub fn zero() -> Self {
+    pub const fn zero() -> Self {
         Encoded::Digit(0)
     }
 
-    pub fn one() -> Self {
+    pub const fn one() -> Self {
         Encoded::Digit(1)
     }
 

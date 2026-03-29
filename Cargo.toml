@@ -8,16 +8,68 @@ authors.workspace = true
 
 [features]
 default = [
+  "quickcheck",
+  "arbitrary",
+  "serde",
+  "rand",
 ]
 debug_structure = [
 ]
+quickcheck = [
+  "dep:quickcheck",
+  "num-bigint/quickcheck",
+]
+arbitrary = [
+  "dep:arbitrary",
+  "num-bigint/arbitrary",
+]
+serde = [
+  "dep:serde",
+  "num-bigint/serde",
+]
+rand = [
+  "dep:rand",
+  "num-bigint/rand",
+]
 
 [dependencies]
-num-bigint = { version = "^0.4.0" }
-num-traits = "^0.2.12"
-num-integer = "^0.1.43"
+num-bigint = "^0.4.0"
 duplicate = "^2.0.1"
 paste = "^1.0.5"
+
+[dependencies.num-integer]
+version = "0.1.46"
+default-features = false
+features = [
+  "i128",
+]
+
+[dependencies.num-traits]
+version = "0.2.18"
+default-features = false
+features = [
+  "i128",
+]
+
+[dependencies.rand]
+optional = true
+version = "0.8"
+default-features = false
+
+[dependencies.serde]
+optional = true
+version = "1.0"
+default-features = false
+
+[dependencies.quickcheck]
+optional = true
+version = "1"
+default-features = false
+
+[dependencies.arbitrary]
+optional = true
+version = "1"
+default-features = false
 
 [dev-dependencies]
 num-bigint = { version = "^0.4.0", features = [

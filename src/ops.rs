@@ -5,6 +5,7 @@ use crate::encoding::Encoded;
 use crate::to_cow::{ToCow, ToDecodedCow};
 use duplicate::duplicate;
 use num_bigint::BigInt;
+use num_traits::Pow;
 use paste::paste;
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -251,16 +252,26 @@ macro_rules! duplicate_arith_and_bit_ops {
     }
 }
 
-// macro_rules! duplicate_ops {
-//     ($($body:tt)*) => {
-//         duplicate_arith_ops! { $($body)* }
-//         duplicate_shift_ops! { $($body)* }
-//         duplicate_bit_ops! { $($body)* }
-//     }
-// }
+macro_rules! duplicate_uprims {
+    ($($body:tt)*) => {
+        duplicate! {
+            [
+                prim;
+                [u8];
+                [u16];
+                [u32];
+                [u64];
+                [u128];
+                [usize];
+            ]
+            $($body)*
+        }
+    }
+}
 
 macro_rules! duplicate_prims {
     ($($body:tt)*) => {
+        duplicate_uprims! { $($body)* }
         duplicate! {
             [
                 prim;
@@ -270,12 +281,6 @@ macro_rules! duplicate_prims {
                 [i64];
                 [i128];
                 [isize];
-                [u8];
-                [u16];
-                [u32];
-                [u64];
-                [u128];
-                [usize];
             ]
             $($body)*
         }
@@ -497,10 +502,44 @@ duplicate_shift_ops! {
     }
 }
 
+duplicate_uprims! {
+    impl Pow<prim> for CBigInt {
+        type Output = CBigInt;
+
+        fn pow(self, rhs: prim) -> Self::Output {
+            BigInt::from(self).pow(rhs).into()
+        }
+    }
+
+    impl Pow<&prim> for CBigInt {
+        type Output = CBigInt;
+
+        fn pow(self, rhs: &prim) -> Self::Output {
+            BigInt::from(self).pow(rhs).into()
+        }
+    }
+
+    impl Pow<prim> for &CBigInt {
+        type Output = CBigInt;
+
+        fn pow(self, rhs: prim) -> Self::Output {
+            BigInt::from(self).pow(rhs).into()
+        }
+    }
+
+    impl Pow<&prim> for &CBigInt {
+        type Output = CBigInt;
+
+        fn pow(self, rhs: &prim) -> Self::Output {
+            BigInt::from(self).pow(rhs).into()
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use num_traits::Zero;
+    use num_traits::{Pow, Zero};
 
     fn always(_lhs: &BigInt, _rhs: &BigInt) -> bool {
         true
@@ -514,7 +553,7 @@ mod test {
         let mut small_range: Vec<Digit> = vec![Digit::MIN, Digit::MAX, -Digit::MAX];
         small_range.extend(-10..=10);
         let mut range: Vec<BigInt> = small_range.into_iter().map(From::from).collect();
-        let huge: BigInt = <BigInt as From<i128>>::from(i128::MAX).pow(2);
+        let huge: BigInt = <BigInt as From<i128>>::from(i128::MAX).pow(2u32);
         range.push(huge.clone());
         range.push(-huge);
         range
@@ -607,75 +646,69 @@ mod test {
         }
     }
 
-    duplicate_ops! {
-        match_ident! {
-            op_type;
-            arith | bit => {
-                paste! {
-                    #[test]
-                    fn [< test_ op_fn >]() {
-                        test_bin_op::<CBigInt, CBigInt>(BinOpsForTypes {
-                            predicate: op_test_pred,
-                            cbigint_op1: |x, y| op_trait::op_fn(x, y),
-                            cbigint_op2: |x, y| op_trait::op_fn(x, y),
-                            cbigint_op3: |x, y| op_trait::op_fn(x, y),
-                            cbigint_op4: |x, y| op_trait::op_fn(x, y),
-                            op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                            op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                            bigint_op: |x, y| op_trait::op_fn(x, y),
-                        });
-                    }
+    duplicate_arith_and_bit_ops! {
+        paste! {
+            #[test]
+            fn [< test_ op_fn >]() {
+                test_bin_op::<CBigInt, CBigInt>(BinOpsForTypes {
+                    predicate: op_test_pred,
+                    cbigint_op1: |x, y| op_trait::op_fn(x, y),
+                    cbigint_op2: |x, y| op_trait::op_fn(x, y),
+                    cbigint_op3: |x, y| op_trait::op_fn(x, y),
+                    cbigint_op4: |x, y| op_trait::op_fn(x, y),
+                    op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                    op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                    bigint_op: |x, y| op_trait::op_fn(x, y),
+                });
+            }
+        }
+    }
+    duplicate_shift_ops! {
+         duplicate_prims! {
+            paste! {
+                #[test]
+                fn [< test_ op_fn _ prim _rhs >]() {
+                    test_shift_op::<prim>(ShiftOpsForType {
+                        cbigint_op1: |x, y| op_trait::op_fn(x, y),
+                        cbigint_op2: |x, y| op_trait::op_fn(x, y),
+                        cbigint_op3: |x, y| op_trait::op_fn(x, y),
+                        cbigint_op4: |x, y| op_trait::op_fn(x, y),
+                        op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        bigint_op: |x, y| op_trait::op_fn(x, y),
+                    });
                 }
             }
-            _ => {}
         }
-        duplicate_prims! {
+    }
+    duplicate_arith_ops! {
+         duplicate_prims! {
             paste! {
-                match_ident! {
-                    op_type;
-                    shift => {
-                        #[test]
-                        fn [< test_ op_fn _ prim _rhs >]() {
-                            test_shift_op::<prim>(ShiftOpsForType {
-                                cbigint_op1: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op2: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op3: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op4: |x, y| op_trait::op_fn(x, y),
-                                op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                bigint_op: |x, y| op_trait::op_fn(x, y),
-                            });
-                        }
-                    }
-                    arith => {
-                        #[test]
-                        fn [< test_ op_fn _ prim _lhs >]() {
-                            test_bin_op::<prim, CBigInt>(BinOpsForTypes {
-                                predicate: op_test_pred,
-                                cbigint_op1: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op2: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op3: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op4: |x, y| op_trait::op_fn(x, y),
-                                op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                bigint_op: |x, y| op_trait::op_fn(x, y),
-                        });
-                        }
-                        #[test]
-                        fn [< test_ op_fn _ prim _rhs >]() {
-                            test_bin_op::<CBigInt, prim>(BinOpsForTypes {
-                                predicate: op_test_pred,
-                                cbigint_op1: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op2: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op3: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op4: |x, y| op_trait::op_fn(x, y),
-                                op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
-                                bigint_op: |x, y| op_trait::op_fn(x, y),
-                            });
-                        }
-                    }
-                    _ => {}
+                #[test]
+                fn [< test_ op_fn _ prim _lhs >]() {
+                    test_bin_op::<prim, CBigInt>(BinOpsForTypes {
+                        predicate: op_test_pred,
+                        cbigint_op1: |x, y| op_trait::op_fn(x, y),
+                        cbigint_op2: |x, y| op_trait::op_fn(x, y),
+                        cbigint_op3: |x, y| op_trait::op_fn(x, y),
+                        cbigint_op4: |x, y| op_trait::op_fn(x, y),
+                        op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        bigint_op: |x, y| op_trait::op_fn(x, y),
+                });
+                }
+                #[test]
+                fn [< test_ op_fn _ prim _rhs >]() {
+                    test_bin_op::<CBigInt, prim>(BinOpsForTypes {
+                        predicate: op_test_pred,
+                        cbigint_op1: |x, y| op_trait::op_fn(x, y),
+                        cbigint_op2: |x, y| op_trait::op_fn(x, y),
+                        cbigint_op3: |x, y| op_trait::op_fn(x, y),
+                        cbigint_op4: |x, y| op_trait::op_fn(x, y),
+                        op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
+                        bigint_op: |x, y| op_trait::op_fn(x, y),
+                    });
                 }
             }
         }

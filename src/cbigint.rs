@@ -4,13 +4,15 @@ use std::fmt::{Debug, Display, Formatter};
 use std::mem::size_of;
 
 use num_bigint::{BigInt, BigUint, Sign};
+use num_integer::Roots;
 
 use crate::Sign::*;
 use crate::accum::*;
+use crate::big_integer::BigInteger;
 use crate::encoding::Encoded;
 use crate::{DIGIT_BITS, Digit, Udigit};
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Eq)]
 pub struct CBigInt(pub(crate) Encoded<BigInt>);
 
 impl CBigInt {
@@ -32,10 +34,63 @@ impl CBigInt {
         try_apply_sign(sign, magnitude).map(|digit| CBigInt(Encoded::Digit(digit)))
     }
 
+    /// Returns the magnitude of the `CBigInt` as a `BigUint`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use compact_bigint::CBigInt;
+    /// use num_traits::Zero;
+    /// use std::borrow::Borrow;
+    /// use num_bigint::BigUint;
+    ///
+    /// assert_eq!(*CBigInt::from(1234).magnitude(), BigUint::from(1234u32));
+    /// assert_eq!(*CBigInt::from(-4321).magnitude(), BigUint::from(4321u32));
+    /// assert!(CBigInt::zero().magnitude().is_zero());
+    /// ```
+    pub fn magnitude(&self) -> Cow<'_, BigUint> {
+        match &self.0 {
+            Encoded::Digit(n) => Cow::Owned(BigInt::from(*n).into_parts().1),
+            Encoded::Big(n) => Cow::Borrowed(n.magnitude()),
+        }
+    }
+
+    /// Returns the magnitude of the `CBigInt` as a `BigUint` if the necessary
+    /// `BigUint` already exists.
+    pub fn try_magnitude(&self) -> Option<&BigUint> {
+        match &self.0 {
+            Encoded::Digit(_) => None,
+            Encoded::Big(n) => Some(n.magnitude()),
+        }
+    }
+
+    /// Converts this `CBigInt` into a `BigInt`.
+    pub(crate) fn to_bigint(&self) -> Cow<'_, BigInt> {
+        self.into()
+    }
+
+    pub(crate) fn normalized(&self) -> Cow<'_, CBigInt> {
+        let result = match self.0 {
+            Encoded::Big(_) => match Digit::try_from(self) {
+                Ok(digit) => Cow::Owned(Self::from(digit)),
+                _ => Cow::Borrowed(self),
+            },
+            Encoded::Digit(_) => Cow::Borrowed(self),
+        };
+        debug_assert!(result.is_normal());
+        result
+    }
+
+    fn is_normal(&self) -> bool {
+        matches!(self.0, Encoded::Digit(_)) || Digit::try_from(self).is_ok()
+    }
+}
+
+impl BigInteger for CBigInt {
     /// Creates and initializes a BigInt.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
-    pub fn new(sign: Sign, digits: Vec<u32>) -> CBigInt {
+    fn new(sign: Sign, digits: Vec<u32>) -> CBigInt {
         if sign == NoSign {
             return CBigInt(Encoded::zero());
         }
@@ -60,15 +115,14 @@ impl CBigInt {
     /// Creates and initializes a `CBigInt`.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
-    #[inline]
-    pub fn from_biguint(sign: Sign, data: BigUint) -> CBigInt {
+    fn from_biguint(sign: Sign, data: BigUint) -> CBigInt {
         BigInt::from_biguint(sign, data).into()
     }
 
     /// Creates and initializes a `CBigInt`.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
-    pub fn from_slice(sign: Sign, slice: &[u32]) -> CBigInt {
+    fn from_slice(sign: Sign, slice: &[u32]) -> CBigInt {
         if slice.len() <= size_of::<Udigit>() / size_of::<u32>() {
             let mut accum = 0;
             for (i, &word) in slice.iter().enumerate() {
@@ -84,8 +138,7 @@ impl CBigInt {
     /// Reinitializes a `CBigInt`.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
-    #[inline]
-    pub fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
+    fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
         *self = Self::from_slice(sign, slice);
     }
 
@@ -107,7 +160,7 @@ impl CBigInt {
     /// assert_eq!(CBigInt::from_bytes_be(Sign::Plus, b"Hello world!"),
     ///            CBigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
-    pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> CBigInt {
+    fn from_bytes_be(sign: Sign, bytes: &[u8]) -> CBigInt {
         if let Some(accum) = bytes_to_digit_be(bytes)
             && let Some(result) = Self::try_apply_sign(sign, accum)
         {
@@ -119,7 +172,7 @@ impl CBigInt {
     /// Creates and initializes a `CBigInt`.
     ///
     /// The bytes are in little-endian byte order.
-    pub fn from_bytes_le(sign: Sign, bytes: &[u8]) -> CBigInt {
+    fn from_bytes_le(sign: Sign, bytes: &[u8]) -> CBigInt {
         if let Some(accum) = bytes_to_digit_le(bytes)
             && let Some(result) = Self::try_apply_sign(sign, accum)
         {
@@ -132,7 +185,7 @@ impl CBigInt {
     /// two's complement binary representation.
     ///
     /// The digits are in big-endian base 2<sup>8</sup>.
-    pub fn from_signed_bytes_be(digits: &[u8]) -> CBigInt {
+    fn from_signed_bytes_be(digits: &[u8]) -> CBigInt {
         if let Some(accum) = bytes_to_digit_be(digits) {
             (accum as Digit).into()
         } else {
@@ -143,7 +196,7 @@ impl CBigInt {
     /// Creates and initializes a `CBigInt` from an array of bytes in two's complement.
     ///
     /// The digits are in little-endian base 2<sup>8</sup>.
-    pub fn from_signed_bytes_le(digits: &[u8]) -> CBigInt {
+    fn from_signed_bytes_le(digits: &[u8]) -> CBigInt {
         if let Some(accum) = bytes_to_digit_le(digits) {
             (accum as Digit).into()
         } else {
@@ -162,8 +215,7 @@ impl CBigInt {
     /// assert_eq!(CBigInt::parse_bytes(b"ABCD", 16), ToCBigInt::to_cbigint(&0xABCD));
     /// assert_eq!(CBigInt::parse_bytes(b"G", 16), None);
     /// ```
-    #[inline]
-    pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<CBigInt> {
+    fn parse_bytes(buf: &[u8], radix: u32) -> Option<CBigInt> {
         BigInt::parse_bytes(buf, radix).map(Self::from)
     }
 
@@ -183,7 +235,7 @@ impl CBigInt {
     /// let a = CBigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
-    pub fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<CBigInt> {
+    fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<CBigInt> {
         BigInt::from_radix_be(sign, buf, radix).map(Self::from)
     }
 
@@ -203,7 +255,7 @@ impl CBigInt {
     /// let a = CBigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
-    pub fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<CBigInt> {
+    fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<CBigInt> {
         BigInt::from_radix_le(sign, buf, radix).map(Self::from)
     }
 
@@ -217,7 +269,7 @@ impl CBigInt {
     /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_bytes_be(), (Sign::Minus, vec![4, 101]));
     /// ```
-    pub fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
+    fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
         match &self.0 {
             Encoded::Digit(n) => match sign_and_magnitude(*n) {
                 (NoSign, _) => (NoSign, Vec::new()),
@@ -244,7 +296,7 @@ impl CBigInt {
     /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_bytes_le(), (Sign::Minus, vec![101, 4]));
     /// ```
-    pub fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
+    fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
         match &self.0 {
             Encoded::Digit(n) => {
                 let (sign, accum) = sign_and_magnitude(*n);
@@ -276,7 +328,7 @@ impl CBigInt {
     /// assert_eq!(CBigInt::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
     /// assert_eq!(CBigInt::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
     /// ```
-    pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
+    fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
         match &self.0 {
             Encoded::Digit(n) => match sign_and_magnitude(*n) {
                 (NoSign, _) => (NoSign, Vec::new()),
@@ -303,7 +355,7 @@ impl CBigInt {
     /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_signed_bytes_be(), vec![251, 155]);
     /// ```
-    pub fn to_signed_bytes_be(&self) -> Vec<u8> {
+    fn to_signed_bytes_be(&self) -> Vec<u8> {
         match &self.0 {
             Encoded::Digit(0) => Vec::new(),
             Encoded::Digit(n) => {
@@ -329,7 +381,7 @@ impl CBigInt {
     /// let i = -1125.to_cbigint().unwrap();
     /// assert_eq!(i.to_signed_bytes_le(), vec![155, 251]);
     /// ```
-    pub fn to_signed_bytes_le(&self) -> Vec<u8> {
+    fn to_signed_bytes_le(&self) -> Vec<u8> {
         match &self.0 {
             Encoded::Digit(0) => Vec::new(),
             Encoded::Digit(n) => {
@@ -356,8 +408,7 @@ impl CBigInt {
     /// let i = CBigInt::parse_bytes(b"ff", 16).unwrap();
     /// assert_eq!(i.to_str_radix(16), "ff");
     /// ```
-    #[inline]
-    pub fn to_str_radix(&self, radix: u32) -> String {
+    fn to_str_radix(&self, radix: u32) -> String {
         self.to_bigint().to_str_radix(radix)
     }
 
@@ -375,8 +426,7 @@ impl CBigInt {
     ///            (Sign::Minus, vec![2, 94, 27]));
     /// // 0xFFFF = 65535 = 2*(159^2) + 94*159 + 27
     /// ```
-    #[inline]
-    pub fn to_radix_be(&self, radix: u32) -> (Sign, Vec<u8>) {
+    fn to_radix_be(&self, radix: u32) -> (Sign, Vec<u8>) {
         self.to_bigint().to_radix_be(radix)
     }
 
@@ -394,8 +444,7 @@ impl CBigInt {
     ///            (Sign::Minus, vec![27, 94, 2]));
     /// // 0xFFFF = 65535 = 27 + 94*159 + 2*(159^2)
     /// ```
-    #[inline]
-    pub fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>) {
+    fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>) {
         self.to_bigint().to_radix_le(radix)
     }
 
@@ -411,8 +460,7 @@ impl CBigInt {
     /// assert_eq!(CBigInt::from(-4321).sign(), Sign::Minus);
     /// assert_eq!(CBigInt::zero().sign(), Sign::NoSign);
     /// ```
-    #[inline]
-    pub fn sign(&self) -> Sign {
+    fn sign(&self) -> Sign {
         match &self.0 {
             Encoded::Digit(n) => {
                 if *n > 0 {
@@ -424,38 +472,6 @@ impl CBigInt {
                 }
             }
             Encoded::Big(n) => n.sign(),
-        }
-    }
-
-    /// Returns the magnitude of the `CBigInt` as a `BigUint`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use compact_bigint::CBigInt;
-    /// use num_traits::Zero;
-    /// use std::borrow::Borrow;
-    /// use num_bigint::BigUint;
-    ///
-    /// assert_eq!(*CBigInt::from(1234).magnitude(), BigUint::from(1234u32));
-    /// assert_eq!(*CBigInt::from(-4321).magnitude(), BigUint::from(4321u32));
-    /// assert!(CBigInt::zero().magnitude().is_zero());
-    /// ```
-    #[inline]
-    pub fn magnitude(&self) -> Cow<'_, BigUint> {
-        match &self.0 {
-            Encoded::Digit(n) => Cow::Owned(BigInt::from(*n).into_parts().1),
-            Encoded::Big(n) => Cow::Borrowed(n.magnitude()),
-        }
-    }
-
-    /// Returns the magnitude of the `CBigInt` as a `BigUint` if the necessary
-    /// `BigUint` already exists.
-    #[inline]
-    pub fn try_magnitude(&self) -> Option<&BigUint> {
-        match &self.0 {
-            Encoded::Digit(_) => None,
-            Encoded::Big(n) => Some(n.magnitude()),
         }
     }
 
@@ -473,23 +489,27 @@ impl CBigInt {
     /// assert_eq!(CBigInt::from(-4321).into_parts(), (Sign::Minus, BigUint::from(4321u32)));
     /// assert_eq!(CBigInt::zero().into_parts(), (Sign::NoSign, BigUint::zero()));
     /// ```
-    #[inline]
-    pub fn into_parts(self) -> (Sign, BigUint) {
+    fn into_parts(self) -> (Sign, BigUint) {
         BigInt::from(self).into_parts()
+    }
+
+    /// Returns whether the bit in position `bit` is set, using the two’s complement for negative numbers
+    fn bit(&self, bit: u64) -> bool {
+        match &self.0 {
+            &Encoded::Digit(digit) => (digit as Udigit >> bit) & 1 == 1,
+            Encoded::Big(big) => big.bit(bit),
+        }
     }
 
     /// Determines the fewest bits necessary to express the `BigInt`,
     /// not including the sign.
-    #[inline]
-    pub fn bits(&self) -> u64 {
+    fn bits(&self) -> u64 {
         match &self.0 {
             &Encoded::Digit(n) => {
                 if n >= 0 {
                     DIGIT_BITS as u32 - n.leading_zeros()
-                } else if n == Digit::MIN {
-                    DIGIT_BITS as u32
                 } else {
-                    DIGIT_BITS as u32 - (-n).leading_zeros()
+                    DIGIT_BITS as u32 - n.unsigned_abs().leading_zeros()
                 }
             }
             .into(),
@@ -497,51 +517,35 @@ impl CBigInt {
         }
     }
 
-    /// Converts this `CBigInt` into a `BigInt`.
-    pub fn to_bigint(&self) -> Cow<'_, BigInt> {
-        match &self.0 {
-            Encoded::Digit(n) => Cow::Owned(BigInt::from(*n)),
-            Encoded::Big(n) => Cow::Borrowed(n),
-        }
-    }
-
     /// Converts this `CBigInt` into a `BigUint`, if it's not negative.
-    pub fn to_biguint(&self) -> Option<BigUint> {
-        match &self.0 {
-            Encoded::Digit(n) if *n >= 0 => BigInt::from(*n).to_biguint(),
-            Encoded::Digit(_) => None,
-            Encoded::Big(n) => n.to_biguint(),
-        }
+    fn to_biguint(&self) -> Option<BigUint> {
+        self.to_bigint().to_biguint()
     }
 
-    #[inline]
-    pub fn checked_add(&self, v: &CBigInt) -> Option<CBigInt> {
+    fn checked_add(&self, v: &CBigInt) -> Option<CBigInt> {
         Some(self + v)
     }
 
-    #[inline]
-    pub fn checked_sub(&self, v: &CBigInt) -> Option<CBigInt> {
+    fn checked_sub(&self, v: &CBigInt) -> Option<CBigInt> {
         Some(self - v)
     }
 
-    #[inline]
-    pub fn checked_mul(&self, v: &CBigInt) -> Option<CBigInt> {
+    fn checked_mul(&self, v: &CBigInt) -> Option<CBigInt> {
         Some(self * v)
     }
 
-    #[inline]
-    pub fn checked_div(&self, v: &CBigInt) -> Option<CBigInt> {
+    fn checked_div(&self, v: &CBigInt) -> Option<CBigInt> {
         Some(self / v)
     }
 
     /// Returns `self ^ exponent`.
-    pub fn pow(&self, exponent: u32) -> Self {
+    fn pow(&self, exponent: u32) -> Self {
         if let Some(a) = self.to_digit()
             && let (a, false) = a.overflowing_pow(exponent)
         {
             return a.into();
         }
-        BigInt::from(self.clone()).pow(exponent).into()
+        self.to_bigint().pow(exponent).into()
     }
 
     /// Returns `(self ^ exponent) mod modulus`
@@ -552,21 +556,94 @@ impl CBigInt {
     /// or in the interval `(modulus, 0]` for `modulus < 0`
     ///
     /// Panics if the exponent is negative or the modulus is zero.
-    pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
+    fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         self.to_bigint()
             .modpow(&exponent.to_bigint(), &modulus.to_bigint())
             .into()
     }
 
+    /// Returns the truncated principal square root of self.
+    fn sqrt(&self) -> Self {
+        match &self.0 {
+            Encoded::Digit(n) => Self::from(n.sqrt()),
+            Encoded::Big(n) => Self::from(n.sqrt()),
+        }
+    }
+
+    /// Returns the truncated principal cube root of self.
+    fn cbrt(&self) -> Self {
+        match &self.0 {
+            Encoded::Digit(n) => Self::from(n.cbrt()),
+            Encoded::Big(n) => Self::from(n.cbrt()),
+        }
+    }
+
+    /// Returns the truncated principal nth root of self.
+    fn nth_root(&self, n: u32) -> Self {
+        match &self.0 {
+            Encoded::Digit(x) => Self::from(x.nth_root(n)),
+            Encoded::Big(x) => Self::from(x.nth_root(n)),
+        }
+    }
+
     /// Returns the number of least-significant bits that are zero,
     /// or `None` if the entire number is zero.
-    pub fn trailing_zeros(&self) -> Option<u64> {
+    fn trailing_zeros(&self) -> Option<u64> {
         match &self.0 {
             Encoded::Digit(0) => None,
             Encoded::Digit(n) if *n > 0 => Some(n.trailing_zeros() as u64),
             Encoded::Digit(Digit::MIN) => Some(DIGIT_BITS as u64),
             Encoded::Digit(n) => Some((-*n).trailing_zeros() as u64),
             Encoded::Big(n) => n.trailing_zeros(),
+        }
+    }
+
+    const ZERO: Self = CBigInt(Encoded::zero());
+
+    fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
+        self.to_bigint().to_u64_digits()
+    }
+
+    fn iter_u32_digits(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_ {
+        self.to_bigint()
+            .iter_u32_digits()
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+
+    fn iter_u64_digits(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_ {
+        self.to_bigint()
+            .iter_u64_digits()
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+
+    fn modinv(&self, modulus: &Self) -> Option<Self> {
+        BigInt::from(self)
+            .modinv(&modulus.to_bigint())
+            .map(Self::from)
+    }
+
+    fn set_bit(&mut self, bit: u64, value: bool) {
+        match &mut self.0 {
+            Encoded::Digit(n) if (bit as usize) < DIGIT_BITS - 1 => {
+                let mask = 1 << bit;
+                if value {
+                    *n |= mask;
+                } else {
+                    *n &= !mask;
+                }
+            }
+            Encoded::Digit(n) => {
+                let mut big = BigInt::from(*n);
+                big.set_bit(bit, value);
+                self.0 = Encoded::Big(big);
+            }
+            Encoded::Big(n) => n.set_bit(bit, value),
         }
     }
 }

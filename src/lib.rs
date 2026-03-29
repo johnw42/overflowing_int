@@ -5,6 +5,7 @@ pub use num_bigint::{
 pub use cbigint::*;
 
 mod accum;
+pub mod big_integer;
 pub mod cbigint;
 mod checked;
 mod convert;
