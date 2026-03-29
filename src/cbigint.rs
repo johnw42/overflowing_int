@@ -598,8 +598,6 @@ impl BigInteger for CBigInt {
         }
     }
 
-    const ZERO: Self = CBigInt(Encoded::zero());
-
     fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
         self.to_bigint().to_u64_digits()
     }

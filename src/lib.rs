@@ -6,6 +6,7 @@ pub use cbigint::*;
 
 mod accum;
 pub mod big_integer;
+pub mod big_natural;
 pub mod cbigint;
 mod checked;
 mod convert;

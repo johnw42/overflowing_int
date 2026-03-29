@@ -3,7 +3,7 @@ use crate::big_integer::BigInteger as _;
 use crate::cbigint::CBigInt;
 use crate::encoding::Encoded;
 use num_bigint::{BigInt, BigUint, Sign::*, ToBigInt, ToBigUint, TryFromBigIntError};
-use num_traits::{Pow, ToPrimitive};
+use num_traits::ToPrimitive;
 use paste::paste;
 use std::borrow::Cow;
 use std::convert::{TryFrom, TryInto};

@@ -7,9 +7,7 @@ use std::ops::{
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::str::FromStr;
 
-use num_bigint::{
-    BigInt, BigUint, ParseBigIntError, RandomBits, Sign, ToBigInt, ToBigUint, U32Digits, U64Digits,
-};
+use num_bigint::{BigInt, BigUint, ParseBigIntError, RandomBits, Sign, ToBigInt, ToBigUint};
 use num_integer::{Integer, Roots};
 use num_traits::{
     CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, ConstZero, Euclid, FromBytes,
@@ -69,7 +67,6 @@ where
     for<'a> Self: arbitrary::Arbitrary<'a>,
     for<'de> Self: Deserialize<'de>,
     RandomBits: Distribution<Self>,
-    for<'a> &'a Self: Neg + Not,
     // From
     Self: From<BigInt>
         + From<BigUint>
@@ -438,9 +435,6 @@ where
         + SubAssign<i8>
         + SubAssign<isize>,
 {
-    /// A constant `BigNum` with value 0, useful for static initialization.
-    const ZERO: Self;
-
     /// Creates and initializes a [`BigNum`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
@@ -859,8 +853,6 @@ where
 }
 
 impl BigInteger for BigInt {
-    const ZERO: Self = Self::ZERO;
-
     fn new(sign: Sign, digits: Vec<u32>) -> Self {
         Self::from_biguint(sign, BigUint::new(digits))
     }
@@ -921,11 +913,15 @@ impl BigInteger for BigInt {
         self.to_u64_digits()
     }
 
-    fn iter_u32_digits(&self) -> U32Digits<'_> {
+    fn iter_u32_digits(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_ {
         self.iter_u32_digits()
     }
 
-    fn iter_u64_digits(&self) -> U64Digits<'_> {
+    fn iter_u64_digits(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_ {
         self.iter_u64_digits()
     }
 
@@ -951,10 +947,6 @@ impl BigInteger for BigInt {
 
     fn sign(&self) -> Sign {
         self.sign()
-    }
-
-    fn magnitude(&self) -> &BigUint {
-        self.magnitude()
     }
 
     fn into_parts(self) -> (Sign, BigUint) {
