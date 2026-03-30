@@ -435,76 +435,76 @@ where
         + SubAssign<i8>
         + SubAssign<isize>,
 {
-    /// Creates and initializes a [`BigNum`].
+    /// Creates and initializes a [`BigInt`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     fn new(sign: Sign, digits: Vec<u32>) -> Self;
 
-    /// Creates and initializes a [`BigNum`].
+    /// Creates and initializes a [`BigInt`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     fn from_biguint(sign: Sign, data: BigUint) -> Self;
 
-    /// Creates and initializes a [`BigNum`].
+    /// Creates and initializes a [`BigInt`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     fn from_slice(sign: Sign, slice: &[u32]) -> Self;
 
-    /// Reinitializes a [`BigNum`].
+    /// Reinitializes a [`BigInt`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]);
 
-    /// Creates and initializes a [`BigNum`].
+    /// Creates and initializes a [`BigInt`].
     ///
     /// The bytes are in big-endian byte order.
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{BigNum, Sign};
+    /// use num_bigint::{BigInt, Sign};
     ///
-    /// assert_eq!(BigNum::from_bytes_be(Sign::Plus, b"A"),
-    ///            BigNum::parse_bytes(b"65", 10).unwrap());
-    /// assert_eq!(BigNum::from_bytes_be(Sign::Plus, b"AA"),
-    ///            BigNum::parse_bytes(b"16705", 10).unwrap());
-    /// assert_eq!(BigNum::from_bytes_be(Sign::Plus, b"AB"),
-    ///            BigNum::parse_bytes(b"16706", 10).unwrap());
-    /// assert_eq!(BigNum::from_bytes_be(Sign::Plus, b"Hello world!"),
-    ///            BigNum::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
+    /// assert_eq!(BigInt::from_bytes_be(Sign::Plus, b"A"),
+    ///            BigInt::parse_bytes(b"65", 10).unwrap());
+    /// assert_eq!(BigInt::from_bytes_be(Sign::Plus, b"AA"),
+    ///            BigInt::parse_bytes(b"16705", 10).unwrap());
+    /// assert_eq!(BigInt::from_bytes_be(Sign::Plus, b"AB"),
+    ///            BigInt::parse_bytes(b"16706", 10).unwrap());
+    /// assert_eq!(BigInt::from_bytes_be(Sign::Plus, b"Hello world!"),
+    ///            BigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self;
 
-    /// Creates and initializes a [`BigNum`].
+    /// Creates and initializes a [`BigInt`].
     ///
     /// The bytes are in little-endian byte order.
     fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self;
 
-    /// Creates and initializes a [`BigNum`] from an array of bytes in
+    /// Creates and initializes a [`BigInt`] from an array of bytes in
     /// two's complement binary representation.
     ///
     /// The digits are in big-endian base 2<sup>8</sup>.
     fn from_signed_bytes_be(digits: &[u8]) -> Self;
 
-    /// Creates and initializes a [`BigNum`] from an array of bytes in two's complement.
+    /// Creates and initializes a [`BigInt`] from an array of bytes in two's complement.
     ///
     /// The digits are in little-endian base 2<sup>8</sup>.
     fn from_signed_bytes_le(digits: &[u8]) -> Self;
 
-    /// Creates and initializes a [`BigNum`].
+    /// Creates and initializes a [`BigInt`].
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{BigNum, ToBigNum};
+    /// use num_bigint::{BigInt, ToBigInt};
     ///
-    /// assert_eq!(BigNum::parse_bytes(b"1234", 10), ToBigNum::to_BigNum(&1234));
-    /// assert_eq!(BigNum::parse_bytes(b"ABCD", 16), ToBigNum::to_BigNum(&0xABCD));
-    /// assert_eq!(BigNum::parse_bytes(b"G", 16), None);
+    /// assert_eq!(BigInt::parse_bytes(b"1234", 10), ToBigInt::to_bigint(&1234));
+    /// assert_eq!(BigInt::parse_bytes(b"ABCD", 16), ToBigInt::to_bigint(&0xABCD));
+    /// assert_eq!(BigInt::parse_bytes(b"G", 16), None);
     /// ```
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self>;
 
-    /// Creates and initializes a [`BigNum`]. Each `u8` of the input slice is
+    /// Creates and initializes a [`BigInt`]. Each `u8` of the input slice is
     /// interpreted as one digit of the number
     /// and must therefore be less than `radix`.
     ///
@@ -514,15 +514,15 @@ where
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{BigNum, Sign};
+    /// use num_bigint::{BigInt, Sign};
     ///
     /// let inbase190 = vec![15, 33, 125, 12, 14];
-    /// let a = BigNum::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
+    /// let a = BigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_be(190), (Sign:: Minus, inbase190));
     /// ```
     fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self>;
 
-    /// Creates and initializes a [`BigNum`]. Each `u8` of the input slice is
+    /// Creates and initializes a [`BigInt`]. Each `u8` of the input slice is
     /// interpreted as one digit of the number
     /// and must therefore be less than `radix`.
     ///
@@ -532,128 +532,128 @@ where
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{BigNum, Sign};
+    /// use num_bigint::{BigInt, Sign};
     ///
     /// let inbase190 = vec![14, 12, 125, 33, 15];
-    /// let a = BigNum::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
+    /// let a = BigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
     fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self>;
 
-    /// Returns the sign and the byte representation of the [`BigNum`] in big-endian byte order.
+    /// Returns the sign and the byte representation of the [`BigInt`] in big-endian byte order.
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{ToBigNum, Sign};
+    /// use num_bigint::{ToBigInt, Sign};
     ///
-    /// let i = -1125.to_BigNum().unwrap();
+    /// let i = -1125.to_bigint().unwrap();
     /// assert_eq!(i.to_bytes_be(), (Sign::Minus, vec![4, 101]));
     /// ```
     fn to_bytes_be(&self) -> (Sign, Vec<u8>);
 
-    /// Returns the sign and the byte representation of the [`BigNum`] in little-endian byte order.
+    /// Returns the sign and the byte representation of the [`BigInt`] in little-endian byte order.
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{ToBigNum, Sign};
+    /// use num_bigint::{ToBigInt, Sign};
     ///
-    /// let i = -1125.to_BigNum().unwrap();
+    /// let i = -1125.to_bigint().unwrap();
     /// assert_eq!(i.to_bytes_le(), (Sign::Minus, vec![101, 4]));
     /// ```
     fn to_bytes_le(&self) -> (Sign, Vec<u8>);
 
-    /// Returns the sign and the `u32` digits representation of the [`BigNum`] ordered least
+    /// Returns the sign and the `u32` digits representation of the [`BigInt`] ordered least
     /// significant digit first.
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{BigNum, Sign};
+    /// use num_bigint::{BigInt, Sign};
     ///
-    /// assert_eq!(BigNum::from(-1125).to_u32_digits(), (Sign::Minus, vec![1125]));
-    /// assert_eq!(BigNum::from(4294967295u32).to_u32_digits(), (Sign::Plus, vec![4294967295]));
-    /// assert_eq!(BigNum::from(4294967296u64).to_u32_digits(), (Sign::Plus, vec![0, 1]));
-    /// assert_eq!(BigNum::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
-    /// assert_eq!(BigNum::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
+    /// assert_eq!(BigInt::from(-1125).to_u32_digits(), (Sign::Minus, vec![1125]));
+    /// assert_eq!(BigInt::from(4294967295u32).to_u32_digits(), (Sign::Plus, vec![4294967295]));
+    /// assert_eq!(BigInt::from(4294967296u64).to_u32_digits(), (Sign::Plus, vec![0, 1]));
+    /// assert_eq!(BigInt::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
+    /// assert_eq!(BigInt::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
     /// ```
     fn to_u32_digits(&self) -> (Sign, Vec<u32>);
 
-    /// Returns the sign and the `u64` digits representation of the [`BigNum`] ordered least
+    /// Returns the sign and the `u64` digits representation of the [`BigInt`] ordered least
     /// significant digit first.
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{BigNum, Sign};
+    /// use num_bigint::{BigInt, Sign};
     ///
-    /// assert_eq!(BigNum::from(-1125).to_u64_digits(), (Sign::Minus, vec![1125]));
-    /// assert_eq!(BigNum::from(4294967295u32).to_u64_digits(), (Sign::Plus, vec![4294967295]));
-    /// assert_eq!(BigNum::from(4294967296u64).to_u64_digits(), (Sign::Plus, vec![4294967296]));
-    /// assert_eq!(BigNum::from(-112500000000i64).to_u64_digits(), (Sign::Minus, vec![112500000000]));
-    /// assert_eq!(BigNum::from(112500000000i64).to_u64_digits(), (Sign::Plus, vec![112500000000]));
-    /// assert_eq!(BigNum::from(1u128 << 64).to_u64_digits(), (Sign::Plus, vec![0, 1]));
+    /// assert_eq!(BigInt::from(-1125).to_u64_digits(), (Sign::Minus, vec![1125]));
+    /// assert_eq!(BigInt::from(4294967295u32).to_u64_digits(), (Sign::Plus, vec![4294967295]));
+    /// assert_eq!(BigInt::from(4294967296u64).to_u64_digits(), (Sign::Plus, vec![4294967296]));
+    /// assert_eq!(BigInt::from(-112500000000i64).to_u64_digits(), (Sign::Minus, vec![112500000000]));
+    /// assert_eq!(BigInt::from(112500000000i64).to_u64_digits(), (Sign::Plus, vec![112500000000]));
+    /// assert_eq!(BigInt::from(1u128 << 64).to_u64_digits(), (Sign::Plus, vec![0, 1]));
     /// ```
     fn to_u64_digits(&self) -> (Sign, Vec<u64>);
 
-    /// Returns an iterator of `u32` digits representation of the [`BigNum`] ordered least
+    /// Returns an iterator of `u32` digits representation of the [`BigInt`] ordered least
     /// significant digit first.
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::BigNum;
+    /// use num_bigint::BigInt;
     ///
-    /// assert_eq!(BigNum::from(-1125).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
-    /// assert_eq!(BigNum::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
-    /// assert_eq!(BigNum::from(4294967296u64).iter_u32_digits().collect::<Vec<u32>>(), vec![0, 1]);
-    /// assert_eq!(BigNum::from(-112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
-    /// assert_eq!(BigNum::from(112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
+    /// assert_eq!(BigInt::from(-1125).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
+    /// assert_eq!(BigInt::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
+    /// assert_eq!(BigInt::from(4294967296u64).iter_u32_digits().collect::<Vec<u32>>(), vec![0, 1]);
+    /// assert_eq!(BigInt::from(-112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
+    /// assert_eq!(BigInt::from(112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
     /// ```
     fn iter_u32_digits(
         &self,
     ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_;
 
-    /// Returns an iterator of `u64` digits representation of the [`BigNum`] ordered least
+    /// Returns an iterator of `u64` digits representation of the [`BigInt`] ordered least
     /// significant digit first.
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::BigNum;
+    /// use num_bigint::BigInt;
     ///
-    /// assert_eq!(BigNum::from(-1125).iter_u64_digits().collect::<Vec<u64>>(), vec![1125u64]);
-    /// assert_eq!(BigNum::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295u64]);
-    /// assert_eq!(BigNum::from(4294967296u64).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967296u64]);
-    /// assert_eq!(BigNum::from(-112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
-    /// assert_eq!(BigNum::from(112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
-    /// assert_eq!(BigNum::from(1u128 << 64).iter_u64_digits().collect::<Vec<u64>>(), vec![0, 1]);
+    /// assert_eq!(BigInt::from(-1125).iter_u64_digits().collect::<Vec<u64>>(), vec![1125u64]);
+    /// assert_eq!(BigInt::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295u64]);
+    /// assert_eq!(BigInt::from(4294967296u64).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967296u64]);
+    /// assert_eq!(BigInt::from(-112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
+    /// assert_eq!(BigInt::from(112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
+    /// assert_eq!(BigInt::from(1u128 << 64).iter_u64_digits().collect::<Vec<u64>>(), vec![0, 1]);
     /// ```
     fn iter_u64_digits(
         &self,
     ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_;
 
-    /// Returns the two's-complement byte representation of the [`BigNum`] in big-endian byte order.
+    /// Returns the two's-complement byte representation of the [`BigInt`] in big-endian byte order.
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::ToBigNum;
+    /// use num_bigint::ToBigInt;
     ///
-    /// let i = -1125.to_BigNum().unwrap();
+    /// let i = -1125.to_bigint().unwrap();
     /// assert_eq!(i.to_signed_bytes_be(), vec![251, 155]);
     /// ```
     fn to_signed_bytes_be(&self) -> Vec<u8>;
 
-    /// Returns the two's-complement byte representation of the [`BigNum`] in little-endian byte order.
+    /// Returns the two's-complement byte representation of the [`BigInt`] in little-endian byte order.
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::ToBigNum;
+    /// use num_bigint::ToBigInt;
     ///
-    /// let i = -1125.to_BigNum().unwrap();
+    /// let i = -1125.to_bigint().unwrap();
     /// assert_eq!(i.to_signed_bytes_le(), vec![155, 251]);
     /// ```
     fn to_signed_bytes_le(&self) -> Vec<u8>;
@@ -664,9 +664,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::BigNum;
+    /// use num_bigint::BigInt;
     ///
-    /// let i = BigNum::parse_bytes(b"ff", 16).unwrap();
+    /// let i = BigInt::parse_bytes(b"ff", 16).unwrap();
     /// assert_eq!(i.to_str_radix(16), "ff");
     /// ```
     fn to_str_radix(&self, radix: u32) -> String;
@@ -679,9 +679,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{BigNum, Sign};
+    /// use num_bigint::{BigInt, Sign};
     ///
-    /// assert_eq!(BigNum::from(-0xFFFFi64).to_radix_be(159),
+    /// assert_eq!(BigInt::from(-0xFFFFi64).to_radix_be(159),
     ///            (Sign::Minus, vec![2, 94, 27]));
     /// // 0xFFFF = 65535 = 2*(159^2) + 94*159 + 27
     /// ```
@@ -695,46 +695,46 @@ where
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{BigNum, Sign};
+    /// use num_bigint::{BigInt, Sign};
     ///
-    /// assert_eq!(BigNum::from(-0xFFFFi64).to_radix_le(159),
+    /// assert_eq!(BigInt::from(-0xFFFFi64).to_radix_le(159),
     ///            (Sign::Minus, vec![27, 94, 2]));
     /// // 0xFFFF = 65535 = 27 + 94*159 + 2*(159^2)
     /// ```
     fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>);
 
-    /// Returns the sign of the [`BigNum`] as a [`Sign`].
+    /// Returns the sign of the [`BigInt`] as a [`Sign`].
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{BigNum, Sign};
+    /// use num_bigint::{BigInt, Sign};
     ///
-    /// assert_eq!(BigNum::from(1234).sign(), Sign::Plus);
-    /// assert_eq!(BigNum::from(-4321).sign(), Sign::Minus);
-    /// assert_eq!(BigNum::ZERO.sign(), Sign::NoSign);
+    /// assert_eq!(BigInt::from(1234).sign(), Sign::Plus);
+    /// assert_eq!(BigInt::from(-4321).sign(), Sign::Minus);
+    /// assert_eq!(BigInt::ZERO.sign(), Sign::NoSign);
     /// ```
     fn sign(&self) -> Sign;
 
-    /// Convert this [`BigNum`] into its [`Sign`] and [`BigUint`] magnitude,
-    /// the reverse of [`BigNum::from_biguint()`].
+    /// Convert this [`BigInt`] into its [`Sign`] and [`BigUint`] magnitude,
+    /// the reverse of [`BigInt::from_biguint()`].
     ///
     /// # Examples
     ///
     /// ```
-    /// use num_BigNum::{BigNum, BigUint, Sign};
+    /// use num_bigint::{BigInt, BigUint, Sign};
     ///
-    /// assert_eq!(BigNum::from(1234).into_parts(), (Sign::Plus, BigUint::from(1234u32)));
-    /// assert_eq!(BigNum::from(-4321).into_parts(), (Sign::Minus, BigUint::from(4321u32)));
-    /// assert_eq!(BigNum::ZERO.into_parts(), (Sign::NoSign, BigUint::ZERO));
+    /// assert_eq!(BigInt::from(1234).into_parts(), (Sign::Plus, BigUint::from(1234u32)));
+    /// assert_eq!(BigInt::from(-4321).into_parts(), (Sign::Minus, BigUint::from(4321u32)));
+    /// assert_eq!(BigInt::ZERO.into_parts(), (Sign::NoSign, BigUint::ZERO));
     /// ```
     fn into_parts(self) -> (Sign, BigUint);
 
-    /// Determines the fewest bits necessary to express the [`BigNum`],
+    /// Determines the fewest bits necessary to express the [`BigInt`],
     /// not including the sign.
     fn bits(&self) -> u64;
 
-    /// Converts this [`BigNum`] into a [`BigUint`], if it's not negative.
+    /// Converts this [`BigInt`] into a [`BigUint`], if it's not negative.
     fn to_biguint(&self) -> Option<BigUint>;
 
     fn checked_add(&self, v: &Self) -> Option<Self> {
@@ -779,40 +779,40 @@ where
     /// and it exists if and only if `gcd(self, modulus) == 1`.
     ///
     /// ```
-    /// use num_BigNum::BigNum;
+    /// use num_bigint::BigInt;
     /// use num_integer::Integer;
     /// use num_traits::{One, Zero};
     ///
-    /// let m = BigNum::from(383);
+    /// let m = BigInt::from(383);
     ///
     /// // Trivial cases
-    /// assert_eq!(BigNum::zero().modinv(&m), None);
-    /// assert_eq!(BigNum::one().modinv(&m), Some(BigNum::one()));
+    /// assert_eq!(BigInt::zero().modinv(&m), None);
+    /// assert_eq!(BigInt::one().modinv(&m), Some(BigInt::one()));
     /// let neg1 = &m - 1u32;
     /// assert_eq!(neg1.modinv(&m), Some(neg1));
     ///
     /// // Positive self and modulus
-    /// let a = BigNum::from(271);
+    /// let a = BigInt::from(271);
     /// let x = a.modinv(&m).unwrap();
-    /// assert_eq!(x, BigNum::from(106));
+    /// assert_eq!(x, BigInt::from(106));
     /// assert_eq!(x.modinv(&m).unwrap(), a);
-    /// assert_eq!((&a * x).mod_floor(&m), BigNum::one());
+    /// assert_eq!((&a * x).mod_floor(&m), BigInt::one());
     ///
     /// // Negative self and positive modulus
     /// let b = -&a;
     /// let x = b.modinv(&m).unwrap();
-    /// assert_eq!(x, BigNum::from(277));
-    /// assert_eq!((&b * x).mod_floor(&m), BigNum::one());
+    /// assert_eq!(x, BigInt::from(277));
+    /// assert_eq!((&b * x).mod_floor(&m), BigInt::one());
     ///
     /// // Positive self and negative modulus
     /// let n = -&m;
     /// let x = a.modinv(&n).unwrap();
-    /// assert_eq!(x, BigNum::from(-277));
+    /// assert_eq!(x, BigInt::from(-277));
     /// assert_eq!((&a * x).mod_floor(&n), &n + 1);
     ///
     /// // Negative self and modulus
     /// let x = b.modinv(&n).unwrap();
-    /// assert_eq!(x, BigNum::from(-106));
+    /// assert_eq!(x, BigInt::from(-106));
     /// assert_eq!((&b * x).mod_floor(&n), &n + 1);
     /// ```
     fn modinv(&self, modulus: &Self) -> Option<Self>;

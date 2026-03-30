@@ -39,7 +39,7 @@ where
 pub fn criterion_benchmark(c: &mut Criterion) {
     let mut sizes = Vec::new();
 
-    let bits = std::mem::size_of::<compact_bigint::Digit>() * 8;
+    let bits = std::mem::size_of::<compact_bigint::SmallInt>() * 8;
     sizes.push(bits);
     sizes.push(bits + 1);
     sizes.push(bits + 2);

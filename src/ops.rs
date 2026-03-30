@@ -1,414 +1,292 @@
-use crate::Digit;
+use crate::SmallInt;
 use crate::cbigint::CBigInt;
-use crate::checked;
-use crate::encoding::Encoded;
-use crate::to_cow::{ToCow, ToDecodedCow};
+use crate::encoding::{Encoding, ToCow, ToEncodingCow};
+use crate::{
+    duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
+};
 use duplicate::duplicate;
 use num_bigint::BigInt;
 use num_traits::Pow;
 use paste::paste;
+use quickcheck_macros::quickcheck;
 use std::borrow::Cow;
-use std::convert::TryFrom;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
     Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 
-trait BinaryOp {
-    fn on_digits(lhs: Digit, rhs: Digit) -> Option<Digit>;
-    fn on_owned(lhs: BigInt, rhs: BigInt) -> BigInt;
-    fn on_owned_borrowed(lhs: BigInt, rhs: &BigInt) -> BigInt;
-    fn on_borrowed_owned(lhs: &BigInt, rhs: BigInt) -> BigInt;
-    fn on_borrowed(lhs: &BigInt, rhs: &BigInt) -> BigInt;
-    fn update_owned(lhs: &mut BigInt, rhs: BigInt);
-    fn update_borrowed(lhs: &mut BigInt, rhs: &BigInt);
+// MARK: Meta-Operator Trait Definitions
+// -----------------------------------------------------------------------------
+trait ArithOp {
+    fn on_big_small(lhs: Cow<BigInt>, rhs: SmallInt) -> BigInt;
+    fn on_small(lhs: SmallInt, rhs: SmallInt) -> Result<SmallInt, ()>;
+    fn on_small_big(lhs: SmallInt, rhs: Cow<BigInt>) -> BigInt;
+    fn on_big(lhs: Cow<BigInt>, rhs: Cow<BigInt>) -> BigInt;
+    fn update_big(lhs: &mut BigInt, rhs: Cow<BigInt>);
+    fn update_small(lhs: &mut BigInt, rhs: SmallInt);
 
     /// Calls a version of the binary operator that returns a new number.
+    #[inline]
     fn call<'a, L, R>(lhs: L, rhs: R) -> CBigInt
     where
-        L: ToDecodedCow<'a>,
-        R: ToDecodedCow<'a>,
+        L: ToEncodingCow<'a, BigInt>,
+        R: ToEncodingCow<'a, BigInt>,
     {
-        use Cow::*;
-        let lhs = lhs.to_decoded_cow();
-        let rhs = rhs.to_decoded_cow();
-
-        if let (&Encoded::Digit(lhs), &Encoded::Digit(rhs)) = (&lhs, &rhs)
-            && let Some(out) = Self::on_digits(lhs, rhs)
-        {
-            return out.into();
+        match (lhs.to_encoding_cow(), rhs.to_encoding_cow()) {
+            (Encoding::Small(lhs), Encoding::Small(rhs)) => {
+                if let Ok(out) = Self::on_small(lhs, rhs) {
+                    out.into()
+                } else {
+                    Self::on_big_small(Cow::Owned(BigInt::from(lhs)), rhs).into()
+                }
+            }
+            (Encoding::Small(small_lhs), Encoding::Big(big_rhs)) => {
+                Self::on_small_big(small_lhs, big_rhs).into()
+            }
+            (Encoding::Big(big_lhs), Encoding::Small(small_rhs)) => {
+                Self::on_big_small(big_lhs, small_rhs).into()
+            }
+            (Encoding::Big(big_lhs), Encoding::Big(big_rhs)) => {
+                Self::on_big(big_lhs, big_rhs).into()
+            }
         }
-
-        match (lhs.to_cow(), rhs.to_cow()) {
-            (Owned(lhs), Owned(rhs)) => Self::on_owned(lhs, rhs),
-            (Owned(lhs), Borrowed(rhs)) => Self::on_owned_borrowed(lhs, rhs),
-            (Borrowed(lhs), Owned(rhs)) => Self::on_borrowed_owned(lhs, rhs),
-            (Borrowed(lhs), Borrowed(rhs)) => Self::on_borrowed(lhs, rhs),
-        }
-        .into()
     }
 
     /// Calls a version of the binary operator that updates a bigint argument in place.
+    #[inline]
     fn call_update<'a, R>(lhs: &mut CBigInt, rhs: R)
     where
-        R: ToDecodedCow<'a>,
+        R: ToEncodingCow<'a, BigInt>,
     {
-        use Cow::*;
-        let rhs = rhs.to_decoded_cow();
-
-        if let (&Encoded::Digit(lhs_digit), &Encoded::Digit(rhs)) = (&lhs.0, &rhs)
-            && let Some(out) = Self::on_digits(lhs_digit, rhs)
-        {
-            *lhs = out.into();
-            return;
-        }
-
-        let target = lhs;
-        let lhs = std::mem::take(target);
-        *target = match (lhs.0, rhs.to_cow()) {
-            (Encoded::Digit(digit), Owned(rhs)) => Self::on_owned(BigInt::from(digit), rhs),
-            (Encoded::Digit(digit), Borrowed(rhs)) => {
-                Self::on_owned_borrowed(BigInt::from(digit), rhs)
-            }
-            (Encoded::Big(mut big), Owned(rhs)) => {
-                Self::update_owned(&mut big, rhs);
-                big
-            }
-            (Encoded::Big(mut big), Borrowed(rhs)) => {
-                Self::update_borrowed(&mut big, rhs);
-                big
-            }
-        }
-        .into();
-    }
-
-    /// Calls a version of the binary operator that updates a primitive in place.
-    fn call_update_prim<R>(
-        lhs: &mut CBigInt,
-        rhs: R,
-        big_op: fn(BigInt, R) -> BigInt,
-        big_assign_op: for<'b> fn(&'b mut BigInt, R),
-    ) where
-        R: Copy,
-        Digit: TryFrom<R>,
-    {
-        if let Encoded::Digit(lhs_digit) = lhs.0
-            && let Ok(rhs) = Digit::try_from(rhs)
-            && let Some(out) = Self::on_digits(lhs_digit, rhs)
-        {
-            *lhs = out.into();
-            return;
-        }
-
-        let target = lhs;
-        let lhs = std::mem::take(target);
-        *target = match lhs.0 {
-            Encoded::Digit(digit) => big_op(BigInt::from(digit), rhs),
-            Encoded::Big(mut big) => {
-                big_assign_op(&mut big, rhs);
-                big
-            }
-        }
-        .into();
-    }
-
-    fn call_prim_lhs<'a, L, R>(
-        lhs: L,
-        rhs: R,
-        big_op: fn(L, BigInt) -> BigInt,
-        big_ref_op: fn(L, &'a BigInt) -> BigInt,
-    ) -> CBigInt
-    where
-        R: ToDecodedCow<'a>,
-        L: Copy,
-        Digit: TryFrom<L>,
-    {
-        match rhs.to_decoded_cow() {
-            Encoded::Digit(rhs) => {
-                if let Ok(lhs) = Digit::try_from(lhs)
-                    && let Some(out) = Self::on_digits(lhs, rhs)
-                {
-                    return out.into();
+        lhs.0.update_encoding(|encoding| match encoding {
+            Encoding::Small(small_lhs) => match rhs.to_encoding_cow() {
+                Encoding::Small(small_rhs) => match Self::on_small(*small_lhs, small_rhs) {
+                    Ok(out) => *encoding = Encoding::Small(out),
+                    Err(()) => {
+                        *encoding = Encoding::Big(Self::on_small_big(
+                            *small_lhs,
+                            Cow::Owned(BigInt::from(small_rhs)),
+                        ));
+                    }
+                },
+                Encoding::Big(big_rhs) => {
+                    *encoding = Encoding::Big(Self::on_small_big(*small_lhs, big_rhs));
                 }
-                big_op(lhs, BigInt::from(rhs)).into()
-            }
-            Encoded::Big(big) => match big {
-                Cow::Owned(big) => big_op(lhs, big),
-                Cow::Borrowed(big) => big_ref_op(lhs, big),
-            }
-            .into(),
-        }
-    }
-
-    fn call_prim_rhs<'a, L, R>(
-        lhs: L,
-        rhs: R,
-        big_op: fn(BigInt, R) -> BigInt,
-        big_ref_op: fn(&'a BigInt, R) -> BigInt,
-    ) -> CBigInt
-    where
-        L: ToDecodedCow<'a>,
-        R: Copy,
-        Digit: TryFrom<R>,
-    {
-        match lhs.to_decoded_cow() {
-            Encoded::Digit(lhs) => {
-                if let Ok(rhs) = Digit::try_from(rhs)
-                    && let Some(out) = Self::on_digits(lhs, rhs)
-                {
-                    return out.into();
+            },
+            Encoding::Big(big_lhs) => match rhs.to_encoding_cow() {
+                Encoding::Small(small_rhs) => {
+                    Self::update_small(big_lhs, small_rhs);
                 }
-                big_op(BigInt::from(lhs), rhs).into()
-            }
-            Encoded::Big(big) => match big {
-                Cow::Owned(big) => big_op(big, rhs),
-                Cow::Borrowed(big) => big_ref_op(big, rhs),
-            }
-            .into(),
-        }
+                Encoding::Big(big_rhs) => {
+                    Self::update_big(big_lhs, big_rhs);
+                }
+            },
+        });
     }
 }
+trait BitOp {
+    fn on_big(lhs: Cow<BigInt>, rhs: Cow<BigInt>) -> BigInt;
+    fn update_big(lhs: &mut BigInt, rhs: Cow<BigInt>);
 
+    #[inline]
+    fn call<'a, L, R>(lhs: L, rhs: R) -> CBigInt
+    where
+        L: ToCow<'a, BigInt>,
+        R: ToCow<'a, BigInt>,
+    {
+        Self::on_big(lhs.to_cow(), rhs.to_cow()).into()
+    }
+
+    #[inline]
+    fn call_update<'a, R>(lhs: &mut CBigInt, rhs: R)
+    where
+        R: ToCow<'a, BigInt>,
+    {
+        lhs.0.update_encoding(|encoding| match encoding {
+            Encoding::Small(small_lhs) => {
+                *encoding = Encoding::Big(Self::on_big(
+                    Cow::Owned(BigInt::from(*small_lhs)),
+                    rhs.to_cow(),
+                ));
+            }
+            Encoding::Big(big_lhs) => {
+                Self::update_big(big_lhs, rhs.to_cow());
+            }
+        });
+    }
+}
 trait ShiftOp {
-    fn on_digit(lhs: Digit, rhs: u32) -> Option<Digit>;
+    duplicate_prims! {
+        paste! {
+            fn [<on_big_ prim>](lhs: Cow<BigInt>, rhs: prim) -> BigInt;
+            fn [<update_big_ prim>](lhs: &mut BigInt, rhs: prim);
 
-    // Very similar to BinaryOp::call_prim_rhs.
-    fn call<'a, L, R>(
-        lhs: L,
-        rhs: R,
-        big_op: fn(BigInt, R) -> BigInt,
-        big_ref_op: fn(&'a BigInt, R) -> BigInt,
-    ) -> CBigInt
-    where
-        L: ToDecodedCow<'a>,
-        R: Copy,
-        u32: TryFrom<R>,
-    {
-        match lhs.to_decoded_cow() {
-            Encoded::Digit(lhs) => {
-                if let Ok(rhs) = u32::try_from(rhs)
-                    && let Some(out) = Self::on_digit(lhs, rhs)
-                {
-                    return out.into();
-                }
-                big_op(BigInt::from(lhs), rhs).into()
+            fn [<call_ prim>]<'a, L>(lhs: L, rhs: prim) -> CBigInt
+            where
+                L: ToCow<'a, BigInt>,
+            {
+                Self::[<on_big_ prim>](lhs.to_cow(), rhs).into()
             }
-            Encoded::Big(big) => match big {
-                Cow::Owned(big) => big_op(big, rhs),
-                Cow::Borrowed(big) => big_ref_op(big, rhs),
+
+            #[inline]
+            fn [<call_update_big_ prim>](lhs: &mut CBigInt, rhs: prim) {
+                lhs.0.update_encoding(|encoding| match encoding {
+                    Encoding::Small(small_lhs) => {
+                        *encoding = Encoding::Big(Self::[<on_big_ prim>](
+                            Cow::Owned(BigInt::from(*small_lhs)),
+                            rhs,
+                        ));
+                    }
+                    Encoding::Big(big_lhs) => {
+                        Self::[<update_big_ prim>](big_lhs, rhs);
+                    }
+                });
             }
-            .into(),
         }
     }
 }
 
-macro_rules! duplicate_arith_ops {
-    ($($body:tt)*) => {
-        duplicate! {
-            [
-                op_type op_trait op_fn op_test_pred;
-                [arith] [Add] [add] [always];
-                [arith] [Sub] [sub] [always];
-                [arith] [Mul] [mul] [always];
-                [arith] [Div] [div] [nonzero_rhs];
-                [arith] [Rem] [rem] [nonzero_rhs];
-            ]
-            $($body)*
-        }
-    }
-}
-
-macro_rules! duplicate_shift_ops {
-    ($($body:tt)*) => {
-        duplicate! {
-            [
-                op_type op_trait op_fn op_test_pred;
-                [shift] [Shl] [shl] [always];
-                [shift] [Shr] [shr] [always];
-            ]
-            $($body)*
-        }
-    }
-}
-
-macro_rules! duplicate_bit_ops {
-    ($($body:tt)*) => {
-        duplicate! {
-            [
-                op_type op_trait op_fn op_test_pred;
-                [bit] [BitAnd] [bitand] [always];
-                [bit] [BitOr] [bitor] [always];
-                [bit] [BitXor] [bitxor] [always]
-            ]
-            $($body)*
-        }
-    }
-}
-
-macro_rules! duplicate_arith_and_bit_ops {
-    ($($body:tt)*) => {
-        duplicate_arith_ops! { $($body)* }
-        duplicate_bit_ops! { $($body)* }
-    }
-}
-
-macro_rules! duplicate_uprims {
-    ($($body:tt)*) => {
-        duplicate! {
-            [
-                prim;
-                [u8];
-                [u16];
-                [u32];
-                [u64];
-                [u128];
-                [usize];
-            ]
-            $($body)*
-        }
-    }
-}
-
-macro_rules! duplicate_prims {
-    ($($body:tt)*) => {
-        duplicate_uprims! { $($body)* }
-        duplicate! {
-            [
-                prim;
-                [i8];
-                [i16];
-                [i32];
-                [i64];
-                [i128];
-                [isize];
-            ]
-            $($body)*
-        }
-    }
-}
-
-duplicate_arith_and_bit_ops! {
+// MARK: Meta-Operator Trait Implementations
+// -----------------------------------------------------------------------------
+duplicate_arith_ops! {
     paste! {
         struct [< op_trait Op >];
 
-        impl BinaryOp for [< op_trait Op >] {
-            fn on_digits(lhs: Digit, rhs: Digit) -> Option<Digit> {
-                checked::op_fn(lhs, rhs)
+        impl ArithOp for [< op_trait Op >] {
+
+            fn on_big(lhs: Cow<BigInt>, rhs: Cow<BigInt>) -> BigInt {
+                match (lhs, rhs) {
+                    (Cow::Borrowed(lhs), Cow::Borrowed(rhs)) => op_trait::op_fn(lhs, rhs),
+                    (Cow::Borrowed(lhs), Cow::Owned(rhs)) => op_trait::op_fn(lhs, rhs),
+                    (Cow::Owned(lhs), Cow::Borrowed(rhs)) => op_trait::op_fn(lhs, rhs),
+                    (Cow::Owned(lhs), Cow::Owned(rhs)) => op_trait::op_fn(lhs, rhs),
+                }
             }
 
-            fn on_owned(lhs: BigInt, rhs: BigInt) -> BigInt {
-                op_trait::op_fn(lhs, rhs)
+            fn on_small(lhs: SmallInt, rhs: SmallInt) -> Result<SmallInt, ()> {
+                lhs.[<checked_ op_fn>](rhs).ok_or(())
             }
 
-            fn on_owned_borrowed(lhs: BigInt, rhs: &BigInt) -> BigInt {
-                op_trait::op_fn(lhs, rhs)
+            fn on_big_small(lhs: Cow<BigInt>, rhs: SmallInt) -> BigInt {
+                match lhs {
+                    Cow::Borrowed(lhs) => op_trait::op_fn(lhs, rhs),
+                    Cow::Owned(lhs) => op_trait::op_fn(lhs, rhs),
+                }
             }
 
-            fn on_borrowed_owned(lhs: &BigInt, rhs: BigInt) -> BigInt {
-                op_trait::op_fn(lhs, rhs)
+            fn on_small_big(lhs: SmallInt, rhs: Cow<BigInt>) -> BigInt {
+                match rhs {
+                    Cow::Borrowed(rhs) => op_trait::op_fn(lhs, rhs),
+                    Cow::Owned(rhs) => op_trait::op_fn(lhs, rhs),
+                }
             }
 
-            fn on_borrowed(lhs: &BigInt, rhs: &BigInt) -> BigInt {
-                op_trait::op_fn(lhs, rhs)
+            fn update_big(lhs: &mut BigInt, rhs: Cow<BigInt>) {
+                match rhs {
+                    Cow::Borrowed(rhs) => [<op_trait Assign>]::[<op_fn _assign>](lhs, rhs),
+                    Cow::Owned(rhs) => [<op_trait Assign>]::[<op_fn _assign>](lhs, rhs),
+                }
+
             }
 
-            fn update_owned(lhs: &mut BigInt, rhs: BigInt) {
-                [<op_trait Assign>]::[< op_fn _assign >](lhs, rhs)
+            fn update_small(lhs: &mut BigInt, rhs: SmallInt) {
+                [<op_trait Assign>]::[<op_fn _assign>](lhs, rhs);
+            }
+        }
+    }
+}
+
+duplicate_bit_ops! {
+    paste! {
+        struct [< op_trait Op >];
+
+        impl BitOp for [< op_trait Op >] {
+
+            fn on_big(lhs: Cow<BigInt>, rhs: Cow<BigInt>) -> BigInt
+            {
+                match (lhs, rhs) {
+                    (Cow::Borrowed(lhs), Cow::Borrowed(rhs)) => op_trait::op_fn(lhs, rhs),
+                    (Cow::Borrowed(lhs), Cow::Owned(rhs)) => op_trait::op_fn(lhs, rhs),
+                    (Cow::Owned(lhs), Cow::Borrowed(rhs)) => op_trait::op_fn(lhs, rhs),
+                    (Cow::Owned(lhs), Cow::Owned(rhs)) => op_trait::op_fn(lhs, rhs),
+                }
             }
 
-            fn update_borrowed(lhs: &mut BigInt, rhs: &BigInt) {
-                [<op_trait Assign>]::[< op_fn _assign >](lhs, rhs)
+            fn update_big(lhs: &mut BigInt, rhs: Cow<BigInt>)
+            {
+                match rhs {
+                    Cow::Borrowed(rhs) => [<op_trait Assign>]::[<op_fn _assign>](lhs, rhs),
+                    Cow::Owned(rhs) => [<op_trait Assign>]::[<op_fn _assign>](lhs, rhs),
+                }
             }
         }
     }
 }
 
 duplicate_shift_ops! {
-    paste! {
-        struct [< op_trait Op >];
+    paste! { struct [<op_trait Op>]; }
 
-        impl ShiftOp for [< op_trait Op >] {
-            fn on_digit(lhs: Digit, rhs: u32) -> Option<Digit> { checked::op_fn(lhs, rhs) }
+    impl ShiftOp for paste! { [<op_trait Op>] } {
+        duplicate_prims! {
+            paste! {
+                fn [<on_big_ prim>](lhs: Cow<BigInt>, rhs: prim) -> BigInt {
+                    match lhs {
+                        Cow::Borrowed(lhs) => op_trait::op_fn(lhs, rhs),
+                        Cow::Owned(lhs) => op_trait::op_fn(lhs, rhs),
+                    }
+                }
+
+                fn [<update_big_ prim>](lhs: &mut BigInt, rhs: prim) {
+                    [<op_trait Assign>]::[<op_fn _assign>](lhs, rhs);
+                }
+            }
         }
     }
 }
 
-macro_rules! impl_arith_or_bit_ops {
-    ($op_fn: ident, $op_trait:ident) => {
-        paste! {
-            impl<'a, T> $op_trait<T> for CBigInt
-            where
-                T: ToDecodedCow<'a>,
-            {
-                type Output = CBigInt;
+// MARK: Operator Trait Implementations
+// -----------------------------------------------------------------------------
+duplicate_arith_ops! {
+    paste! {
+        impl<'a, T> op_trait<T> for CBigInt
+        where
+            T: ToEncodingCow<'a, BigInt>,
+        {
+            type Output = CBigInt;
 
-                fn $op_fn(self, rhs: T) -> Self::Output {
-                    [< $op_trait Op >]::call(self, rhs)
-                }
-            }
-
-            impl<'a, T> $op_trait<T> for &'a CBigInt
-            where
-                T: ToDecodedCow<'a>,
-            {
-                type Output = CBigInt;
-
-                fn $op_fn(self, rhs: T) -> Self::Output {
-                    [< $op_trait Op >]::call(self, rhs)
-                }
-            }
-
-            impl<'a, T> [< $op_trait Assign >]<T> for CBigInt
-            where
-                T: ToDecodedCow<'a>
-            {
-                fn [< $op_fn _assign >](&mut self, rhs: T) {
-                    [< $op_trait Op >]::call_update(self, rhs);
-                }
+            fn op_fn(self, rhs: T) -> Self::Output {
+                [< op_trait Op >]::call(self, rhs)
             }
         }
-    };
-}
 
-duplicate_arith_ops! {
-    impl_arith_or_bit_ops!(op_fn, op_trait);
-    duplicate_prims! {
+        impl<'a, T> op_trait<T> for &'a CBigInt
+        where
+            T: ToEncodingCow<'a, BigInt>,
+        {
+            type Output = CBigInt;
+
+            fn op_fn(self, rhs: T) -> Self::Output {
+                [< op_trait Op >]::call(self, rhs)
+            }
+        }
+
+        impl<'a, T> [< op_trait Assign >]<T> for CBigInt
+        where
+            T: ToEncodingCow<'a, BigInt>
+        {
+            fn [< op_fn _assign >](&mut self, rhs: T) {
+                [< op_trait Op >]::call_update(self, rhs);
+            }
+        }
+    }
+
+    crate::duplicate_prims! {
         paste! {
-            impl op_trait<prim> for CBigInt {
-                type Output = CBigInt;
-                #[inline(never)]
-                fn op_fn(self, rhs: prim) -> CBigInt {
-                    [< op_trait Op >]::call_prim_rhs(self, rhs, op_trait::op_fn, |x: &BigInt, y| x.op_fn(y))
-                }
-            }
-
-            impl<'a> op_trait<&'a prim> for CBigInt {
-                type Output = CBigInt;
-                fn op_fn(self, rhs: &'a prim) -> CBigInt {
-                    self.op_fn(*rhs)
-                }
-            }
-
-            impl op_trait<prim> for &CBigInt {
-                type Output = CBigInt;
-                #[inline(never)]
-                fn op_fn(self, rhs: prim) -> CBigInt {
-                    [< op_trait Op >]::call_prim_rhs(self, rhs, op_trait::op_fn, |x: &BigInt, y| x.op_fn(y))
-                }
-            }
-
-            impl<'a> op_trait<&'a prim> for &CBigInt {
-                type Output = CBigInt;
-                fn op_fn(self, rhs: &'a prim) -> CBigInt {
-                    self.op_fn(*rhs)
-                }
-            }
-
             impl op_trait<CBigInt> for prim {
                 type Output = CBigInt;
                 #[inline(never)]
                 fn op_fn(self, rhs: CBigInt) -> CBigInt {
-                    [< op_trait Op >]::call_prim_lhs(self, rhs, op_trait::op_fn, |x, y: &BigInt| x.op_fn(y))
+                    [< op_trait Op >]::call(self, rhs)
                 }
             }
 
@@ -423,7 +301,7 @@ duplicate_arith_ops! {
                 type Output = CBigInt;
                 #[inline(never)]
                 fn op_fn(self, rhs: &'a CBigInt) -> CBigInt {
-                    [< op_trait Op >]::call_prim_lhs(self, rhs, op_trait::op_fn, |x, y: &BigInt| x.op_fn(y))
+                    [< op_trait Op >]::call(self, rhs)
                 }
             }
 
@@ -433,24 +311,43 @@ duplicate_arith_ops! {
                     (*self).op_fn(rhs)
                 }
             }
-            impl [< op_trait Assign >]<prim> for CBigInt {
-                #[inline(never)]
-                fn [< op_fn _assign >](&mut self, rhs: prim) {
-                    [< op_trait Op >]::call_update_prim(self, rhs, BigInt::op_fn, BigInt::[< op_fn _assign >]);
-                }
-            }
-
-            impl<'a> [< op_trait Assign >]<&'a prim> for CBigInt {
-                fn [< op_fn _assign >](&mut self, rhs: &'a prim) {
-                    self.[< op_fn _assign >](*rhs);
-                }
-            }
         }
     }
 }
 
 duplicate_bit_ops! {
-    impl_arith_or_bit_ops!(op_fn, op_trait);
+    paste! {
+        impl<'a, T> op_trait<T> for CBigInt
+        where
+            T: ToCow<'a, BigInt>,
+        {
+            type Output = CBigInt;
+
+            fn op_fn(self, rhs: T) -> Self::Output {
+                [< op_trait Op >]::call(self, rhs)
+            }
+        }
+
+        impl<'a, T> op_trait<T> for &'a CBigInt
+        where
+            T: ToCow<'a, BigInt>,
+        {
+            type Output = CBigInt;
+
+            fn op_fn(self, rhs: T) -> Self::Output {
+                [< op_trait Op >]::call(self, rhs)
+            }
+        }
+
+        impl<'a, T> [< op_trait Assign >]<T> for CBigInt
+        where
+            T: ToCow<'a, BigInt>
+        {
+            fn [< op_fn _assign >](&mut self, rhs: T) {
+                [< op_trait Op >]::call_update(self, rhs);
+            }
+        }
+    }
 }
 
 duplicate_shift_ops! {
@@ -459,7 +356,7 @@ duplicate_shift_ops! {
             impl op_trait<prim> for CBigInt {
                 type Output = CBigInt;
                 fn op_fn(self, rhs: prim) -> CBigInt {
-                    [< op_trait Op >]::call(self, rhs, BigInt::op_fn, |x: &BigInt, y| x.op_fn(y))
+                    [< op_trait Op >]::[<call_ prim>](self, rhs)
                 }
             }
 
@@ -473,7 +370,7 @@ duplicate_shift_ops! {
             impl op_trait<prim> for &CBigInt {
                 type Output = CBigInt;
                 fn op_fn(self, rhs: prim) -> CBigInt {
-                    [< op_trait Op >]::call(self, rhs, BigInt::op_fn, |x: &BigInt, y| x.op_fn(y))
+                    [< op_trait Op >]::[<call_ prim>](self, rhs)
                 }
             }
 
@@ -486,10 +383,7 @@ duplicate_shift_ops! {
 
             impl [< op_trait Assign >]<prim> for CBigInt {
                 fn [< op_fn _assign >](&mut self, rhs: prim) {
-                    match &mut self.0 {
-                        Encoded::Digit(_) => *self = self.clone().op_fn(rhs),
-                        Encoded::Big(big) => big.[< op_fn _assign >](rhs),
-                    }
+                    [< op_trait Op >]::[<call_update_big_ prim>](self, rhs);
                 }
             }
 
@@ -502,6 +396,8 @@ duplicate_shift_ops! {
     }
 }
 
+// MARK: Pow Operator Implementations
+// -----------------------------------------------------------------------------
 duplicate_uprims! {
     impl Pow<prim> for CBigInt {
         type Output = CBigInt;
@@ -539,6 +435,7 @@ duplicate_uprims! {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::duplicate_arith_and_bit_ops;
     use num_traits::{Pow, Zero};
 
     fn always(_lhs: &BigInt, _rhs: &BigInt) -> bool {
@@ -550,7 +447,7 @@ mod test {
     }
 
     fn make_range() -> Vec<BigInt> {
-        let mut small_range: Vec<Digit> = vec![Digit::MIN, Digit::MAX, -Digit::MAX];
+        let mut small_range: Vec<SmallInt> = vec![SmallInt::MIN, SmallInt::MAX, -SmallInt::MAX];
         small_range.extend(-10..=10);
         let mut range: Vec<BigInt> = small_range.into_iter().map(From::from).collect();
         let huge: BigInt = <BigInt as From<i128>>::from(i128::MAX).pow(2u32);
@@ -572,7 +469,7 @@ mod test {
     fn test_shift_op<R>(ops: ShiftOpsForType<R>)
     where
         R: TryFrom<u32>,
-        R: Copy,
+        R: Copy + Ord + Zero,
     {
         let range = make_range();
 
@@ -580,6 +477,7 @@ mod test {
             for big_rhs in (0..128).chain((150..500).step_by(10)) {
                 let lhs = CBigInt::from(big_lhs.clone());
                 if let Ok(rhs) = R::try_from(big_rhs) {
+                    assert!(rhs >= R::zero(), "shift amount must be non-negative");
                     let expected = (ops.bigint_op)(big_lhs, rhs);
                     let actual1 = BigInt::from((ops.cbigint_op1)(lhs.clone(), rhs));
                     let actual2 = BigInt::from((ops.cbigint_op2)(lhs.clone(), &rhs));
