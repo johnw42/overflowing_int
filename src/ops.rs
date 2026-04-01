@@ -1,6 +1,6 @@
 use crate::SmallInt;
 use crate::cbigint::CBigInt;
-use crate::encoding::{Encoding, ToCow, ToEncodingCow};
+use crate::encoding::{Encoding, IntoEncoding, ToBigIntCow};
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
 };
@@ -26,12 +26,12 @@ trait ArithOp {
 
     /// Calls a version of the binary operator that returns a new number.
     #[inline]
-    fn call<'a, L, R>(lhs: L, rhs: R) -> CBigInt
+    fn call<'a, 'b, L, R>(lhs: L, rhs: R) -> CBigInt<'static>
     where
-        L: ToEncodingCow<'a, BigInt>,
-        R: ToEncodingCow<'a, BigInt>,
+        L: IntoEncoding<'a, SmallInt, BigInt>,
+        R: IntoEncoding<'b, SmallInt, BigInt>,
     {
-        match (lhs.to_encoding_cow(), rhs.to_encoding_cow()) {
+        match (lhs.into_encoding(), rhs.into_encoding()) {
             (Encoding::Small(lhs), Encoding::Small(rhs)) => {
                 if let Ok(out) = Self::on_small(lhs, rhs) {
                     out.into()
@@ -53,63 +53,64 @@ trait ArithOp {
 
     /// Calls a version of the binary operator that updates a bigint argument in place.
     #[inline]
-    fn call_update<'a, R>(lhs: &mut CBigInt, rhs: R)
+    fn call_update<'a, 'b, 'c, R>(lhs: &'a mut CBigInt<'b>, rhs: R)
     where
-        R: ToEncodingCow<'a, BigInt>,
+        R: IntoEncoding<'c, SmallInt, BigInt>,
     {
         lhs.0.update_encoding(|encoding| match encoding {
-            Encoding::Small(small_lhs) => match rhs.to_encoding_cow() {
+            Encoding::Small(small_lhs) => match rhs.into_encoding() {
                 Encoding::Small(small_rhs) => match Self::on_small(*small_lhs, small_rhs) {
                     Ok(out) => *encoding = Encoding::Small(out),
                     Err(()) => {
-                        *encoding = Encoding::Big(Self::on_small_big(
+                        *encoding = Encoding::Big(Cow::Owned(Self::on_small_big(
                             *small_lhs,
                             Cow::Owned(BigInt::from(small_rhs)),
-                        ));
+                        )));
                     }
                 },
                 Encoding::Big(big_rhs) => {
-                    *encoding = Encoding::Big(Self::on_small_big(*small_lhs, big_rhs));
+                    *encoding = Encoding::Big(Cow::Owned(Self::on_small_big(*small_lhs, big_rhs)));
                 }
             },
-            Encoding::Big(big_lhs) => match rhs.to_encoding_cow() {
+            Encoding::Big(big_lhs) => match rhs.into_encoding() {
                 Encoding::Small(small_rhs) => {
-                    Self::update_small(big_lhs, small_rhs);
+                    Self::update_small(big_lhs.to_mut(), small_rhs);
                 }
                 Encoding::Big(big_rhs) => {
-                    Self::update_big(big_lhs, big_rhs);
+                    Self::update_big(big_lhs.to_mut(), big_rhs);
                 }
             },
         });
     }
 }
+
 trait BitOp {
     fn on_big(lhs: Cow<BigInt>, rhs: Cow<BigInt>) -> BigInt;
     fn update_big(lhs: &mut BigInt, rhs: Cow<BigInt>);
 
     #[inline]
-    fn call<'a, L, R>(lhs: L, rhs: R) -> CBigInt
+    fn call<'a, 'b, L, R>(lhs: L, rhs: R) -> CBigInt<'static>
     where
-        L: ToCow<'a, BigInt>,
-        R: ToCow<'a, BigInt>,
+        L: ToBigIntCow<'a>,
+        R: ToBigIntCow<'b>,
     {
         Self::on_big(lhs.to_cow(), rhs.to_cow()).into()
     }
 
     #[inline]
-    fn call_update<'a, R>(lhs: &mut CBigInt, rhs: R)
+    fn call_update<'a, 'b, 'c, R>(lhs: &'a mut CBigInt<'b>, rhs: R)
     where
-        R: ToCow<'a, BigInt>,
+        R: ToBigIntCow<'c>,
     {
         lhs.0.update_encoding(|encoding| match encoding {
             Encoding::Small(small_lhs) => {
-                *encoding = Encoding::Big(Self::on_big(
+                *encoding = Encoding::Big(Cow::Owned(Self::on_big(
                     Cow::Owned(BigInt::from(*small_lhs)),
                     rhs.to_cow(),
-                ));
+                )));
             }
             Encoding::Big(big_lhs) => {
-                Self::update_big(big_lhs, rhs.to_cow());
+                Self::update_big(big_lhs.to_mut(), rhs.to_cow());
             }
         });
     }
@@ -120,24 +121,24 @@ trait ShiftOp {
             fn [<on_big_ prim>](lhs: Cow<BigInt>, rhs: prim) -> BigInt;
             fn [<update_big_ prim>](lhs: &mut BigInt, rhs: prim);
 
-            fn [<call_ prim>]<'a, L>(lhs: L, rhs: prim) -> CBigInt
+            fn [<call_ prim>]<'a, L>(lhs: L, rhs: prim) -> CBigInt<'static>
             where
-                L: ToCow<'a, BigInt>,
+                L: ToBigIntCow<'a>,
             {
                 Self::[<on_big_ prim>](lhs.to_cow(), rhs).into()
             }
 
             #[inline]
-            fn [<call_update_big_ prim>](lhs: &mut CBigInt, rhs: prim) {
+            fn [<call_update_big_ prim>](lhs: &mut CBigInt<'_>, rhs: prim) {
                 lhs.0.update_encoding(|encoding| match encoding {
                     Encoding::Small(small_lhs) => {
-                        *encoding = Encoding::Big(Self::[<on_big_ prim>](
+                        *encoding = Encoding::Big(Cow::Owned(Self::[<on_big_ prim>](
                             Cow::Owned(BigInt::from(*small_lhs)),
                             rhs,
-                        ));
+                        )));
                     }
                     Encoding::Big(big_lhs) => {
-                        Self::[<update_big_ prim>](big_lhs, rhs);
+                        Self::[<update_big_ prim>](big_lhs.to_mut(), rhs);
                     }
                 });
             }
@@ -247,31 +248,31 @@ duplicate_shift_ops! {
 // -----------------------------------------------------------------------------
 duplicate_arith_ops! {
     paste! {
-        impl<'a, T> op_trait<T> for CBigInt
+        impl<'a, T> op_trait<T> for CBigInt<'a>
         where
-            T: ToEncodingCow<'a, BigInt>,
+            T: IntoEncoding<'a, SmallInt, BigInt>,
         {
-            type Output = CBigInt;
+            type Output = CBigInt<'a>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
                 [< op_trait Op >]::call(self, rhs)
             }
         }
 
-        impl<'a, T> op_trait<T> for &'a CBigInt
+        impl<'a, T> op_trait<T> for &CBigInt<'a>
         where
-            T: ToEncodingCow<'a, BigInt>,
+            T: IntoEncoding<'a, SmallInt, BigInt>,
         {
-            type Output = CBigInt;
+            type Output = CBigInt<'a>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
                 [< op_trait Op >]::call(self, rhs)
             }
         }
 
-        impl<'a, T> [< op_trait Assign >]<T> for CBigInt
+        impl<'a, T> [< op_trait Assign >]<T> for CBigInt<'a>
         where
-            T: ToEncodingCow<'a, BigInt>
+            T: IntoEncoding<'a, SmallInt, BigInt>
         {
             fn [< op_fn _assign >](&mut self, rhs: T) {
                 [< op_trait Op >]::call_update(self, rhs);
@@ -281,32 +282,32 @@ duplicate_arith_ops! {
 
     crate::duplicate_prims! {
         paste! {
-            impl op_trait<CBigInt> for prim {
-                type Output = CBigInt;
+            impl<'a> op_trait<CBigInt<'a>> for prim {
+                type Output = CBigInt<'a>;
                 #[inline(never)]
-                fn op_fn(self, rhs: CBigInt) -> CBigInt {
+                fn op_fn(self, rhs: CBigInt<'a>) -> Self::Output {
                     [< op_trait Op >]::call(self, rhs)
                 }
             }
 
-            impl op_trait<CBigInt> for &prim {
-                type Output = CBigInt;
-                fn op_fn(self, rhs: CBigInt) -> CBigInt {
+            impl<'a> op_trait<CBigInt<'a>> for &prim {
+                type Output = CBigInt<'a>;
+                fn op_fn(self, rhs: CBigInt<'a>) -> Self::Output {
                     (*self).op_fn(rhs)
                 }
             }
 
-            impl<'a> op_trait<&'a CBigInt> for prim {
-                type Output = CBigInt;
+            impl<'a> op_trait<&CBigInt<'a>> for prim {
+                type Output = CBigInt<'a>;
                 #[inline(never)]
-                fn op_fn(self, rhs: &'a CBigInt) -> CBigInt {
+                fn op_fn(self, rhs: &CBigInt<'a>) -> Self::Output {
                     [< op_trait Op >]::call(self, rhs)
                 }
             }
 
-            impl<'b> op_trait<&'b CBigInt> for &prim {
-                type Output = CBigInt;
-                fn op_fn(self, rhs: &'b CBigInt) -> CBigInt {
+            impl<'a> op_trait<&CBigInt<'a>> for &prim {
+                type Output = CBigInt<'a>;
+                fn op_fn(self, rhs: &CBigInt<'a>) -> Self::Output {
                     (*self).op_fn(rhs)
                 }
             }
@@ -316,31 +317,31 @@ duplicate_arith_ops! {
 
 duplicate_bit_ops! {
     paste! {
-        impl<'a, T> op_trait<T> for CBigInt
+        impl<'a, 'b, T> op_trait<T> for CBigInt<'a>
         where
-            T: ToCow<'a, BigInt>,
+            T: ToBigIntCow<'b>,
         {
-            type Output = CBigInt;
+            type Output = CBigInt<'a>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
                 [< op_trait Op >]::call(self, rhs)
             }
         }
 
-        impl<'a, T> op_trait<T> for &'a CBigInt
+        impl<'a, 'b, T> op_trait<T> for &CBigInt<'a>
         where
-            T: ToCow<'a, BigInt>,
+            T: ToBigIntCow<'b>,
         {
-            type Output = CBigInt;
+            type Output = CBigInt<'a>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
                 [< op_trait Op >]::call(self, rhs)
             }
         }
 
-        impl<'a, T> [< op_trait Assign >]<T> for CBigInt
+        impl<'a, 'b, T> [< op_trait Assign >]<T> for CBigInt<'a>
         where
-            T: ToCow<'a, BigInt>
+            T: ToBigIntCow<'b>
         {
             fn [< op_fn _assign >](&mut self, rhs: T) {
                 [< op_trait Op >]::call_update(self, rhs);
@@ -352,41 +353,41 @@ duplicate_bit_ops! {
 duplicate_shift_ops! {
     duplicate_prims! {
         paste! {
-            impl op_trait<prim> for CBigInt {
-                type Output = CBigInt;
-                fn op_fn(self, rhs: prim) -> CBigInt {
+            impl<'a> op_trait<prim> for CBigInt<'a> {
+                type Output = CBigInt<'a>;
+                fn op_fn(self, rhs: prim) -> Self::Output {
                     [< op_trait Op >]::[<call_ prim>](self, rhs)
                 }
             }
 
-            impl<'a> op_trait<&'a prim> for CBigInt {
-                type Output = CBigInt;
-                fn op_fn(self, rhs: &'a prim) -> CBigInt {
+            impl<'a> op_trait<&prim> for CBigInt<'a> {
+                type Output = CBigInt<'a>;
+                fn op_fn(self, rhs: &prim) -> Self::Output {
                     self.op_fn(*rhs)
                 }
             }
 
-            impl op_trait<prim> for &CBigInt {
-                type Output = CBigInt;
-                fn op_fn(self, rhs: prim) -> CBigInt {
+            impl<'a> op_trait<prim> for &CBigInt<'a> {
+                type Output = CBigInt<'a>;
+                fn op_fn(self, rhs: prim) -> Self::Output {
                     [< op_trait Op >]::[<call_ prim>](self, rhs)
                 }
             }
 
-            impl op_trait<&prim> for &CBigInt {
-                type Output = CBigInt;
-                fn op_fn(self, rhs: &prim) -> CBigInt {
+            impl<'a> op_trait<&prim> for &CBigInt<'a> {
+                type Output = CBigInt<'a>;
+                fn op_fn(self, rhs: &prim) -> Self::Output {
                     self.op_fn(*rhs)
                 }
             }
 
-            impl [< op_trait Assign >]<prim> for CBigInt {
+            impl<'a> [< op_trait Assign >]<prim> for CBigInt<'a> {
                 fn [< op_fn _assign >](&mut self, rhs: prim) {
                     [< op_trait Op >]::[<call_update_big_ prim>](self, rhs);
                 }
             }
 
-            impl [< op_trait Assign >]<&prim> for CBigInt {
+            impl<'a> [< op_trait Assign >]<&prim> for CBigInt<'a> {
                 fn [< op_fn _assign >](&mut self, rhs: &prim) {
                     self.[< op_fn _assign >](*rhs);
                 }
@@ -398,32 +399,32 @@ duplicate_shift_ops! {
 // MARK: Pow Operator Implementations
 // -----------------------------------------------------------------------------
 duplicate_uprims! {
-    impl Pow<prim> for CBigInt {
-        type Output = CBigInt;
+    impl<'a> Pow<prim> for CBigInt<'a> {
+        type Output = CBigInt<'a>;
 
         fn pow(self, rhs: prim) -> Self::Output {
             BigInt::from(self).pow(rhs).into()
         }
     }
 
-    impl Pow<&prim> for CBigInt {
-        type Output = CBigInt;
+    impl<'a> Pow<&prim> for CBigInt<'a> {
+        type Output = CBigInt<'a>;
 
         fn pow(self, rhs: &prim) -> Self::Output {
             BigInt::from(self).pow(rhs).into()
         }
     }
 
-    impl Pow<prim> for &CBigInt {
-        type Output = CBigInt;
+    impl<'a> Pow<prim> for &'a CBigInt<'a> {
+        type Output = CBigInt<'a>;
 
         fn pow(self, rhs: prim) -> Self::Output {
             BigInt::from(self).pow(rhs).into()
         }
     }
 
-    impl Pow<&prim> for &CBigInt {
-        type Output = CBigInt;
+    impl<'a> Pow<&prim> for &'a CBigInt<'a> {
+        type Output = CBigInt<'a>;
 
         fn pow(self, rhs: &prim) -> Self::Output {
             BigInt::from(self).pow(rhs).into()
@@ -450,16 +451,27 @@ mod test {
     }
 
     struct ShiftOpsForType<R> {
-        cbigint_op1: fn(CBigInt, R) -> CBigInt,
-        cbigint_op2: fn(CBigInt, &R) -> CBigInt,
-        cbigint_op3: fn(&CBigInt, R) -> CBigInt,
-        cbigint_op4: fn(&CBigInt, &R) -> CBigInt,
-        op_assign1: fn(&mut CBigInt, R),
-        op_assign2: fn(&mut CBigInt, &R),
+        cbigint_op1: fn(CBigInt<'static>, R) -> CBigInt<'static>,
+        cbigint_op2: fn(CBigInt<'static>, &R) -> CBigInt<'static>,
+        cbigint_op3: fn(&CBigInt<'static>, R) -> CBigInt<'static>,
+        cbigint_op4: fn(&CBigInt<'static>, &R) -> CBigInt<'static>,
+        op_assign1: fn(&mut CBigInt<'static>, R),
+        op_assign2: fn(&mut CBigInt<'static>, &R),
         bigint_op: fn(&BigInt, R) -> BigInt,
     }
 
-    fn test_shift_op<R>(ops: ShiftOpsForType<R>, lhs: CBigInt, rhs: u16) -> TestResult
+    struct BinOpsForTypes<L, R> {
+        predicate: fn(&BigInt, &BigInt) -> bool,
+        cbigint_op1: fn(L, R) -> CBigInt<'static>,
+        cbigint_op2: fn(L, &R) -> CBigInt<'static>,
+        cbigint_op3: fn(&L, R) -> CBigInt<'static>,
+        cbigint_op4: fn(&L, &R) -> CBigInt<'static>,
+        op_assign1: fn(&mut CBigInt<'static>, R),
+        op_assign2: fn(&mut CBigInt<'static>, &R),
+        bigint_op: fn(&BigInt, &BigInt) -> BigInt,
+    }
+
+    fn test_shift_op<R>(ops: ShiftOpsForType<R>, lhs: CBigInt<'static>, rhs: u16) -> TestResult
     where
         R: TryFrom<u16> + Copy + Ord + Zero + Display,
     {
@@ -487,17 +499,6 @@ mod test {
         } else {
             TestResult::discard()
         }
-    }
-
-    struct BinOpsForTypes<L, R> {
-        predicate: fn(&BigInt, &BigInt) -> bool,
-        cbigint_op1: fn(L, R) -> CBigInt,
-        cbigint_op2: fn(L, &R) -> CBigInt,
-        cbigint_op3: fn(&L, R) -> CBigInt,
-        cbigint_op4: fn(&L, &R) -> CBigInt,
-        op_assign1: fn(&mut CBigInt, R),
-        op_assign2: fn(&mut CBigInt, &R),
-        bigint_op: fn(&BigInt, &BigInt) -> BigInt,
     }
 
     fn test_bin_op<L, R>(ops: BinOpsForTypes<L, R>, lhs: L, rhs: R) -> TestResult
@@ -538,7 +539,7 @@ mod test {
     duplicate_arith_and_bit_ops! {
         paste! {
             #[quickcheck]
-            fn [< test_ op_fn >](lhs: CBigInt, rhs: CBigInt) -> TestResult{
+            fn [< test_ op_fn >](lhs: CBigInt<'static>, rhs: CBigInt<'static>) -> TestResult{
                 test_bin_op::<CBigInt, CBigInt>(BinOpsForTypes {
                     predicate: op_test_pred,
                     cbigint_op1: |x, y| op_trait::op_fn(x, y),
@@ -552,11 +553,12 @@ mod test {
             }
         }
     }
+
     duplicate_shift_ops! {
          duplicate_prims! {
             paste! {
                 #[quickcheck]
-                fn [< test_ op_fn _ prim _rhs >](lhs: CBigInt, rhs: u16) -> TestResult{
+                fn [< test_ op_fn _ prim _rhs >](lhs: CBigInt<'static>, rhs: u16) -> TestResult{
                     test_shift_op::<prim>(ShiftOpsForType {
                         cbigint_op1: |x, y| op_trait::op_fn(x, y),
                         cbigint_op2: |x, y| op_trait::op_fn(x, y),
@@ -570,11 +572,12 @@ mod test {
             }
         }
     }
+
     duplicate_arith_ops! {
          duplicate_prims! {
             paste! {
                 #[quickcheck]
-                fn [< test_ op_fn _ prim _lhs >](lhs: prim, rhs: CBigInt) -> TestResult{
+                fn [< test_ op_fn _ prim _lhs >](lhs: prim, rhs: CBigInt<'static>) -> TestResult{
                     test_bin_op::<prim, CBigInt>(BinOpsForTypes {
                         predicate: op_test_pred,
                         cbigint_op1: |x, y| op_trait::op_fn(x, y),
@@ -587,7 +590,7 @@ mod test {
                     }, lhs, rhs)
                 }
                 #[quickcheck]
-                fn [< test_ op_fn _ prim _rhs >](lhs: CBigInt, rhs: prim) -> TestResult {
+                fn [< test_ op_fn _ prim _rhs >](lhs: CBigInt<'static>, rhs: prim) -> TestResult {
                     test_bin_op::<CBigInt, prim>(BinOpsForTypes {
                         predicate: op_test_pred,
                         cbigint_op1: |x, y| op_trait::op_fn(x, y),
@@ -606,7 +609,7 @@ mod test {
     duplicate_prims! {
         paste! {
             #[quickcheck]
-            fn [< test_pow_ prim >](lhs: CBigInt, rhs: u32) {
+            fn [< test_pow_ prim >](lhs: CBigInt<'static>, rhs: u32) {
                 let rhs = rhs % 64; // limit the exponent to avoid long test times
                 let big_lhs = &BigInt::from(lhs.clone());
                 let expected = big_lhs.pow(rhs);

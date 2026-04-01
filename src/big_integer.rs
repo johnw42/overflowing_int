@@ -17,6 +17,8 @@ use rand::distributions::uniform::SampleUniform;
 use rand::prelude::Distribution;
 use serde::{Deserialize, Serialize};
 
+use crate::CBigInt;
+
 pub trait BigInteger
 where
     Self: Binary
@@ -852,148 +854,155 @@ where
     fn set_bit(&mut self, bit: u64, value: bool);
 }
 
-impl BigInteger for BigInt {
-    fn new(sign: Sign, digits: Vec<u32>) -> Self {
-        Self::from_biguint(sign, BigUint::new(digits))
-    }
+macro_rules! impl_big_integer {
+    ($t:ty) => {
+        impl BigInteger for $t {
+            fn new(sign: Sign, digits: Vec<u32>) -> Self {
+                Self::from_biguint(sign, BigUint::new(digits))
+            }
 
-    fn from_biguint(sign: Sign, data: BigUint) -> Self {
-        Self::from_biguint(sign, data)
-    }
+            fn from_biguint(sign: Sign, data: BigUint) -> Self {
+                Self::from_biguint(sign, data)
+            }
 
-    fn from_slice(sign: Sign, slice: &[u32]) -> Self {
-        Self::from_biguint(sign, BigUint::from_slice(slice))
-    }
+            fn from_slice(sign: Sign, slice: &[u32]) -> Self {
+                Self::from_biguint(sign, BigUint::from_slice(slice))
+            }
 
-    fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
-        *self = Self::from_slice(sign, slice);
-    }
+            fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
+                *self = Self::from_slice(sign, slice);
+            }
 
-    fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self {
-        Self::from_bytes_be(sign, bytes)
-    }
+            fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self {
+                Self::from_bytes_be(sign, bytes)
+            }
 
-    fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self {
-        Self::from_bytes_le(sign, bytes)
-    }
+            fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self {
+                Self::from_bytes_le(sign, bytes)
+            }
 
-    fn from_signed_bytes_be(digits: &[u8]) -> Self {
-        Self::from_signed_bytes_be(digits)
-    }
+            fn from_signed_bytes_be(digits: &[u8]) -> Self {
+                Self::from_signed_bytes_be(digits)
+            }
 
-    fn from_signed_bytes_le(digits: &[u8]) -> Self {
-        Self::from_signed_bytes_le(digits)
-    }
+            fn from_signed_bytes_le(digits: &[u8]) -> Self {
+                Self::from_signed_bytes_le(digits)
+            }
 
-    fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
-        Self::parse_bytes(buf, radix)
-    }
+            fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
+                Self::parse_bytes(buf, radix)
+            }
 
-    fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
-        Self::from_radix_be(sign, buf, radix)
-    }
+            fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
+                Self::from_radix_be(sign, buf, radix)
+            }
 
-    fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
-        Self::from_radix_le(sign, buf, radix)
-    }
+            fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
+                Self::from_radix_le(sign, buf, radix)
+            }
 
-    fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
-        self.to_bytes_be()
-    }
+            fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
+                self.to_bytes_be()
+            }
 
-    fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
-        self.to_bytes_le()
-    }
+            fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
+                self.to_bytes_le()
+            }
 
-    fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
-        self.to_u32_digits()
-    }
+            fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
+                self.to_u32_digits()
+            }
 
-    fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
-        self.to_u64_digits()
-    }
+            fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
+                self.to_u64_digits()
+            }
 
-    fn iter_u32_digits(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_ {
-        self.iter_u32_digits()
-    }
+            fn iter_u32_digits(
+                &self,
+            ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_ {
+                self.iter_u32_digits()
+            }
 
-    fn iter_u64_digits(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_ {
-        self.iter_u64_digits()
-    }
+            fn iter_u64_digits(
+                &self,
+            ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_ {
+                self.iter_u64_digits()
+            }
 
-    fn to_signed_bytes_be(&self) -> Vec<u8> {
-        self.to_signed_bytes_be()
-    }
+            fn to_signed_bytes_be(&self) -> Vec<u8> {
+                self.to_signed_bytes_be()
+            }
 
-    fn to_signed_bytes_le(&self) -> Vec<u8> {
-        self.to_signed_bytes_le()
-    }
+            fn to_signed_bytes_le(&self) -> Vec<u8> {
+                self.to_signed_bytes_le()
+            }
 
-    fn to_str_radix(&self, radix: u32) -> String {
-        self.to_str_radix(radix)
-    }
+            fn to_str_radix(&self, radix: u32) -> String {
+                self.to_str_radix(radix)
+            }
 
-    fn to_radix_be(&self, radix: u32) -> (Sign, Vec<u8>) {
-        self.to_radix_be(radix)
-    }
+            fn to_radix_be(&self, radix: u32) -> (Sign, Vec<u8>) {
+                self.to_radix_be(radix)
+            }
 
-    fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>) {
-        self.to_radix_le(radix)
-    }
+            fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>) {
+                self.to_radix_le(radix)
+            }
 
-    fn sign(&self) -> Sign {
-        self.sign()
-    }
+            fn sign(&self) -> Sign {
+                self.sign()
+            }
 
-    fn into_parts(self) -> (Sign, BigUint) {
-        self.into_parts()
-    }
+            fn into_parts(self) -> (Sign, BigUint) {
+                self.into_parts()
+            }
 
-    fn bits(&self) -> u64 {
-        self.bits()
-    }
+            fn bits(&self) -> u64 {
+                self.bits()
+            }
 
-    fn to_biguint(&self) -> Option<BigUint> {
-        self.to_biguint()
-    }
+            fn to_biguint(&self) -> Option<BigUint> {
+                self.to_biguint()
+            }
 
-    fn pow(&self, exponent: u32) -> Self {
-        self.pow(exponent)
-    }
+            fn pow(&self, exponent: u32) -> Self {
+                self.pow(exponent)
+            }
 
-    fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-        self.modpow(exponent, modulus)
-    }
+            fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
+                self.modpow(exponent, modulus)
+            }
 
-    fn modinv(&self, modulus: &Self) -> Option<Self> {
-        self.modinv(modulus)
-    }
+            fn modinv(&self, modulus: &Self) -> Option<Self> {
+                self.modinv(modulus)
+            }
 
-    fn sqrt(&self) -> Self {
-        self.sqrt()
-    }
+            fn sqrt(&self) -> Self {
+                self.sqrt()
+            }
 
-    fn cbrt(&self) -> Self {
-        self.cbrt()
-    }
+            fn cbrt(&self) -> Self {
+                self.cbrt()
+            }
 
-    fn nth_root(&self, n: u32) -> Self {
-        self.nth_root(n)
-    }
+            fn nth_root(&self, n: u32) -> Self {
+                self.nth_root(n)
+            }
 
-    fn trailing_zeros(&self) -> Option<u64> {
-        self.trailing_zeros()
-    }
+            fn trailing_zeros(&self) -> Option<u64> {
+                self.trailing_zeros()
+            }
 
-    fn bit(&self, bit: u64) -> bool {
-        self.bit(bit)
-    }
+            fn bit(&self, bit: u64) -> bool {
+                self.bit(bit)
+            }
 
-    fn set_bit(&mut self, bit: u64, value: bool) {
-        self.set_bit(bit, value)
-    }
+            fn set_bit(&mut self, bit: u64, value: bool) {
+                self.set_bit(bit, value)
+            }
+        }
+    };
 }
+
+// impl_big_integer!(BigInt);
+// impl_big_integer!(CBigInt<'_>);
