@@ -433,9 +433,13 @@ duplicate_uprims! {
 
 #[cfg(test)]
 mod test {
+    use std::fmt::Display;
+
     use super::*;
     use crate::duplicate_arith_and_bit_ops;
     use num_traits::{Pow, Zero};
+    use quickcheck::TestResult;
+    use quickcheck_macros::quickcheck;
 
     fn always(_lhs: &BigInt, _rhs: &BigInt) -> bool {
         true
@@ -443,16 +447,6 @@ mod test {
 
     fn nonzero_rhs(_lhs: &BigInt, rhs: &BigInt) -> bool {
         !rhs.is_zero()
-    }
-
-    fn make_range() -> Vec<BigInt> {
-        let mut small_range: Vec<SmallInt> = vec![SmallInt::MIN, SmallInt::MAX, -SmallInt::MAX];
-        small_range.extend(-10..=10);
-        let mut range: Vec<BigInt> = small_range.into_iter().map(From::from).collect();
-        let huge: BigInt = <BigInt as From<i128>>::from(i128::MAX).pow(2u32);
-        range.push(huge.clone());
-        range.push(-huge);
-        range
     }
 
     struct ShiftOpsForType<R> {
@@ -465,36 +459,33 @@ mod test {
         bigint_op: fn(&BigInt, R) -> BigInt,
     }
 
-    fn test_shift_op<R>(ops: ShiftOpsForType<R>)
+    fn test_shift_op<R>(ops: ShiftOpsForType<R>, lhs: CBigInt, rhs: u16) -> TestResult
     where
-        R: TryFrom<u32>,
-        R: Copy + Ord + Zero,
+        R: TryFrom<u16> + Copy + Ord + Zero + Display,
     {
-        let range = make_range();
-
-        for big_lhs in &range {
-            for big_rhs in (0..128).chain((150..500).step_by(10)) {
-                let lhs = CBigInt::from(big_lhs.clone());
-                if let Ok(rhs) = R::try_from(big_rhs) {
-                    assert!(rhs >= R::zero(), "shift amount must be non-negative");
-                    let expected = (ops.bigint_op)(big_lhs, rhs);
-                    let actual1 = BigInt::from((ops.cbigint_op1)(lhs.clone(), rhs));
-                    let actual2 = BigInt::from((ops.cbigint_op2)(lhs.clone(), &rhs));
-                    let actual3 = BigInt::from((ops.cbigint_op3)(&lhs, rhs));
-                    let actual4 = BigInt::from((ops.cbigint_op4)(&lhs, &rhs));
-                    let mut actual5 = lhs.clone();
-                    (ops.op_assign1)(&mut actual5, rhs);
-                    let mut actual6 = lhs.clone();
-                    (ops.op_assign2)(&mut actual6, &rhs);
-                    let label = format!("failed with inputs {}, {}", big_lhs, big_rhs);
-                    assert_eq!(expected, actual1, "{}", label);
-                    assert_eq!(expected, actual2, "{}", label);
-                    assert_eq!(expected, actual3, "{}", label);
-                    assert_eq!(expected, actual4, "{}", label);
-                    assert_eq!(expected, BigInt::from(actual5), "{}", label);
-                    assert_eq!(expected, BigInt::from(actual6), "{}", label);
-                }
-            }
+        let big_lhs = &BigInt::from(lhs.clone());
+        let lhs = CBigInt::from(big_lhs.clone());
+        if let Ok(rhs) = R::try_from(rhs) {
+            assert!(rhs >= R::zero(), "shift amount must be non-negative");
+            let expected = (ops.bigint_op)(big_lhs, rhs);
+            let actual1 = BigInt::from((ops.cbigint_op1)(lhs.clone(), rhs));
+            let actual2 = BigInt::from((ops.cbigint_op2)(lhs.clone(), &rhs));
+            let actual3 = BigInt::from((ops.cbigint_op3)(&lhs, rhs));
+            let actual4 = BigInt::from((ops.cbigint_op4)(&lhs, &rhs));
+            let mut actual5 = lhs.clone();
+            (ops.op_assign1)(&mut actual5, rhs);
+            let mut actual6 = lhs.clone();
+            (ops.op_assign2)(&mut actual6, &rhs);
+            let label = format!("failed with inputs {}, {}", big_lhs, rhs);
+            assert_eq!(expected, actual1, "{}", label);
+            assert_eq!(expected, actual2, "{}", label);
+            assert_eq!(expected, actual3, "{}", label);
+            assert_eq!(expected, actual4, "{}", label);
+            assert_eq!(expected, BigInt::from(actual5), "{}", label);
+            assert_eq!(expected, BigInt::from(actual6), "{}", label);
+            TestResult::passed()
+        } else {
+            TestResult::discard()
         }
     }
 
@@ -509,44 +500,45 @@ mod test {
         bigint_op: fn(&BigInt, &BigInt) -> BigInt,
     }
 
-    fn test_bin_op<L, R>(ops: BinOpsForTypes<L, R>)
+    fn test_bin_op<L, R>(ops: BinOpsForTypes<L, R>, lhs: L, rhs: R) -> TestResult
     where
         L: TryFrom<BigInt> + Clone,
         R: TryFrom<BigInt> + Clone,
+        BigInt: From<L>,
+        BigInt: From<R>,
     {
-        let range = make_range();
+        let big_lhs = &BigInt::from(lhs.clone());
+        let big_rhs = &BigInt::from(rhs.clone());
 
-        for big_lhs in &range {
-            for big_rhs in &range {
-                if (ops.predicate)(big_lhs, big_rhs)
-                    && let (Ok(lhs), Ok(rhs)) =
-                        (L::try_from(big_lhs.clone()), R::try_from(big_rhs.clone()))
-                {
-                    let expected = (ops.bigint_op)(big_lhs, big_rhs);
-                    let actual1 = BigInt::from((ops.cbigint_op1)(lhs.clone(), rhs.clone()));
-                    let actual2 = BigInt::from((ops.cbigint_op2)(lhs.clone(), &rhs));
-                    let actual3 = BigInt::from((ops.cbigint_op3)(&lhs, rhs.clone()));
-                    let actual4 = BigInt::from((ops.cbigint_op4)(&lhs, &rhs));
-                    let mut actual5 = big_lhs.clone().into();
-                    (ops.op_assign1)(&mut actual5, rhs.clone());
-                    let mut actual6 = big_lhs.clone().into();
-                    (ops.op_assign2)(&mut actual6, &rhs);
-                    let label = format!("failed with inputs {}, {}", big_lhs, big_rhs);
-                    assert_eq!(expected, actual1, "{}", label);
-                    assert_eq!(expected, actual2, "{}", label);
-                    assert_eq!(expected, actual3, "{}", label);
-                    assert_eq!(expected, actual4, "{}", label);
-                    assert_eq!(expected, BigInt::from(actual5), "{}", label);
-                    assert_eq!(expected, BigInt::from(actual6), "{}", label);
-                }
-            }
+        if (ops.predicate)(big_lhs, big_rhs)
+            && let (Ok(lhs), Ok(rhs)) = (L::try_from(big_lhs.clone()), R::try_from(big_rhs.clone()))
+        {
+            let expected = (ops.bigint_op)(big_lhs, big_rhs);
+            let actual1 = BigInt::from((ops.cbigint_op1)(lhs.clone(), rhs.clone()));
+            let actual2 = BigInt::from((ops.cbigint_op2)(lhs.clone(), &rhs));
+            let actual3 = BigInt::from((ops.cbigint_op3)(&lhs, rhs.clone()));
+            let actual4 = BigInt::from((ops.cbigint_op4)(&lhs, &rhs));
+            let mut actual5 = big_lhs.clone().into();
+            (ops.op_assign1)(&mut actual5, rhs.clone());
+            let mut actual6 = big_lhs.clone().into();
+            (ops.op_assign2)(&mut actual6, &rhs);
+            let label = format!("failed with inputs {}, {}", big_lhs, big_rhs);
+            assert_eq!(expected, actual1, "{}", label);
+            assert_eq!(expected, actual2, "{}", label);
+            assert_eq!(expected, actual3, "{}", label);
+            assert_eq!(expected, actual4, "{}", label);
+            assert_eq!(expected, BigInt::from(actual5), "{}", label);
+            assert_eq!(expected, BigInt::from(actual6), "{}", label);
+            TestResult::passed()
+        } else {
+            TestResult::discard()
         }
     }
 
     duplicate_arith_and_bit_ops! {
         paste! {
-            #[test]
-            fn [< test_ op_fn >]() {
+            #[quickcheck]
+            fn [< test_ op_fn >](lhs: CBigInt, rhs: CBigInt) -> TestResult{
                 test_bin_op::<CBigInt, CBigInt>(BinOpsForTypes {
                     predicate: op_test_pred,
                     cbigint_op1: |x, y| op_trait::op_fn(x, y),
@@ -556,15 +548,15 @@ mod test {
                     op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
                     op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
                     bigint_op: |x, y| op_trait::op_fn(x, y),
-                });
+                }, lhs, rhs)
             }
         }
     }
     duplicate_shift_ops! {
          duplicate_prims! {
             paste! {
-                #[test]
-                fn [< test_ op_fn _ prim _rhs >]() {
+                #[quickcheck]
+                fn [< test_ op_fn _ prim _rhs >](lhs: CBigInt, rhs: u16) -> TestResult{
                     test_shift_op::<prim>(ShiftOpsForType {
                         cbigint_op1: |x, y| op_trait::op_fn(x, y),
                         cbigint_op2: |x, y| op_trait::op_fn(x, y),
@@ -573,7 +565,7 @@ mod test {
                         op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
                         op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
                         bigint_op: |x, y| op_trait::op_fn(x, y),
-                    });
+                    }, lhs, rhs)
                 }
             }
         }
@@ -581,8 +573,8 @@ mod test {
     duplicate_arith_ops! {
          duplicate_prims! {
             paste! {
-                #[test]
-                fn [< test_ op_fn _ prim _lhs >]() {
+                #[quickcheck]
+                fn [< test_ op_fn _ prim _lhs >](lhs: prim, rhs: CBigInt) -> TestResult{
                     test_bin_op::<prim, CBigInt>(BinOpsForTypes {
                         predicate: op_test_pred,
                         cbigint_op1: |x, y| op_trait::op_fn(x, y),
@@ -592,10 +584,10 @@ mod test {
                         op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
                         op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
                         bigint_op: |x, y| op_trait::op_fn(x, y),
-                });
+                    }, lhs, rhs)
                 }
-                #[test]
-                fn [< test_ op_fn _ prim _rhs >]() {
+                #[quickcheck]
+                fn [< test_ op_fn _ prim _rhs >](lhs: CBigInt, rhs: prim) -> TestResult {
                     test_bin_op::<CBigInt, prim>(BinOpsForTypes {
                         predicate: op_test_pred,
                         cbigint_op1: |x, y| op_trait::op_fn(x, y),
@@ -605,8 +597,24 @@ mod test {
                         op_assign1: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
                         op_assign2: |x, y| [< op_trait Assign >]::[< op_fn _assign >](x, y),
                         bigint_op: |x, y| op_trait::op_fn(x, y),
-                    });
+                    }, lhs, rhs)
                 }
+            }
+        }
+    }
+
+    duplicate_prims! {
+        paste! {
+            #[quickcheck]
+            fn [< test_pow_ prim >](lhs: CBigInt, rhs: u32) {
+                let rhs = rhs % 64; // limit the exponent to avoid long test times
+                let big_lhs = &BigInt::from(lhs.clone());
+                let expected = big_lhs.pow(rhs);
+                let actual1 = BigInt::from(lhs.clone().pow(rhs));
+                let actual2 = BigInt::from((&lhs).pow(rhs));
+                let label = format!("failed with inputs {}, {}", big_lhs, rhs);
+                assert_eq!(expected, actual1, "{}", label);
+                assert_eq!(expected, actual2, "{}", label);
             }
         }
     }
