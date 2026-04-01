@@ -1,6 +1,6 @@
+use crate::CBigInt;
 use crate::SmallInt;
 use crate::big_integer::BigInteger as _;
-use crate::cbigint::CBigInt;
 use crate::encoding::{Encoded, Encoding};
 use num_bigint::{BigInt, BigUint, Sign::*, ToBigInt, ToBigUint, TryFromBigIntError};
 use num_traits::ToPrimitive;

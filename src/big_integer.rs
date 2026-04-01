@@ -435,27 +435,27 @@ where
         + SubAssign<i8>
         + SubAssign<isize>,
 {
-    /// Creates and initializes a [`BigInt`].
+    /// Creates and initializes a [`BigInteger`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     fn new(sign: Sign, digits: Vec<u32>) -> Self;
 
-    /// Creates and initializes a [`BigInt`].
+    /// Creates and initializes a [`BigInteger`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     fn from_biguint(sign: Sign, data: BigUint) -> Self;
 
-    /// Creates and initializes a [`BigInt`].
+    /// Creates and initializes a [`BigInteger`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     fn from_slice(sign: Sign, slice: &[u32]) -> Self;
 
-    /// Reinitializes a [`BigInt`].
+    /// Reinitializes a [`BigInteger`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]);
 
-    /// Creates and initializes a [`BigInt`].
+    /// Creates and initializes a [`BigInteger`].
     ///
     /// The bytes are in big-endian byte order.
     ///
@@ -475,23 +475,23 @@ where
     /// ```
     fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self;
 
-    /// Creates and initializes a [`BigInt`].
+    /// Creates and initializes a [`BigInteger`].
     ///
     /// The bytes are in little-endian byte order.
     fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self;
 
-    /// Creates and initializes a [`BigInt`] from an array of bytes in
+    /// Creates and initializes a [`BigInteger`] from an array of bytes in
     /// two's complement binary representation.
     ///
     /// The digits are in big-endian base 2<sup>8</sup>.
     fn from_signed_bytes_be(digits: &[u8]) -> Self;
 
-    /// Creates and initializes a [`BigInt`] from an array of bytes in two's complement.
+    /// Creates and initializes a [`BigInteger`] from an array of bytes in two's complement.
     ///
     /// The digits are in little-endian base 2<sup>8</sup>.
     fn from_signed_bytes_le(digits: &[u8]) -> Self;
 
-    /// Creates and initializes a [`BigInt`].
+    /// Creates and initializes a [`BigInteger`].
     ///
     /// # Examples
     ///
@@ -504,7 +504,7 @@ where
     /// ```
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self>;
 
-    /// Creates and initializes a [`BigInt`]. Each `u8` of the input slice is
+    /// Creates and initializes a [`BigInteger`]. Each `u8` of the input slice is
     /// interpreted as one digit of the number
     /// and must therefore be less than `radix`.
     ///
@@ -522,7 +522,7 @@ where
     /// ```
     fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self>;
 
-    /// Creates and initializes a [`BigInt`]. Each `u8` of the input slice is
+    /// Creates and initializes a [`BigInteger`]. Each `u8` of the input slice is
     /// interpreted as one digit of the number
     /// and must therefore be less than `radix`.
     ///
@@ -540,7 +540,7 @@ where
     /// ```
     fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self>;
 
-    /// Returns the sign and the byte representation of the [`BigInt`] in big-endian byte order.
+    /// Returns the sign and the byte representation of the [`BigInteger`] in big-endian byte order.
     ///
     /// # Examples
     ///
@@ -552,7 +552,7 @@ where
     /// ```
     fn to_bytes_be(&self) -> (Sign, Vec<u8>);
 
-    /// Returns the sign and the byte representation of the [`BigInt`] in little-endian byte order.
+    /// Returns the sign and the byte representation of the [`BigInteger`] in little-endian byte order.
     ///
     /// # Examples
     ///
@@ -564,7 +564,7 @@ where
     /// ```
     fn to_bytes_le(&self) -> (Sign, Vec<u8>);
 
-    /// Returns the sign and the `u32` digits representation of the [`BigInt`] ordered least
+    /// Returns the sign and the `u32` digits representation of the [`BigInteger`] ordered least
     /// significant digit first.
     ///
     /// # Examples
@@ -580,7 +580,7 @@ where
     /// ```
     fn to_u32_digits(&self) -> (Sign, Vec<u32>);
 
-    /// Returns the sign and the `u64` digits representation of the [`BigInt`] ordered least
+    /// Returns the sign and the `u64` digits representation of the [`BigInteger`] ordered least
     /// significant digit first.
     ///
     /// # Examples
@@ -597,7 +597,7 @@ where
     /// ```
     fn to_u64_digits(&self) -> (Sign, Vec<u64>);
 
-    /// Returns an iterator of `u32` digits representation of the [`BigInt`] ordered least
+    /// Returns an iterator of `u32` digits representation of the [`BigInteger`] ordered least
     /// significant digit first.
     ///
     /// # Examples
@@ -615,7 +615,7 @@ where
         &self,
     ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_;
 
-    /// Returns an iterator of `u64` digits representation of the [`BigInt`] ordered least
+    /// Returns an iterator of `u64` digits representation of the [`BigInteger`] ordered least
     /// significant digit first.
     ///
     /// # Examples
@@ -634,7 +634,7 @@ where
         &self,
     ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_;
 
-    /// Returns the two's-complement byte representation of the [`BigInt`] in big-endian byte order.
+    /// Returns the two's-complement byte representation of the [`BigInteger`] in big-endian byte order.
     ///
     /// # Examples
     ///
@@ -646,7 +646,7 @@ where
     /// ```
     fn to_signed_bytes_be(&self) -> Vec<u8>;
 
-    /// Returns the two's-complement byte representation of the [`BigInt`] in little-endian byte order.
+    /// Returns the two's-complement byte representation of the [`BigInteger`] in little-endian byte order.
     ///
     /// # Examples
     ///
@@ -703,7 +703,7 @@ where
     /// ```
     fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>);
 
-    /// Returns the sign of the [`BigInt`] as a [`Sign`].
+    /// Returns the sign of the [`BigInteger`] as a [`Sign`].
     ///
     /// # Examples
     ///
@@ -716,7 +716,7 @@ where
     /// ```
     fn sign(&self) -> Sign;
 
-    /// Convert this [`BigInt`] into its [`Sign`] and [`BigUint`] magnitude,
+    /// Convert this [`BigInteger`] into its [`Sign`] and [`BigUint`] magnitude,
     /// the reverse of [`BigInt::from_biguint()`].
     ///
     /// # Examples
@@ -730,11 +730,11 @@ where
     /// ```
     fn into_parts(self) -> (Sign, BigUint);
 
-    /// Determines the fewest bits necessary to express the [`BigInt`],
+    /// Determines the fewest bits necessary to express the [`BigInteger`],
     /// not including the sign.
     fn bits(&self) -> u64;
 
-    /// Converts this [`BigInt`] into a [`BigUint`], if it's not negative.
+    /// Converts this [`BigInteger`] into a [`BigUint`], if it's not negative.
     fn to_biguint(&self) -> Option<BigUint>;
 
     fn checked_add(&self, v: &Self) -> Option<Self> {

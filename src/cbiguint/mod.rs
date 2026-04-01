@@ -1,2 +1,2 @@
-mod cbiguint;
+pub mod cbiguint;
 pub use cbiguint::*;

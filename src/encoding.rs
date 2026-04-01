@@ -58,7 +58,7 @@ impl<S, T> Encoded<S, T> {
 
     /// Encodes a big integer as an `Encoded` value, using the small encoding if
     /// possible, and cloning the big integer if otherwise.
-    pub fn from_big_ref<'a>(x: &'a T) -> Encoded<S, T>
+    pub fn from_big_ref(x: &T) -> Encoded<S, T>
     where
         for<'b> S: TryFrom<&'b T>,
         T: Clone,
@@ -279,6 +279,7 @@ duplicate_prims! {
     impl<'a> ToEncodingCow<'a, BigInt> for prim {
         fn to_encoding_cow(self) -> Encoding<SmallInt, Cow<'a, BigInt>> {
             #[allow(irrefutable_let_patterns)]
+            #[allow(clippy::unnecessary_fallible_conversions)]
             if let Ok(small) = SmallInt::try_from(self) {
                 Encoding::Small(small)
             } else {

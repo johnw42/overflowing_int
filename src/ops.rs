@@ -8,7 +8,6 @@ use duplicate::duplicate;
 use num_bigint::BigInt;
 use num_traits::Pow;
 use paste::paste;
-use quickcheck_macros::quickcheck;
 use std::borrow::Cow;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,

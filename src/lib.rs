@@ -4,7 +4,7 @@ pub use num_bigint::{
     BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint, TryFromBigIntError,
 };
 
-pub use cbigint::*;
+pub use crate::cbigint::cbigint_impl::CBigInt;
 
 mod accum;
 pub mod big_integer;
