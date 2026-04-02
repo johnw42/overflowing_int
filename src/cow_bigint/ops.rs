@@ -1,6 +1,6 @@
 use super::encoding::{Encoding, IntoBigIntCow, IntoEncoding};
-use crate::SmallInt;
 use crate::cow_bigint::CowBigInt;
+use crate::cow_bigint::small_num::SmallInt;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
 };

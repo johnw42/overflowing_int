@@ -7,7 +7,7 @@ use num_bigint::BigUint;
 use duplicate::duplicate;
 
 use crate::CowBigInt;
-use crate::{SmallInt, SmallUint};
+use crate::cow_bigint::small_num::{SmallInt, SmallUint};
 use crate::{duplicate_prims, duplicate_uprims};
 
 /// A wrapper type around `Encoding` that maintains the the invariant that
