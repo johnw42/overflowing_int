@@ -57,7 +57,7 @@ trait ArithOp {
     where
         R: IntoEncoding<'c, SmallInt, BigInt>,
     {
-        lhs.0.update_encoding(|encoding| match encoding {
+        lhs.0.0.update_encoding(|encoding| match encoding {
             Encoding::Small(small_lhs) => match rhs.into_encoding() {
                 Encoding::Small(small_rhs) => match Self::on_small(*small_lhs, small_rhs) {
                     Ok(out) => *encoding = Encoding::Small(out),
@@ -102,7 +102,7 @@ trait BitOp {
     where
         R: IntoBigIntCow<'c>,
     {
-        lhs.0.update_encoding(|encoding| match encoding {
+        lhs.0.0.update_encoding(|encoding| match encoding {
             Encoding::Small(small_lhs) => {
                 *encoding = Encoding::Big(Cow::Owned(Self::on_big(
                     Cow::Owned(BigInt::from(*small_lhs)),
@@ -130,7 +130,7 @@ trait ShiftOp {
 
             #[inline]
             fn [<call_update_big_ prim>](lhs: &mut CBigInt<'_>, rhs: prim) {
-                lhs.0.update_encoding(|encoding| match encoding {
+                lhs.0.0.update_encoding(|encoding| match encoding {
                     Encoding::Small(small_lhs) => {
                         *encoding = Encoding::Big(Cow::Owned(Self::[<on_big_ prim>](
                             Cow::Owned(BigInt::from(*small_lhs)),

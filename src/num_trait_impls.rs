@@ -269,10 +269,10 @@ impl<'a> Not for CBigInt<'a> {
     type Output = CBigInt<'a>;
 
     fn not(self) -> Self::Output {
-        CBigInt(match self.into_encoding() {
-            Encoding::Small(n) => Encoded::from_small(n.not()),
-            Encoding::Big(n) => Encoded::from_big(n.into_owned().not()),
-        })
+        CBigInt(Encoded(match self.into_encoding() {
+            Encoding::Small(n) => Encoding::from_small(n.not()),
+            Encoding::Big(n) => Encoding::from_big(n.into_owned().not()),
+        }))
     }
 }
 
@@ -280,10 +280,10 @@ impl<'a> Not for &CBigInt<'a> {
     type Output = CBigInt<'a>;
 
     fn not(self) -> Self::Output {
-        CBigInt(match self.into_encoding() {
-            Encoding::Small(n) => Encoded::from_small(n.not()),
-            Encoding::Big(n) => Encoded::from_big(n.borrow().not()),
-        })
+        CBigInt(Encoded(match self.into_encoding() {
+            Encoding::Small(n) => Encoding::from_small(n.not()),
+            Encoding::Big(n) => Encoding::from_big(n.borrow().not()),
+        }))
     }
 }
 

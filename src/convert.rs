@@ -46,7 +46,7 @@ impl<'a> From<&CBigInt<'a>> for Cow<'a, BigInt> {
 
 impl<'a> From<BigInt> for CBigInt<'a> {
     fn from(value: BigInt) -> Self {
-        CBigInt(value.into())
+        CBigInt(Encoded(Encoding::from_big(value)))
     }
 }
 
@@ -112,7 +112,7 @@ duplicate::duplicate! {
                 #[allow(irrefutable_let_patterns)]
                 #[allow(clippy::unnecessary_fallible_conversions)]
                 if let Ok(n) = SmallInt::try_from(value) {
-                    CBigInt(Encoded::from_small(n))
+                    CBigInt(Encoded(Encoding::from_small(n)))
                 } else {
                     BigInt::from(value).into()
                 }

@@ -41,7 +41,7 @@ impl<'a> CBigInt<'a> {
     }
 
     pub(crate) fn encoding(&self) -> &Encoding<'a, SmallInt, BigInt> {
-        self.0.borrow_encoding()
+        &self.0.0
     }
 
     fn try_apply_sign(sign: Sign, magnitude: SmallUint) -> Option<Self> {
@@ -53,10 +53,6 @@ impl<'a> CBigInt<'a> {
                 Sign::NoSign => 0,
             })
             .map(Self::from)
-    }
-
-    pub fn into_static(&self) -> CBigInt<'static> {
-        Self(self.0.clone().into_static())
     }
 
     /// Returns the magnitude of the `CBigInt` as a `BigUint`.
@@ -529,7 +525,7 @@ impl<'a> CBigInt<'a> {
     }
 
     pub fn set_bit(&mut self, bit: u64, value: bool) {
-        self.0.update_encoding(|encoding| match encoding {
+        self.0.0.update_encoding(|encoding| match encoding {
             Encoding::Small(n) if (bit as usize) < SMALL_BITS - 1 => {
                 let mask = 1 << bit;
                 if value {
