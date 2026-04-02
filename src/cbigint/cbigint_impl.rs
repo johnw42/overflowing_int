@@ -41,7 +41,11 @@ impl<'a> CBigInt<'a> {
     }
 
     pub(crate) fn encoding(&self) -> &Encoding<'a, SmallInt, BigInt> {
-        &self.0.0
+        self.0.encoding()
+    }
+
+    pub(crate) fn update_encoding(&mut self, f: impl FnOnce(&mut Encoding<'a, SmallInt, BigInt>)) {
+        self.0.update_encoding(f)
     }
 
     fn try_apply_sign(sign: Sign, magnitude: SmallUint) -> Option<Self> {
@@ -525,7 +529,7 @@ impl<'a> CBigInt<'a> {
     }
 
     pub fn set_bit(&mut self, bit: u64, value: bool) {
-        self.0.0.update_encoding(|encoding| match encoding {
+        self.update_encoding(|encoding| match encoding {
             Encoding::Small(n) if (bit as usize) < SMALL_BITS - 1 => {
                 let mask = 1 << bit;
                 if value {
@@ -550,6 +554,18 @@ impl<'a> CBigInt<'a> {
                 }
             },
         });
+    }
+}
+
+impl<'a> From<Encoding<'a, SmallInt, BigInt>> for CBigInt<'a> {
+    fn from(x: Encoding<'a, SmallInt, BigInt>) -> Self {
+        CBigInt(x.into())
+    }
+}
+
+impl<'a> From<Encoded<'a, SmallInt, BigInt>> for CBigInt<'a> {
+    fn from(x: Encoded<'a, SmallInt, BigInt>) -> Self {
+        CBigInt(x.into())
     }
 }
 

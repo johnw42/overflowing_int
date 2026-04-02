@@ -91,7 +91,7 @@ impl CheckedSub for CBigInt<'_> {
 }
 
 impl ConstZero for CBigInt<'static> {
-    const ZERO: Self = CBigInt(Encoded::ZERO);
+    const ZERO: Self = Self(Encoded::from_small(0));
 }
 
 impl<'a, 'de> Deserialize<'de> for CBigInt<'a> {
@@ -269,10 +269,11 @@ impl<'a> Not for CBigInt<'a> {
     type Output = CBigInt<'a>;
 
     fn not(self) -> Self::Output {
-        CBigInt(Encoded(match self.into_encoding() {
-            Encoding::Small(n) => Encoding::from_small(n.not()),
-            Encoding::Big(n) => Encoding::from_big(n.into_owned().not()),
-        }))
+        match self.into_encoding() {
+            Encoding::Small(n) => Encoded::from_small(n.not()),
+            Encoding::Big(n) => Encoded::from_big(n.into_owned().not()),
+        }
+        .into()
     }
 }
 
@@ -280,10 +281,11 @@ impl<'a> Not for &CBigInt<'a> {
     type Output = CBigInt<'a>;
 
     fn not(self) -> Self::Output {
-        CBigInt(Encoded(match self.into_encoding() {
-            Encoding::Small(n) => Encoding::from_small(n.not()),
-            Encoding::Big(n) => Encoding::from_big(n.borrow().not()),
-        }))
+        match self.into_encoding() {
+            Encoding::Small(n) => Encoded::from_small(n.not()),
+            Encoding::Big(n) => Encoded::from_big(n.borrow().not()),
+        }
+        .into()
     }
 }
 
@@ -345,11 +347,11 @@ fn test_ord(a: CBigInt<'static>, b: CBigInt<'static>) -> bool {
 
 impl<'a> One for CBigInt<'a> {
     fn one() -> Self {
-        CBigInt(Encoded::ONE)
+        CBigInt(Encoded::from_small(1))
     }
 
     fn is_one(&self) -> bool {
-        self.0 == Encoded::ONE
+        self.encoding() == Encoded::from_small(1).encoding()
     }
 }
 
@@ -508,11 +510,11 @@ impl<'a> UpperHex for CBigInt<'a> {
 
 impl<'a> Zero for CBigInt<'a> {
     fn zero() -> Self {
-        CBigInt(Encoded::ZERO)
+        CBigInt(Encoded::from_small(0))
     }
 
     fn is_zero(&self) -> bool {
-        self.0 == Encoded::ZERO
+        self.encoding() == Encoded::from_small(0).encoding()
     }
 }
 

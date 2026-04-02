@@ -3,8 +3,6 @@ use std::fmt::Debug;
 
 use num_bigint::BigInt;
 use num_bigint::BigUint;
-use num_traits::ConstOne;
-use num_traits::ConstZero;
 
 use duplicate::duplicate;
 
@@ -19,42 +17,23 @@ use crate::{duplicate_prims, duplicate_uprims};
 /// content of `CBigInt` and `CBigUint`, which implement high-level operations
 /// and traits.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Encoded<'a, S, T: Clone>(pub Encoding<'a, S, T>);
+pub struct Encoded<'a, S, T: Clone>(Encoding<'a, S, T>);
 
-/// The content of an `Encoded` value, which is either a small integer or a big
-/// integer.  Typically `S` will be `SmallInt` or `SmallUint`, and `T` will be
-/// `BigInt` or `BigUint`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Encoding<'a, S, T: Clone> {
-    Small(S),
-    Big(Cow<'a, T>),
-}
-
-impl<S, T> Encoded<'static, S, T>
-where
-    S: ConstZero + ConstOne,
-    T: Clone,
-{
-    pub const ONE: Encoded<'static, S, T> = Encoded(Encoding::from_small(S::ONE));
-    pub const ZERO: Encoded<'static, S, T> = Encoded(Encoding::from_small(S::ZERO));
-}
-
-impl<'a, S, T: Clone> Encoding<'a, S, T> {
-    /// Creates a small encoding.
-    pub const fn from_small(x: S) -> Encoding<'static, S, T> {
-        Encoding::Small(x)
+impl<'a, S, T: Clone> Encoded<'a, S, T> {
+    pub const fn from_small(small: S) -> Self {
+        Encoded(Encoding::Small(small))
     }
 
     /// Creates an encoding from an owned value, using the small encoding if possible.
-    pub fn from_big(x: T) -> Encoding<'static, S, T>
+    pub fn from_big(x: T) -> Encoded<'static, S, T>
     where
         for<'b> S: TryFrom<&'b T>,
     {
-        if let Ok(s) = S::try_from(&x) {
+        Encoded(if let Ok(s) = S::try_from(&x) {
             Encoding::Small(s)
         } else {
             Encoding::Big(Cow::Owned(x))
-        }
+        })
     }
 
     /// Creates an encoding from a `Cow`, using the small encoding if possible.
@@ -67,8 +46,36 @@ impl<'a, S, T: Clone> Encoding<'a, S, T> {
         } else {
             Encoding::Big(x)
         }
+        .into()
     }
 
+    pub fn encoding(&self) -> &Encoding<'a, S, T> {
+        &self.0
+    }
+
+    pub fn into_encoding(self) -> Encoding<'a, S, T> {
+        self.0
+    }
+
+    pub fn update_encoding(&mut self, f: impl FnOnce(&mut Encoding<'a, S, T>))
+    where
+        for<'b> S: TryFrom<&'b T>,
+    {
+        f(&mut self.0);
+        self.0.normalize();
+    }
+}
+
+/// The content of an `Encoded` value, which is either a small integer or a big
+/// integer.  Typically `S` will be `SmallInt` or `SmallUint`, and `T` will be
+/// `BigInt` or `BigUint`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Encoding<'a, S, T: Clone> {
+    Small(S),
+    Big(Cow<'a, T>),
+}
+
+impl<'a, S, T: Clone> Encoding<'a, S, T> {
     pub fn into_static(self) -> Encoding<'static, S, T>
     where
         for<'b> S: TryFrom<&'b T>,
@@ -79,13 +86,12 @@ impl<'a, S, T: Clone> Encoding<'a, S, T> {
         }
     }
 
-    pub fn update_encoding(&mut self, f: impl FnOnce(&mut Encoding<'a, S, T>))
+    pub fn normalize(&mut self)
     where
         for<'b> S: TryFrom<&'b T>,
     {
-        f(self);
         let mut small_value = None;
-        if let Encoding::Big(big) = self {
+        if let Encoding::Big(big) = &self {
             small_value = S::try_from(big).ok();
         }
         if let Some(small) = small_value {
@@ -94,54 +100,60 @@ impl<'a, S, T: Clone> Encoding<'a, S, T> {
     }
 }
 
-impl<S, T> From<S> for Encoding<'static, S, T>
+impl<'a, S, T: Clone> From<Encoding<'a, S, T>> for Encoded<'a, S, T> {
+    fn from(x: Encoding<'a, S, T>) -> Self {
+        Encoded(x)
+    }
+}
+
+impl<S, T> From<S> for Encoded<'static, S, T>
 where
     for<'a> S: TryFrom<&'a T>,
     T: Clone,
 {
     fn from(x: S) -> Self {
-        Encoding::from_small(x)
+        Encoded::from_small(x)
     }
 }
 
-impl From<BigInt> for Encoding<'static, SmallInt, BigInt> {
+impl From<BigInt> for Encoded<'static, SmallInt, BigInt> {
     fn from(x: BigInt) -> Self {
-        Encoding::from_big(x)
+        Encoded::from_big(x)
     }
 }
 
-impl<'a> From<&'a BigInt> for Encoding<'a, SmallInt, BigInt> {
+impl<'a> From<&'a BigInt> for Encoded<'a, SmallInt, BigInt> {
     fn from(x: &'a BigInt) -> Self {
-        Encoding::from_big_cow(Cow::Borrowed(x))
+        Encoded::from_big_cow(Cow::Borrowed(x))
     }
 }
 
-impl From<Encoding<'static, SmallInt, BigInt>> for BigInt {
-    fn from(x: Encoding<'static, SmallInt, BigInt>) -> Self {
-        match x {
+impl From<Encoded<'static, SmallInt, BigInt>> for BigInt {
+    fn from(x: Encoded<'static, SmallInt, BigInt>) -> Self {
+        match x.into_encoding() {
             Encoding::Small(n) => n.into(),
             Encoding::Big(n) => n.into_owned(),
         }
     }
 }
 
-impl From<BigUint> for Encoding<'static, SmallUint, BigUint> {
+impl From<BigUint> for Encoded<'static, SmallUint, BigUint> {
     fn from(x: BigUint) -> Self {
-        Encoding::from_big(x)
+        Encoded::from_big(x)
     }
 }
 
-impl<'a> From<&'a BigUint> for Encoding<'a, SmallUint, BigUint> {
+impl<'a> From<&'a BigUint> for Encoded<'a, SmallUint, BigUint> {
     fn from(x: &'a BigUint) -> Self {
-        Encoding::from_big_cow(Cow::Borrowed(x))
+        Encoded::from_big_cow(Cow::Borrowed(x))
     }
 }
 
-impl<'a> From<Encoding<'a, SmallUint, BigUint>> for BigUint {
-    fn from(value: Encoding<'a, SmallUint, BigUint>) -> Self {
-        match value {
+impl<'a> From<Encoded<'a, SmallUint, BigUint>> for BigUint {
+    fn from(value: Encoded<'a, SmallUint, BigUint>) -> Self {
+        match value.into_encoding() {
             Encoding::Small(n) => n.into(),
-            Encoding::Big(n) => n.into_owned(),
+            Encoding::Big(n) => n.into_owned().into(),
         }
     }
 }

@@ -1,7 +1,8 @@
 use crate::CBigInt;
 use crate::SmallInt;
+use crate::encoding::Encoded;
+use crate::encoding::Encoding;
 use crate::encoding::IntoEncoding;
-use crate::encoding::{Encoded, Encoding};
 use num_bigint::{BigInt, BigUint, Sign::*, ToBigInt, ToBigUint, TryFromBigIntError};
 use num_traits::ToPrimitive;
 use paste::paste;
@@ -46,7 +47,7 @@ impl<'a> From<&CBigInt<'a>> for Cow<'a, BigInt> {
 
 impl<'a> From<BigInt> for CBigInt<'a> {
     fn from(value: BigInt) -> Self {
-        CBigInt(Encoded(Encoding::from_big(value)))
+        Encoded::from_big(value).into()
     }
 }
 
@@ -112,7 +113,7 @@ duplicate::duplicate! {
                 #[allow(irrefutable_let_patterns)]
                 #[allow(clippy::unnecessary_fallible_conversions)]
                 if let Ok(n) = SmallInt::try_from(value) {
-                    CBigInt(Encoded(Encoding::from_small(n)))
+                    Encoded::from_small(n).into()
                 } else {
                     BigInt::from(value).into()
                 }
