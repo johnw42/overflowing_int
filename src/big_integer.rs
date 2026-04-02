@@ -17,7 +17,7 @@ use rand::distributions::uniform::SampleUniform;
 use rand::prelude::Distribution;
 use serde::{Deserialize, Serialize};
 
-use crate::CBigInt;
+use crate::CowBigInt;
 
 pub trait BigInteger
 where
@@ -1007,4 +1007,4 @@ macro_rules! impl_big_integer {
 }
 
 impl_big_integer!(BigInt, , );
-impl_big_integer!(CBigInt<'static>, ,);
+impl_big_integer!(CowBigInt<'static>, ,);

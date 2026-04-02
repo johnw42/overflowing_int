@@ -21,29 +21,29 @@ use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformSampler};
 use rand::prelude::Distribution;
 use serde::{Deserialize, Serialize};
 
+use super::encoding::{Encoded, Encoding, IntoEncoding, IntoEncodingRef as _};
 use crate::SmallInt;
-use crate::cbigint::CBigInt;
-use crate::encoding::{Encoded, Encoding, IntoEncoding, IntoEncodingRef as _};
+use crate::cow_bigint::CowBigInt;
 
-impl quickcheck::Arbitrary for CBigInt<'static> {
+impl quickcheck::Arbitrary for CowBigInt<'static> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         match bool::arbitrary(g) {
-            true => CBigInt::from(i128::arbitrary(g)),
-            false => CBigInt::from(BigInt::arbitrary(g)),
+            true => CowBigInt::from(i128::arbitrary(g)),
+            false => CowBigInt::from(BigInt::arbitrary(g)),
         }
     }
 }
 
-impl<'a, 'b> arbitrary::Arbitrary<'a> for CBigInt<'b> {
+impl<'a, 'b> arbitrary::Arbitrary<'a> for CowBigInt<'b> {
     fn arbitrary(g: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         match bool::arbitrary(g)? {
-            true => Ok(CBigInt::from(i128::arbitrary(g)?)),
-            false => Ok(CBigInt::from(BigInt::arbitrary(g)?)),
+            true => Ok(CowBigInt::from(i128::arbitrary(g)?)),
+            false => Ok(CowBigInt::from(BigInt::arbitrary(g)?)),
         }
     }
 }
 
-impl Binary for CBigInt<'_> {
+impl Binary for CowBigInt<'_> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.into_encoding_ref() {
             Encoding::Small(n) => Binary::fmt(n, f),
@@ -52,19 +52,19 @@ impl Binary for CBigInt<'_> {
     }
 }
 
-impl CheckedAdd for CBigInt<'_> {
+impl CheckedAdd for CowBigInt<'_> {
     fn checked_add(&self, v: &Self) -> Option<Self> {
         Some(self.clone() + v.clone())
     }
 }
 
-impl CheckedDiv for CBigInt<'_> {
+impl CheckedDiv for CowBigInt<'_> {
     fn checked_div(&self, v: &Self) -> Option<Self> {
         Some(self.clone() / v.clone())
     }
 }
 
-impl CheckedEuclid for CBigInt<'_> {
+impl CheckedEuclid for CowBigInt<'_> {
     fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
         Cow::from(self)
             .checked_rem_euclid(&Cow::from(v))
@@ -78,38 +78,38 @@ impl CheckedEuclid for CBigInt<'_> {
     }
 }
 
-impl CheckedMul for CBigInt<'_> {
+impl CheckedMul for CowBigInt<'_> {
     fn checked_mul(&self, v: &Self) -> Option<Self> {
         Some(self.clone() * v.clone())
     }
 }
 
-impl CheckedSub for CBigInt<'_> {
+impl CheckedSub for CowBigInt<'_> {
     fn checked_sub(&self, v: &Self) -> Option<Self> {
         Some(self.clone() - v.clone())
     }
 }
 
-impl ConstZero for CBigInt<'static> {
+impl ConstZero for CowBigInt<'static> {
     const ZERO: Self = Self(Encoded::from_small(0));
 }
 
-impl<'a, 'de> Deserialize<'de> for CBigInt<'a> {
+impl<'a, 'de> Deserialize<'de> for CowBigInt<'a> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        BigInt::deserialize(deserializer).map(CBigInt::from)
+        BigInt::deserialize(deserializer).map(CowBigInt::from)
     }
 }
 
-impl<'a> Distribution<CBigInt<'a>> for RandomBits {
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> CBigInt<'a> {
+impl<'a> Distribution<CowBigInt<'a>> for RandomBits {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> CowBigInt<'a> {
         <RandomBits as Distribution<BigInt>>::sample(self, rng).into()
     }
 }
 
-impl Euclid for CBigInt<'_> {
+impl Euclid for CowBigInt<'_> {
     fn rem_euclid(&self, v: &Self) -> Self {
         Cow::from(self).rem_euclid(&Cow::from(v)).into()
     }
@@ -119,7 +119,7 @@ impl Euclid for CBigInt<'_> {
     }
 }
 
-impl FromBytes for CBigInt<'_> {
+impl FromBytes for CowBigInt<'_> {
     type Bytes = [u8];
 
     fn from_be_bytes(bytes: &[u8]) -> Self {
@@ -131,17 +131,17 @@ impl FromBytes for CBigInt<'_> {
     }
 }
 
-impl FromPrimitive for CBigInt<'_> {
+impl FromPrimitive for CowBigInt<'_> {
     fn from_i64(n: i64) -> Option<Self> {
-        Some(CBigInt::from(n))
+        Some(CowBigInt::from(n))
     }
 
     fn from_u64(n: u64) -> Option<Self> {
-        Some(CBigInt::from(n))
+        Some(CowBigInt::from(n))
     }
 }
 
-impl FromStr for CBigInt<'_> {
+impl FromStr for CowBigInt<'_> {
     type Err = num_bigint::ParseBigIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -149,7 +149,7 @@ impl FromStr for CBigInt<'_> {
     }
 }
 
-impl Integer for CBigInt<'_> {
+impl Integer for CowBigInt<'_> {
     fn div_floor(&self, other: &Self) -> Self {
         if let Some((lhs, rhs)) = self.to_small_with(other)
             && (lhs, rhs) != (SmallInt::MIN, -1)
@@ -222,7 +222,7 @@ impl Integer for CBigInt<'_> {
     }
 }
 
-impl LowerHex for CBigInt<'_> {
+impl LowerHex for CowBigInt<'_> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.into_encoding_ref() {
             Encoding::Small(n) => LowerHex::fmt(n, f),
@@ -231,8 +231,8 @@ impl LowerHex for CBigInt<'_> {
     }
 }
 
-impl<'a> Neg for CBigInt<'a> {
-    type Output = CBigInt<'a>;
+impl<'a> Neg for CowBigInt<'a> {
+    type Output = CowBigInt<'a>;
 
     fn neg(self) -> Self::Output {
         if let Some(a) = self.to_small()
@@ -244,8 +244,8 @@ impl<'a> Neg for CBigInt<'a> {
     }
 }
 
-impl<'a> Neg for &CBigInt<'a> {
-    type Output = CBigInt<'a>;
+impl<'a> Neg for &CowBigInt<'a> {
+    type Output = CowBigInt<'a>;
 
     fn neg(self) -> Self::Output {
         if let Some(a) = self.to_small()
@@ -257,16 +257,16 @@ impl<'a> Neg for &CBigInt<'a> {
     }
 }
 
-impl Num for CBigInt<'_> {
+impl Num for CowBigInt<'_> {
     type FromStrRadixErr = ParseBigIntError;
 
     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-        BigInt::from_str_radix(str, radix).map(CBigInt::from)
+        BigInt::from_str_radix(str, radix).map(CowBigInt::from)
     }
 }
 
-impl<'a> Not for CBigInt<'a> {
-    type Output = CBigInt<'a>;
+impl<'a> Not for CowBigInt<'a> {
+    type Output = CowBigInt<'a>;
 
     fn not(self) -> Self::Output {
         match self.into_encoding() {
@@ -277,8 +277,8 @@ impl<'a> Not for CBigInt<'a> {
     }
 }
 
-impl<'a> Not for &CBigInt<'a> {
-    type Output = CBigInt<'a>;
+impl<'a> Not for &CowBigInt<'a> {
+    type Output = CowBigInt<'a>;
 
     fn not(self) -> Self::Output {
         match self.into_encoding() {
@@ -289,7 +289,7 @@ impl<'a> Not for &CBigInt<'a> {
     }
 }
 
-impl Octal for CBigInt<'_> {
+impl Octal for CowBigInt<'_> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.into_encoding_ref() {
             Encoding::Small(n) => Octal::fmt(n, f),
@@ -298,7 +298,7 @@ impl Octal for CBigInt<'_> {
     }
 }
 
-impl Ord for CBigInt<'_> {
+impl Ord for CowBigInt<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         use Encoding::*;
         use Ordering::*;
@@ -326,28 +326,28 @@ impl Ord for CBigInt<'_> {
 }
 
 #[quickcheck]
-fn test_round_trip1(a: CBigInt<'static>) -> bool {
-    CBigInt::from(BigInt::from(a.clone())) == a && a.clone() == CBigInt::from(BigInt::from(a))
+fn test_round_trip1(a: CowBigInt<'static>) -> bool {
+    CowBigInt::from(BigInt::from(a.clone())) == a && a.clone() == CowBigInt::from(BigInt::from(a))
 }
 
 #[quickcheck]
 fn test_round_trip2(a: BigInt) -> bool {
-    BigInt::from(CBigInt::from(a.clone())) == a && a.clone() == BigInt::from(CBigInt::from(a))
+    BigInt::from(CowBigInt::from(a.clone())) == a && a.clone() == BigInt::from(CowBigInt::from(a))
 }
 
 #[quickcheck]
-fn test_to_string(a: CBigInt<'static>) -> bool {
+fn test_to_string(a: CowBigInt<'static>) -> bool {
     a.to_string() == BigInt::from(a).to_string()
 }
 
 #[quickcheck]
-fn test_ord(a: CBigInt<'static>, b: CBigInt<'static>) -> bool {
+fn test_ord(a: CowBigInt<'static>, b: CowBigInt<'static>) -> bool {
     a.cmp(&b) == BigInt::from(a).cmp(&BigInt::from(b))
 }
 
-impl<'a> One for CBigInt<'a> {
+impl<'a> One for CowBigInt<'a> {
     fn one() -> Self {
-        CBigInt(Encoded::from_small(1))
+        CowBigInt(Encoded::from_small(1))
     }
 
     fn is_one(&self) -> bool {
@@ -355,15 +355,15 @@ impl<'a> One for CBigInt<'a> {
     }
 }
 
-impl<'a> PartialOrd for CBigInt<'a> {
+impl<'a> PartialOrd for CowBigInt<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a> RefUnwindSafe for CBigInt<'a> {}
+impl<'a> RefUnwindSafe for CowBigInt<'a> {}
 
-impl<'a> Roots for CBigInt<'a> {
+impl<'a> Roots for CowBigInt<'a> {
     fn nth_root(&self, n: u32) -> Self {
         match self.into_encoding() {
             Encoding::Small(a) => a.nth_root(n).into(),
@@ -372,14 +372,14 @@ impl<'a> Roots for CBigInt<'a> {
     }
 }
 
-impl SampleUniform for CBigInt<'static> {
+impl SampleUniform for CowBigInt<'static> {
     type Sampler = UniformCBigInt;
 }
 
 pub struct UniformCBigInt(UniformBigInt);
 
 impl UniformSampler for UniformCBigInt {
-    type X = CBigInt<'static>;
+    type X = CowBigInt<'static>;
 
     fn new<B1, B2>(low: B1, high: B2) -> Self
     where
@@ -408,7 +408,7 @@ impl UniformSampler for UniformCBigInt {
     }
 }
 
-impl<'a> Serialize for CBigInt<'a> {
+impl<'a> Serialize for CowBigInt<'a> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -417,7 +417,7 @@ impl<'a> Serialize for CBigInt<'a> {
     }
 }
 
-impl<'a> Signed for CBigInt<'a> {
+impl<'a> Signed for CowBigInt<'a> {
     fn abs(&self) -> Self {
         match self.into_encoding_ref() {
             Encoding::Small(a) => {
@@ -453,7 +453,7 @@ impl<'a> Signed for CBigInt<'a> {
     }
 }
 
-impl<'a> ToBytes for CBigInt<'a> {
+impl<'a> ToBytes for CowBigInt<'a> {
     type Bytes = Vec<u8>;
 
     fn to_be_bytes(&self) -> Self::Bytes {
@@ -471,7 +471,7 @@ impl<'a> ToBytes for CBigInt<'a> {
     }
 }
 
-impl<'a> ToPrimitive for CBigInt<'a> {
+impl<'a> ToPrimitive for CowBigInt<'a> {
     #[duplicate::duplicate_item(
         prim;
         [i8];
@@ -499,7 +499,7 @@ impl<'a> ToPrimitive for CBigInt<'a> {
     }
 }
 
-impl<'a> UpperHex for CBigInt<'a> {
+impl<'a> UpperHex for CowBigInt<'a> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.into_encoding_ref() {
             Encoding::Small(n) => UpperHex::fmt(n, f),
@@ -508,9 +508,9 @@ impl<'a> UpperHex for CBigInt<'a> {
     }
 }
 
-impl<'a> Zero for CBigInt<'a> {
+impl<'a> Zero for CowBigInt<'a> {
     fn zero() -> Self {
-        CBigInt(Encoded::from_small(0))
+        CowBigInt(Encoded::from_small(0))
     }
 
     fn is_zero(&self) -> bool {
@@ -520,22 +520,22 @@ impl<'a> Zero for CBigInt<'a> {
 
 #[test]
 fn test_gcd() {
-    let small = CBigInt::from(5);
-    let huge = CBigInt::from(i128::MAX).pow(2);
-    assert_eq!(huge.gcd(&small), CBigInt::from(1));
-    assert_eq!(small.gcd(&huge), CBigInt::from(1));
+    let small = CowBigInt::from(5);
+    let huge = CowBigInt::from(i128::MAX).pow(2);
+    assert_eq!(huge.gcd(&small), CowBigInt::from(1));
+    assert_eq!(small.gcd(&huge), CowBigInt::from(1));
 }
 
 #[test]
 fn test_one() {
-    assert!(CBigInt::one().is_one());
-    assert_eq!(CBigInt::one(), CBigInt::from(1));
-    assert!(!CBigInt::from(2).is_one());
+    assert!(CowBigInt::one().is_one());
+    assert_eq!(CowBigInt::one(), CowBigInt::from(1));
+    assert!(!CowBigInt::from(2).is_one());
 }
 
 #[test]
 fn test_zero() {
-    assert!(CBigInt::zero().is_zero());
-    assert_eq!(CBigInt::zero(), CBigInt::from(0));
-    assert!(!CBigInt::from(1).is_zero());
+    assert!(CowBigInt::zero().is_zero());
+    assert_eq!(CowBigInt::zero(), CowBigInt::from(0));
+    assert!(!CowBigInt::from(1).is_zero());
 }

@@ -4,17 +4,14 @@ pub use num_bigint::{
     BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint, TryFromBigIntError,
 };
 
-pub use crate::cbigint::cbigint_impl::CBigInt;
+pub use crate::cow_bigint::bigint_impl::CowBigInt;
 
-mod accum;
 pub mod big_integer;
 pub mod big_natural;
-pub mod cbigint;
-mod convert;
-mod encoding;
+pub mod cow_bigint;
 mod macros;
-mod num_trait_impls;
-mod ops;
+pub mod rc_bigint;
+mod small_uint;
 
 pub type SmallInt = i128;
 pub type SmallUint = u128;

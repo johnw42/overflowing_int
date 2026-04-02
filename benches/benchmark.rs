@@ -51,7 +51,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         group.plot_config(plot_config.clone());
         for &bit_size in &sizes {
             generic_benchmark::<BigInt, _>(&mut group, "BigInt", bit_size, |x, y| x + y);
-            generic_benchmark::<CBigInt, _>(&mut group, "CBigInt", bit_size, |x, y| x + y);
+            generic_benchmark::<CowBigInt, _>(&mut group, "CBigInt", bit_size, |x, y| x + y);
         }
     }
     {
@@ -59,7 +59,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         group.plot_config(plot_config.clone());
         for &bit_size in &sizes {
             generic_benchmark::<BigInt, _>(&mut group, "BigInt", bit_size, |x, y| x * y);
-            generic_benchmark::<CBigInt, _>(&mut group, "CBigInt", bit_size, |x, y| x * y);
+            generic_benchmark::<CowBigInt, _>(&mut group, "CBigInt", bit_size, |x, y| x * y);
         }
     }
 }

@@ -7,12 +7,12 @@ use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Roots;
 use num_traits::ConstZero;
 
-use crate::accum::*;
-use crate::encoding::{Encoded, Encoding, IntoEncodingRef as _};
+use super::encoding::{Encoded, Encoding, IntoEncodingRef as _};
+use crate::small_uint::*;
 use crate::{SMALL_BITS, SmallInt, SmallUint};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct CBigInt<'a>(pub(crate) Encoded<'a, SmallInt, BigInt>);
+pub struct CowBigInt<'a>(pub(crate) Encoded<'a, SmallInt, BigInt>);
 
 #[test]
 fn test_size() {
@@ -20,12 +20,12 @@ fn test_size() {
 
     if size_of::<usize>() == 8 {
         assert_eq!(size_of::<BigInt>(), 32);
-        assert_eq!(size_of::<CBigInt>(), 32);
+        assert_eq!(size_of::<CowBigInt>(), 32);
     }
-    assert_eq!(size_of::<BigInt>(), size_of::<CBigInt>());
+    assert_eq!(size_of::<BigInt>(), size_of::<CowBigInt>());
 }
 
-impl<'a> CBigInt<'a> {
+impl<'a> CowBigInt<'a> {
     pub(crate) fn to_small(&self) -> Option<SmallInt> {
         match self.encoding() {
             Encoding::Small(n) => Some(*n),
@@ -33,7 +33,7 @@ impl<'a> CBigInt<'a> {
         }
     }
 
-    pub(crate) fn to_small_with(&self, other: &CBigInt) -> Option<(SmallInt, SmallInt)> {
+    pub(crate) fn to_small_with(&self, other: &CowBigInt) -> Option<(SmallInt, SmallInt)> {
         match (self.to_small(), other.to_small()) {
             (Some(a), Some(b)) => Some((a, b)),
             _ => None,
@@ -48,7 +48,7 @@ impl<'a> CBigInt<'a> {
         self.0.update_encoding(f)
     }
 
-    pub fn into_static(self) -> CBigInt<'static> {
+    pub fn into_static(self) -> CowBigInt<'static> {
         self.0.into_static().into()
     }
 
@@ -98,7 +98,7 @@ impl<'a> CBigInt<'a> {
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn new(sign: Sign, digits: Vec<u32>) -> Self {
         if sign == Sign::NoSign {
-            return CBigInt::ZERO;
+            return CowBigInt::ZERO;
         }
         BigInt::new(sign, digits).into()
     }
@@ -434,19 +434,19 @@ impl<'a> CBigInt<'a> {
         Cow::from(self).to_biguint()
     }
 
-    pub fn checked_add(&'a self, v: &'a CBigInt) -> Option<Self> {
+    pub fn checked_add(&'a self, v: &'a CowBigInt) -> Option<Self> {
         Some(self + v)
     }
 
-    pub fn checked_sub(&'a self, v: &'a CBigInt) -> Option<Self> {
+    pub fn checked_sub(&'a self, v: &'a CowBigInt) -> Option<Self> {
         Some(self - v)
     }
 
-    pub fn checked_mul(&'a self, v: &'a CBigInt) -> Option<Self> {
+    pub fn checked_mul(&'a self, v: &'a CowBigInt) -> Option<Self> {
         Some(self * v)
     }
 
-    pub fn checked_div(&'a self, v: &'a CBigInt) -> Option<Self> {
+    pub fn checked_div(&'a self, v: &'a CowBigInt) -> Option<Self> {
         Some(self / v)
     }
 
@@ -475,7 +475,7 @@ impl<'a> CBigInt<'a> {
     }
 
     /// Returns the truncated principal square root of self.
-    pub fn sqrt(&self) -> CBigInt<'a> {
+    pub fn sqrt(&self) -> CowBigInt<'a> {
         match self.encoding() {
             Encoding::Small(n) => Self::from(n.sqrt()),
             Encoding::Big(n) => Self::from(n.sqrt()),
@@ -483,7 +483,7 @@ impl<'a> CBigInt<'a> {
     }
 
     /// Returns the truncated principal cube root of self.
-    pub fn cbrt(&self) -> CBigInt<'a> {
+    pub fn cbrt(&self) -> CowBigInt<'a> {
         match self.encoding() {
             Encoding::Small(n) => Self::from(n.cbrt()),
             Encoding::Big(n) => Self::from(n.cbrt()),
@@ -491,7 +491,7 @@ impl<'a> CBigInt<'a> {
     }
 
     /// Returns the truncated principal nth root of self.
-    pub fn nth_root(&self, n: u32) -> CBigInt<'a> {
+    pub fn nth_root(&self, n: u32) -> CowBigInt<'a> {
         match self.encoding() {
             Encoding::Small(x) => Self::from(x.nth_root(n)),
             Encoding::Big(x) => Self::from(x.nth_root(n)),
@@ -561,25 +561,25 @@ impl<'a> CBigInt<'a> {
     }
 }
 
-impl<'a> From<Encoding<'a, SmallInt, BigInt>> for CBigInt<'a> {
+impl<'a> From<Encoding<'a, SmallInt, BigInt>> for CowBigInt<'a> {
     fn from(x: Encoding<'a, SmallInt, BigInt>) -> Self {
-        CBigInt(x.into())
+        CowBigInt(x.into())
     }
 }
 
-impl<'a> From<Encoded<'a, SmallInt, BigInt>> for CBigInt<'a> {
+impl<'a> From<Encoded<'a, SmallInt, BigInt>> for CowBigInt<'a> {
     fn from(x: Encoded<'a, SmallInt, BigInt>) -> Self {
-        CBigInt(x)
+        CowBigInt(x)
     }
 }
 
-impl Default for CBigInt<'static> {
+impl Default for CowBigInt<'static> {
     fn default() -> Self {
-        CBigInt::ZERO
+        CowBigInt::ZERO
     }
 }
 
-impl Display for CBigInt<'_> {
+impl Display for CowBigInt<'_> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.into_encoding_ref() {
             Encoding::Small(n) => Display::fmt(n, f),
@@ -588,7 +588,7 @@ impl Display for CBigInt<'_> {
     }
 }
 
-impl Debug for CBigInt<'_> {
+impl Debug for CowBigInt<'_> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         if cfg!(feature = "debug_structure") {
             Debug::fmt(&self.0, f)
@@ -623,93 +623,94 @@ mod tests {
 
     #[quickcheck]
     fn prop_new_matches_bigint(sign: ArbSign, digits: Vec<u32>) -> bool {
-        BigInt::from(CBigInt::new(sign.0, digits.clone())) == BigInt::new(sign.0, digits)
+        BigInt::from(CowBigInt::new(sign.0, digits.clone())) == BigInt::new(sign.0, digits)
     }
 
     #[quickcheck]
     fn prop_from_slice_matches_bigint(sign: ArbSign, digits: Vec<u32>) -> bool {
-        BigInt::from(CBigInt::from_slice(sign.0, &digits)) == BigInt::from_slice(sign.0, &digits)
+        BigInt::from(CowBigInt::from_slice(sign.0, &digits)) == BigInt::from_slice(sign.0, &digits)
     }
 
     #[quickcheck]
     fn prop_from_bytes_be_matches_bigint(sign: ArbSign, bytes: Vec<u8>) -> bool {
-        BigInt::from(CBigInt::from_bytes_be(sign.0, &bytes))
+        BigInt::from(CowBigInt::from_bytes_be(sign.0, &bytes))
             == BigInt::from_bytes_be(sign.0, &bytes)
     }
 
     #[quickcheck]
     fn prop_from_bytes_le_matches_bigint(sign: ArbSign, bytes: Vec<u8>) -> bool {
-        BigInt::from(CBigInt::from_bytes_le(sign.0, &bytes))
+        BigInt::from(CowBigInt::from_bytes_le(sign.0, &bytes))
             == BigInt::from_bytes_le(sign.0, &bytes)
     }
 
     #[quickcheck]
     fn prop_from_signed_bytes_be_matches_bigint(bytes: Vec<u8>) {
         assert_eq!(
-            BigInt::from(CBigInt::from_signed_bytes_be(&bytes)),
+            BigInt::from(CowBigInt::from_signed_bytes_be(&bytes)),
             BigInt::from_signed_bytes_be(&bytes)
         );
     }
 
     #[quickcheck]
     fn prop_from_signed_bytes_le_matches_bigint(bytes: Vec<u8>) -> bool {
-        BigInt::from(CBigInt::from_signed_bytes_le(&bytes)) == BigInt::from_signed_bytes_le(&bytes)
+        BigInt::from(CowBigInt::from_signed_bytes_le(&bytes))
+            == BigInt::from_signed_bytes_le(&bytes)
     }
 
     #[quickcheck]
-    fn prop_to_bytes_be_matches_bigint(n: CBigInt<'static>) -> bool {
+    fn prop_to_bytes_be_matches_bigint(n: CowBigInt<'static>) -> bool {
         BigInt::from(&n).to_bytes_be() == n.to_bytes_be()
     }
 
     #[quickcheck]
-    fn prop_to_bytes_le_matches_bigint(n: CBigInt<'static>) -> bool {
+    fn prop_to_bytes_le_matches_bigint(n: CowBigInt<'static>) -> bool {
         BigInt::from(&n).to_bytes_le() == n.to_bytes_le()
     }
 
     #[quickcheck]
-    fn prop_to_u32_digits_matches_bigint(n: CBigInt<'static>) -> bool {
+    fn prop_to_u32_digits_matches_bigint(n: CowBigInt<'static>) -> bool {
         BigInt::from(&n).to_u32_digits() == n.to_u32_digits()
     }
 
     #[quickcheck]
-    fn prop_to_signed_bytes_be_matches_bigint(n: CBigInt<'static>) -> bool {
+    fn prop_to_signed_bytes_be_matches_bigint(n: CowBigInt<'static>) -> bool {
         BigInt::from(&n).to_signed_bytes_be() == n.to_signed_bytes_be()
     }
 
     #[quickcheck]
-    fn prop_to_signed_bytes_le_matches_bigint(n: CBigInt<'static>) -> bool {
+    fn prop_to_signed_bytes_le_matches_bigint(n: CowBigInt<'static>) -> bool {
         BigInt::from(&n).to_signed_bytes_le() == n.to_signed_bytes_le()
     }
 
     #[quickcheck]
-    fn prop_sign_matches_bigint(n: CBigInt<'static>) -> bool {
+    fn prop_sign_matches_bigint(n: CowBigInt<'static>) -> bool {
         BigInt::from(&n).sign() == n.sign()
     }
 
     #[quickcheck]
-    fn prop_bit_matches_bigint(n: CBigInt<'static>, bit: u64) -> () {
+    fn prop_bit_matches_bigint(n: CowBigInt<'static>, bit: u64) {
         let bit = bit % 1024;
         assert_eq!(BigInt::from(n.clone()).bit(bit), n.bit(bit));
     }
 
     #[quickcheck]
-    fn prop_bits_matches_bigint(n: CBigInt<'static>) -> bool {
+    fn prop_bits_matches_bigint(n: CowBigInt<'static>) -> bool {
         BigInt::from(&n).bits() == n.bits()
     }
 
     #[quickcheck]
-    fn prop_pow_matches_bigint(n: CBigInt<'static>, k: u32) -> bool {
+    fn prop_pow_matches_bigint(n: CowBigInt<'static>, k: u32) -> bool {
         let k = k % 16;
         BigInt::from(&n).pow(k) == n.pow(k).into()
     }
 
     #[quickcheck]
-    fn prop_trailing_zeros_matches_bigint(n: CBigInt<'static>) -> bool {
+    fn prop_trailing_zeros_matches_bigint(n: CowBigInt<'static>) -> bool {
         BigInt::from(&n).trailing_zeros() == n.trailing_zeros()
     }
 
     #[quickcheck]
-    fn prop_set_bit_matches_bigint(mut n1: CBigInt<'static>, bit: u64, value: bool) -> bool {
+    fn prop_set_bit_matches_bigint(mut n1: CowBigInt<'static>, bit: u64, value: bool) -> bool {
         let bit = bit % (n1.bits() + 16);
         let mut n2 = BigInt::from(&n1);
         n1.set_bit(bit, value);

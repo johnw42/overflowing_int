@@ -6,7 +6,7 @@ use num_bigint::BigUint;
 
 use duplicate::duplicate;
 
-use crate::CBigInt;
+use crate::CowBigInt;
 use crate::{SmallInt, SmallUint};
 use crate::{duplicate_prims, duplicate_uprims};
 
@@ -160,7 +160,7 @@ impl<'a> From<Encoded<'a, SmallUint, BigUint>> for BigUint {
     fn from(value: Encoded<'a, SmallUint, BigUint>) -> Self {
         match value.into_encoding() {
             Encoding::Small(n) => n.into(),
-            Encoding::Big(n) => n.into_owned().into(),
+            Encoding::Big(n) => n.into_owned(),
         }
     }
 }
@@ -169,7 +169,7 @@ pub trait IntoBigIntCow<'a> {
     fn into_bigint_cow(self) -> Cow<'a, BigInt>;
 }
 
-impl<'a> IntoBigIntCow<'a> for CBigInt<'a> {
+impl<'a> IntoBigIntCow<'a> for CowBigInt<'a> {
     fn into_bigint_cow(self) -> Cow<'a, BigInt> {
         match self.into_encoding() {
             Encoding::Small(n) => Cow::Owned(n.into()),
@@ -178,7 +178,7 @@ impl<'a> IntoBigIntCow<'a> for CBigInt<'a> {
     }
 }
 
-impl<'a> IntoBigIntCow<'a> for &CBigInt<'a> {
+impl<'a> IntoBigIntCow<'a> for &CowBigInt<'a> {
     fn into_bigint_cow(self) -> Cow<'a, BigInt> {
         match self.encoding() {
             Encoding::Small(n) => Cow::Owned((*n).into()),
@@ -203,13 +203,13 @@ pub trait IntoEncoding<'a, S, T: Clone> {
     fn into_encoding(self) -> Encoding<'a, S, T>;
 }
 
-impl<'a> IntoEncoding<'a, SmallInt, BigInt> for CBigInt<'a> {
+impl<'a> IntoEncoding<'a, SmallInt, BigInt> for CowBigInt<'a> {
     fn into_encoding(self) -> Encoding<'a, SmallInt, BigInt> {
         self.0.0
     }
 }
 
-impl<'a> IntoEncoding<'a, SmallInt, BigInt> for &CBigInt<'a> {
+impl<'a> IntoEncoding<'a, SmallInt, BigInt> for &CowBigInt<'a> {
     fn into_encoding(self) -> Encoding<'a, SmallInt, BigInt> {
         self.0.0.clone()
     }
@@ -240,13 +240,13 @@ pub trait IntoEncodingRef<'a, S, T: Clone> {
     fn into_encoding_ref(&self) -> &Encoding<'a, S, T>;
 }
 
-impl<'a> IntoEncodingRef<'a, SmallInt, BigInt> for CBigInt<'a> {
+impl<'a> IntoEncodingRef<'a, SmallInt, BigInt> for CowBigInt<'a> {
     fn into_encoding_ref(&self) -> &Encoding<'a, SmallInt, BigInt> {
         &self.0.0
     }
 }
 
-impl<'a> IntoEncodingRef<'a, SmallInt, BigInt> for &CBigInt<'a> {
+impl<'a> IntoEncodingRef<'a, SmallInt, BigInt> for &CowBigInt<'a> {
     fn into_encoding_ref(&self) -> &Encoding<'a, SmallInt, BigInt> {
         &self.0.0
     }
