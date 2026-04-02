@@ -153,7 +153,7 @@ impl<'a> ToBigIntCow<'a> for CBigInt<'a> {
     }
 }
 
-impl<'a> ToBigIntCow<'a> for &'a CBigInt<'a> {
+impl<'a> ToBigIntCow<'a> for &CBigInt<'a> {
     fn to_cow(self) -> Cow<'a, BigInt> {
         match self.encoding() {
             Encoding::Small(n) => Cow::Owned((*n).into()),

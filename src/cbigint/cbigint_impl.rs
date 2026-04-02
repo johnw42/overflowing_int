@@ -8,8 +8,7 @@ use num_integer::Roots;
 use num_traits::ConstZero;
 
 use crate::accum::*;
-use crate::big_integer::BigInteger;
-use crate::encoding::{Encoded, Encoding, IntoEncoding as _, IntoEncodingRef as _};
+use crate::encoding::{Encoded, Encoding, IntoEncodingRef as _};
 use crate::{SMALL_BITS, SmallInt, SmallUint};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -95,7 +94,7 @@ impl<'a> CBigInt<'a> {
     /// Creates and initializes a BigInt.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
-    fn new(sign: Sign, digits: Vec<u32>) -> Self {
+    pub fn new(sign: Sign, digits: Vec<u32>) -> Self {
         if sign == Sign::NoSign {
             return CBigInt::ZERO;
         }
@@ -510,16 +509,16 @@ impl<'a> CBigInt<'a> {
     pub fn iter_u32_digits(
         &self,
     ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_ {
-        self.to_bigint_cow()
+        BigInt::from(self)
             .iter_u32_digits()
             .collect::<Vec<_>>()
             .into_iter()
     }
 
     pub fn iter_u64_digits(
-        &'a self,
-    ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + 'a {
-        self.to_bigint_cow()
+        &self,
+    ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_ {
+        BigInt::from(self)
             .iter_u64_digits()
             .collect::<Vec<_>>()
             .into_iter()

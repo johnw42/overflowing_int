@@ -66,7 +66,7 @@ where
         + UnwindSafe
         + UpperHex
         + Zero,
-    for<'a> Self: arbitrary::Arbitrary<'a>,
+    Self: arbitrary::Arbitrary<'static>,
     for<'de> Self: Deserialize<'de>,
     RandomBits: Distribution<Self>,
     // From
@@ -855,10 +855,10 @@ where
 }
 
 macro_rules! impl_big_integer {
-    ($t:ty) => {
-        impl BigInteger for $t {
+    ($t:ty, $(<$lifetime_decl:lifetime>)?, $(<$lifetime_impl:lifetime>)?) => {
+        impl$(<$lifetime_decl>)? BigInteger for $t {
             fn new(sign: Sign, digits: Vec<u32>) -> Self {
-                Self::from_biguint(sign, BigUint::new(digits))
+                Self::new(sign, digits)
             }
 
             fn from_biguint(sign: Sign, data: BigUint) -> Self {
@@ -919,13 +919,15 @@ macro_rules! impl_big_integer {
 
             fn iter_u32_digits(
                 &self,
-            ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_ {
+            ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_
+            {
                 self.iter_u32_digits()
             }
 
             fn iter_u64_digits(
                 &self,
-            ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_ {
+            ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_
+            {
                 self.iter_u64_digits()
             }
 
@@ -1004,5 +1006,5 @@ macro_rules! impl_big_integer {
     };
 }
 
-// impl_big_integer!(BigInt);
-// impl_big_integer!(CBigInt<'_>);
+impl_big_integer!(BigInt, , );
+impl_big_integer!(CBigInt<'static>, ,);

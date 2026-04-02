@@ -415,7 +415,7 @@ duplicate_uprims! {
         }
     }
 
-    impl<'a> Pow<prim> for &'a CBigInt<'a> {
+    impl<'a> Pow<prim> for &CBigInt<'a> {
         type Output = CBigInt<'a>;
 
         fn pow(self, rhs: prim) -> Self::Output {
@@ -423,7 +423,7 @@ duplicate_uprims! {
         }
     }
 
-    impl<'a> Pow<&prim> for &'a CBigInt<'a> {
+    impl<'a> Pow<&prim> for &CBigInt<'a> {
         type Output = CBigInt<'a>;
 
         fn pow(self, rhs: &prim) -> Self::Output {

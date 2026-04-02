@@ -33,8 +33,8 @@ impl quickcheck::Arbitrary for CBigInt<'static> {
     }
 }
 
-impl arbitrary::Arbitrary<'_> for CBigInt<'static> {
-    fn arbitrary(g: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
+impl<'a, 'b> arbitrary::Arbitrary<'a> for CBigInt<'b> {
+    fn arbitrary(g: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         match bool::arbitrary(g)? {
             true => Ok(CBigInt::from(i128::arbitrary(g)?)),
             false => Ok(CBigInt::from(BigInt::arbitrary(g)?)),
