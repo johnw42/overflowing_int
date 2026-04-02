@@ -64,6 +64,13 @@ impl<'a, S, T: Clone> Encoded<'a, S, T> {
         f(&mut self.0);
         self.0.normalize();
     }
+
+    pub fn into_static(self) -> Encoded<'static, S, T>
+    where
+        for<'b> S: TryFrom<&'b T>,
+    {
+        Encoded(self.0.into_static())
+    }
 }
 
 /// The content of an `Encoded` value, which is either a small integer or a big

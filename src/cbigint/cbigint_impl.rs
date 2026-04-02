@@ -48,6 +48,10 @@ impl<'a> CBigInt<'a> {
         self.0.update_encoding(f)
     }
 
+    pub fn into_static(self) -> CBigInt<'static> {
+        self.0.into_static().into()
+    }
+
     fn try_apply_sign(sign: Sign, magnitude: SmallUint) -> Option<Self> {
         SmallInt::try_from(magnitude)
             .ok()
@@ -565,7 +569,7 @@ impl<'a> From<Encoding<'a, SmallInt, BigInt>> for CBigInt<'a> {
 
 impl<'a> From<Encoded<'a, SmallInt, BigInt>> for CBigInt<'a> {
     fn from(x: Encoded<'a, SmallInt, BigInt>) -> Self {
-        CBigInt(x.into())
+        CBigInt(x)
     }
 }
 
