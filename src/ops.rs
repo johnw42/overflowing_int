@@ -1,6 +1,6 @@
 use crate::SmallInt;
 use crate::cbigint::CBigInt;
-use crate::encoding::{Encoding, IntoEncoding, ToBigIntCow};
+use crate::encoding::{Encoding, IntoBigIntCow, IntoEncoding};
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
 };
@@ -91,26 +91,26 @@ trait BitOp {
     #[inline]
     fn call<'a, 'b, L, R>(lhs: L, rhs: R) -> CBigInt<'static>
     where
-        L: ToBigIntCow<'a>,
-        R: ToBigIntCow<'b>,
+        L: IntoBigIntCow<'a>,
+        R: IntoBigIntCow<'b>,
     {
-        Self::on_big(lhs.to_cow(), rhs.to_cow()).into()
+        Self::on_big(lhs.into_bigint_cow(), rhs.into_bigint_cow()).into()
     }
 
     #[inline]
     fn call_update<'a, 'b, 'c, R>(lhs: &'a mut CBigInt<'b>, rhs: R)
     where
-        R: ToBigIntCow<'c>,
+        R: IntoBigIntCow<'c>,
     {
         lhs.0.update_encoding(|encoding| match encoding {
             Encoding::Small(small_lhs) => {
                 *encoding = Encoding::Big(Cow::Owned(Self::on_big(
                     Cow::Owned(BigInt::from(*small_lhs)),
-                    rhs.to_cow(),
+                    rhs.into_bigint_cow(),
                 )));
             }
             Encoding::Big(big_lhs) => {
-                Self::update_big(big_lhs.to_mut(), rhs.to_cow());
+                Self::update_big(big_lhs.to_mut(), rhs.into_bigint_cow());
             }
         });
     }
@@ -123,9 +123,9 @@ trait ShiftOp {
 
             fn [<call_ prim>]<'a, L>(lhs: L, rhs: prim) -> CBigInt<'static>
             where
-                L: ToBigIntCow<'a>,
+                L: IntoBigIntCow<'a>,
             {
-                Self::[<on_big_ prim>](lhs.to_cow(), rhs).into()
+                Self::[<on_big_ prim>](lhs.into_bigint_cow(), rhs).into()
             }
 
             #[inline]
@@ -319,7 +319,7 @@ duplicate_bit_ops! {
     paste! {
         impl<'a, 'b, T> op_trait<T> for CBigInt<'a>
         where
-            T: ToBigIntCow<'b>,
+            T: IntoBigIntCow<'b>,
         {
             type Output = CBigInt<'a>;
 
@@ -330,7 +330,7 @@ duplicate_bit_ops! {
 
         impl<'a, 'b, T> op_trait<T> for &CBigInt<'a>
         where
-            T: ToBigIntCow<'b>,
+            T: IntoBigIntCow<'b>,
         {
             type Output = CBigInt<'a>;
 
@@ -341,7 +341,7 @@ duplicate_bit_ops! {
 
         impl<'a, 'b, T> [< op_trait Assign >]<T> for CBigInt<'a>
         where
-            T: ToBigIntCow<'b>
+            T: IntoBigIntCow<'b>
         {
             fn [< op_fn _assign >](&mut self, rhs: T) {
                 [< op_trait Op >]::call_update(self, rhs);

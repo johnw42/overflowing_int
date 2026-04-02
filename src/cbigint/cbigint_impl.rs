@@ -55,6 +55,10 @@ impl<'a> CBigInt<'a> {
             .map(Self::from)
     }
 
+    pub fn into_static(&self) -> CBigInt<'static> {
+        Self(self.0.clone().into_static())
+    }
+
     /// Returns the magnitude of the `CBigInt` as a `BigUint`.
     ///
     /// # Examples
@@ -83,12 +87,6 @@ impl<'a> CBigInt<'a> {
             Encoding::Small(_) => None,
             Encoding::Big(n) => Some(n.magnitude()),
         }
-    }
-
-    /// Converts this `CBigInt` into a `BigInt`.
-    // TODO: Delete?
-    pub(crate) fn to_bigint_cow(&self) -> Cow<'_, BigInt> {
-        self.into()
     }
 
     /// Creates and initializes a BigInt.
@@ -317,7 +315,7 @@ impl<'a> CBigInt<'a> {
     /// assert_eq!(i.to_str_radix(16), "ff");
     /// ```
     pub fn to_str_radix(&self, radix: u32) -> String {
-        self.to_bigint_cow().to_str_radix(radix)
+        Cow::from(self).to_str_radix(radix)
     }
 
     /// Returns the integer in the requested base in big-endian digit order.
@@ -335,7 +333,7 @@ impl<'a> CBigInt<'a> {
     /// // 0xFFFF = 65535 = 2*(159^2) + 94*159 + 27
     /// ```
     pub fn to_radix_be(&self, radix: u32) -> (Sign, Vec<u8>) {
-        self.to_bigint_cow().to_radix_be(radix)
+        Cow::from(self).to_radix_be(radix)
     }
 
     /// Returns the integer in the requested base in little-endian digit order.
@@ -353,7 +351,7 @@ impl<'a> CBigInt<'a> {
     /// // 0xFFFF = 65535 = 27 + 94*159 + 2*(159^2)
     /// ```
     pub fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>) {
-        self.to_bigint_cow().to_radix_le(radix)
+        Cow::from(self).to_radix_le(radix)
     }
 
     /// Returns the sign of the `CBigInt` as a `Sign`.
@@ -429,7 +427,7 @@ impl<'a> CBigInt<'a> {
 
     /// Converts this `CBigInt` into a `BigUint`, if it's not negative.
     pub fn to_biguint(&self) -> Option<BigUint> {
-        self.to_bigint_cow().to_biguint()
+        Cow::from(self).to_biguint()
     }
 
     pub fn checked_add(&'a self, v: &'a CBigInt) -> Option<Self> {
@@ -455,7 +453,7 @@ impl<'a> CBigInt<'a> {
         {
             return a.into();
         }
-        self.to_bigint_cow().pow(exponent).into()
+        Cow::from(self).pow(exponent).into()
     }
 
     /// Returns `(self ^ exponent) mod modulus`
@@ -467,8 +465,8 @@ impl<'a> CBigInt<'a> {
     ///
     /// Panics if the exponent is negative or the modulus is zero.
     pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-        self.to_bigint_cow()
-            .modpow(&exponent.to_bigint_cow(), &modulus.to_bigint_cow())
+        Cow::from(self)
+            .modpow(&Cow::from(exponent), &Cow::from(modulus))
             .into()
     }
 
@@ -503,7 +501,7 @@ impl<'a> CBigInt<'a> {
     }
 
     pub fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
-        self.to_bigint_cow().to_u64_digits()
+        Cow::from(self).to_u64_digits()
     }
 
     pub fn iter_u32_digits(
@@ -526,7 +524,7 @@ impl<'a> CBigInt<'a> {
 
     pub fn modinv(&self, modulus: &Self) -> Option<Self> {
         BigInt::from(self)
-            .modinv(&modulus.to_bigint_cow())
+            .modinv(&Cow::from(modulus))
             .map(Self::from)
     }
 
@@ -556,21 +554,6 @@ impl<'a> CBigInt<'a> {
                 }
             },
         });
-    }
-}
-
-// TODO: Delete?
-pub trait ToCBigInt<'a> {
-    fn to_cbigint(&self) -> Option<CBigInt<'a>>;
-}
-
-impl<'a, T> ToCBigInt<'a> for T
-where
-    T: Clone,
-    CBigInt<'a>: TryFrom<T>,
-{
-    fn to_cbigint(&self) -> Option<CBigInt<'a>> {
-        CBigInt::try_from(self.clone()).ok()
     }
 }
 

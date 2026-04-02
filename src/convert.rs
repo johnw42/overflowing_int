@@ -10,7 +10,7 @@ use std::convert::{TryFrom, TryInto};
 
 impl<'a> ToBigInt for CBigInt<'a> {
     fn to_bigint(&self) -> Option<BigInt> {
-        Some(Cow::into_owned(self.to_bigint_cow()))
+        Some(Cow::into_owned(Cow::from(self)))
     }
 }
 

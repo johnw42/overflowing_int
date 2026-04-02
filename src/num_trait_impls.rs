@@ -1,5 +1,6 @@
 use core::cmp::Ordering;
 use core::ops::{Neg, Not};
+use std::borrow::Cow;
 use std::fmt::{Binary, Formatter, LowerHex, Octal, UpperHex};
 use std::panic::RefUnwindSafe;
 use std::str::FromStr;
@@ -65,14 +66,14 @@ impl CheckedDiv for CBigInt<'_> {
 
 impl CheckedEuclid for CBigInt<'_> {
     fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
-        self.to_bigint_cow()
-            .checked_rem_euclid(&v.to_bigint_cow())
+        Cow::from(self)
+            .checked_rem_euclid(&Cow::from(v))
             .map(Into::into)
     }
 
     fn checked_div_euclid(&self, v: &Self) -> Option<Self> {
-        self.to_bigint_cow()
-            .checked_div_euclid(&v.to_bigint_cow())
+        Cow::from(self)
+            .checked_div_euclid(&Cow::from(v))
             .map(Into::into)
     }
 }
@@ -110,11 +111,11 @@ impl<'a> Distribution<CBigInt<'a>> for RandomBits {
 
 impl Euclid for CBigInt<'_> {
     fn rem_euclid(&self, v: &Self) -> Self {
-        self.to_bigint_cow().rem_euclid(&v.to_bigint_cow()).into()
+        Cow::from(self).rem_euclid(&Cow::from(v)).into()
     }
 
     fn div_euclid(&self, v: &Self) -> Self {
-        self.to_bigint_cow().div_euclid(&v.to_bigint_cow()).into()
+        Cow::from(self).div_euclid(&Cow::from(v)).into()
     }
 }
 
@@ -155,9 +156,7 @@ impl Integer for CBigInt<'_> {
         {
             return Integer::div_floor(&lhs, &rhs).into();
         }
-        self.to_bigint_cow()
-            .div_floor(&*other.to_bigint_cow())
-            .into()
+        Cow::from(self).div_floor(&*Cow::from(other)).into()
     }
 
     fn mod_floor(&self, other: &Self) -> Self {
@@ -166,37 +165,35 @@ impl Integer for CBigInt<'_> {
         {
             return Integer::mod_floor(&lhs, &rhs).into();
         }
-        self.to_bigint_cow()
-            .mod_floor(&*other.to_bigint_cow())
-            .into()
+        Cow::from(self).mod_floor(&*Cow::from(other)).into()
     }
 
     fn gcd(&self, other: &Self) -> Self {
         if let Some((lhs, rhs)) = self.to_small_with(other) {
             return lhs.gcd(&rhs).into();
         }
-        self.to_bigint_cow().gcd(&*other.to_bigint_cow()).into()
+        Cow::from(self).gcd(&*Cow::from(other)).into()
     }
 
     fn lcm(&self, other: &Self) -> Self {
         if let Some((lhs, rhs)) = self.to_small_with(other) {
             return lhs.lcm(&rhs).into();
         }
-        self.to_bigint_cow().lcm(&*other.to_bigint_cow()).into()
+        Cow::from(self).lcm(&*Cow::from(other)).into()
     }
 
     fn divides(&self, other: &Self) -> bool {
         if let Some((lhs, rhs)) = self.to_small_with(other) {
             return lhs.is_multiple_of(&rhs);
         }
-        self.to_bigint_cow().is_multiple_of(&*other.to_bigint_cow())
+        Cow::from(self).is_multiple_of(&*Cow::from(other))
     }
 
     fn is_multiple_of(&self, other: &Self) -> bool {
         if let Some((lhs, rhs)) = self.to_small_with(other) {
             return lhs.is_multiple_of(&rhs);
         }
-        self.to_bigint_cow().is_multiple_of(&*other.to_bigint_cow())
+        Cow::from(self).is_multiple_of(&*Cow::from(other))
     }
 
     fn is_even(&self) -> bool {
@@ -220,7 +217,7 @@ impl Integer for CBigInt<'_> {
             let (q, r) = lhs.div_rem(&rhs);
             return (q.into(), r.into());
         }
-        let (q, r) = self.to_bigint_cow().div_rem(&*other.to_bigint_cow());
+        let (q, r) = Cow::<BigInt>::from(self).div_rem(&*Cow::from(other));
         (q.into(), r.into())
     }
 }
@@ -256,7 +253,7 @@ impl<'a> Neg for &CBigInt<'a> {
         {
             return b.into();
         }
-        (&*self.to_bigint_cow()).neg().into()
+        (&*Cow::from(self)).neg().into()
     }
 }
 
@@ -388,8 +385,8 @@ impl UniformSampler for UniformCBigInt {
         B2: SampleBorrow<Self::X> + Sized,
     {
         Self(UniformBigInt::new(
-            low.borrow().to_bigint_cow().borrow(),
-            high.borrow().to_bigint_cow().borrow(),
+            Cow::from(low.borrow()).borrow(),
+            Cow::from(high.borrow()).borrow(),
         ))
     }
 
@@ -399,8 +396,8 @@ impl UniformSampler for UniformCBigInt {
         B2: SampleBorrow<Self::X> + Sized,
     {
         Self(UniformBigInt::new_inclusive(
-            low.borrow().to_bigint_cow().borrow(),
-            high.borrow().to_bigint_cow().borrow(),
+            Cow::from(low.borrow()).borrow(),
+            Cow::from(high.borrow()).borrow(),
         ))
     }
 
@@ -414,7 +411,7 @@ impl<'a> Serialize for CBigInt<'a> {
     where
         S: serde::Serializer,
     {
-        self.to_bigint_cow().serialize(serializer)
+        Cow::from(self).serialize(serializer)
     }
 }
 

@@ -41,12 +41,12 @@ where
 
 impl<'a, S, T: Clone> Encoded<'a, S, T> {
     /// Encodes a small integer as an `Encoded` value, using the small encoding.
-    pub const fn from_small(x: S) -> Self {
+    pub const fn from_small(x: S) -> Encoded<'static, S, T> {
         Encoded(Encoding::Small(x))
     }
 
     /// Encodes a big integer as an `Encoded` value, using the small encoding if possible.
-    pub fn from_big(x: T) -> Self
+    pub fn from_big(x: T) -> Encoded<'static, S, T>
     where
         for<'b> S: TryFrom<&'b T>,
     {
@@ -66,6 +66,16 @@ impl<'a, S, T: Clone> Encoded<'a, S, T> {
             Encoded(Encoding::Small(s))
         } else {
             Encoded(Encoding::Big(x))
+        }
+    }
+
+    pub fn into_static(self) -> Encoded<'static, S, T>
+    where
+        for<'b> S: TryFrom<&'b T>,
+    {
+        match self.0 {
+            Encoding::Small(s) => Encoded(Encoding::Small(s)),
+            Encoding::Big(b) => Encoded(Encoding::Big(Cow::Owned(b.into_owned()))),
         }
     }
 
@@ -140,12 +150,12 @@ impl<'a> From<Encoded<'a, SmallUint, BigUint>> for BigUint {
     }
 }
 
-pub trait ToBigIntCow<'a> {
-    fn to_cow(self) -> Cow<'a, BigInt>;
+pub trait IntoBigIntCow<'a> {
+    fn into_bigint_cow(self) -> Cow<'a, BigInt>;
 }
 
-impl<'a> ToBigIntCow<'a> for CBigInt<'a> {
-    fn to_cow(self) -> Cow<'a, BigInt> {
+impl<'a> IntoBigIntCow<'a> for CBigInt<'a> {
+    fn into_bigint_cow(self) -> Cow<'a, BigInt> {
         match self.into_encoding() {
             Encoding::Small(n) => Cow::Owned(n.into()),
             Encoding::Big(n) => n,
@@ -153,8 +163,8 @@ impl<'a> ToBigIntCow<'a> for CBigInt<'a> {
     }
 }
 
-impl<'a> ToBigIntCow<'a> for &CBigInt<'a> {
-    fn to_cow(self) -> Cow<'a, BigInt> {
+impl<'a> IntoBigIntCow<'a> for &CBigInt<'a> {
+    fn into_bigint_cow(self) -> Cow<'a, BigInt> {
         match self.encoding() {
             Encoding::Small(n) => Cow::Owned((*n).into()),
             Encoding::Big(n) => n.clone(),
@@ -162,27 +172,17 @@ impl<'a> ToBigIntCow<'a> for &CBigInt<'a> {
     }
 }
 
-impl<'a> ToBigIntCow<'a> for BigInt {
-    fn to_cow(self) -> Cow<'a, BigInt> {
+impl<'a> IntoBigIntCow<'a> for BigInt {
+    fn into_bigint_cow(self) -> Cow<'a, BigInt> {
         Cow::Owned(self)
     }
 }
 
-impl<'a> ToBigIntCow<'a> for &'a BigInt {
-    fn to_cow(self) -> Cow<'a, BigInt> {
+impl<'a> IntoBigIntCow<'a> for &'a BigInt {
+    fn into_bigint_cow(self) -> Cow<'a, BigInt> {
         Cow::Borrowed(self)
     }
 }
-
-// TODO
-// impl<'a> ToCow<'a, BigInt> for Encoded<SmallInt, Cow<'a, BigInt>> {
-//     fn to_cow(self) -> Cow<'a, BigInt> {
-//         match self.into_encoding() {
-//             Encoding::Small(n) => Cow::Owned(n.into()),
-//             Encoding::Big(cow) => cow,
-//         }
-//     }
-// }
 
 pub trait IntoEncoding<'a, S, T: Clone> {
     fn into_encoding(self) -> Encoding<'a, S, T>;
