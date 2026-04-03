@@ -1,9 +1,12 @@
+use num_traits::Unsigned;
+
 pub trait EncodedBigNum<'a>
 where
     Self: Sized + Clone + From<Encoding<Self::Small, Self::BigEncoding>>,
 {
     type Small: SmallNum;
-    type Big: Clone;
+    type SmallUint: SmallNum + Unsigned;
+    type Big: BitInteger;
     type BigEncoding: Clone;
 
     const ZERO: Self;

@@ -1,77 +1,19 @@
-use std::fmt::{Binary, Debug, Display, LowerHex, Octal, UpperHex};
-use std::hash::Hash;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
-    Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+    Mul, MulAssign, Neg, Not, Rem, RemAssign, Sub, SubAssign,
 };
-use std::panic::{RefUnwindSafe, UnwindSafe};
-use std::str::FromStr;
 
+use crate::BigNumber;
 use num_bigint::{BigInt, BigUint, ParseBigIntError, RandomBits, Sign, ToBigInt, ToBigUint};
-use num_integer::{Integer, Roots};
-use num_traits::{
-    CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, ConstZero, Euclid, FromBytes,
-    FromPrimitive, Num, One, Pow, Signed, ToBytes, ToPrimitive, Zero,
-};
-use rand::distributions::uniform::SampleUniform;
+use num_traits::{Pow, Signed};
 use rand::prelude::Distribution;
-use serde::{Deserialize, Serialize};
 
-use crate::CowBigInt;
-
-pub trait BigInteger
+pub trait BigInteger: BigNumber
 where
-    Self: Binary
-        + quickcheck::Arbitrary
-        + Binary
-        + CheckedAdd
-        + CheckedDiv
-        + CheckedEuclid
-        + CheckedMul
-        + CheckedSub
-        + Clone
-        + ConstZero
-        + Debug
-        + Default
-        + Display
-        + Eq
-        + Euclid
-        + FromBytes
-        + FromPrimitive
-        + FromStr
-        + Hash
-        + Integer
-        + LowerHex
-        + Neg
-        + Not
-        + Num<FromStrRadixErr = ParseBigIntError>
-        + Octal
-        + One
-        + Ord
-        + PartialEq
-        + PartialOrd
-        + RefUnwindSafe
-        + Roots
-        + SampleUniform
-        + Send
-        + Serialize
-        + Signed
-        + Sized
-        + Sync
-        + ToBigInt
-        + ToBigUint
-        + ToBytes
-        + ToPrimitive
-        + Unpin
-        + UnwindSafe
-        + UpperHex
-        + Zero,
-    Self: arbitrary::Arbitrary<'static>,
-    for<'de> Self: Deserialize<'de>,
+    Self: Neg + Not + Signed,
     RandomBits: Distribution<Self>,
     // From
     Self: From<BigInt>
-        + From<BigUint>
         + From<bool>
         + From<i128>
         + From<i16>
@@ -92,6 +34,12 @@ where
     for<'a> i64: TryFrom<Self> + TryFrom<&'a Self>,
     for<'a> i8: TryFrom<Self> + TryFrom<&'a Self>,
     for<'a> isize: TryFrom<Self> + TryFrom<&'a Self>,
+    for<'a> u128: TryFrom<Self> + TryFrom<&'a Self>,
+    for<'a> u16: TryFrom<Self> + TryFrom<&'a Self>,
+    for<'a> u32: TryFrom<Self> + TryFrom<&'a Self>,
+    for<'a> u64: TryFrom<Self> + TryFrom<&'a Self>,
+    for<'a> u8: TryFrom<Self> + TryFrom<&'a Self>,
+    for<'a> usize: TryFrom<Self> + TryFrom<&'a Self>,
     // Add
     for<'a> Self: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
     for<'a> Self: Add<i128, Output = Self> + Add<&'a i128, Output = Self>,
@@ -153,6 +101,18 @@ where
     for<'a> &'a i64: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
     for<'a> &'a i8: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
     for<'a> &'a isize: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> u128: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> u16: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> u32: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> u64: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> u8: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> usize: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> &'a u128: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> &'a u16: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> &'a u32: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> &'a u64: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> &'a u8: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
+    for<'a> &'a usize: Add<Self, Output = Self> + Add<&'a Self, Output = Self>,
     for<'a> Self: AddAssign<Self>
         + AddAssign<&'a Self>
         + AddAssign<i128>
@@ -291,116 +251,6 @@ where
         + RemAssign<i64>
         + RemAssign<i8>
         + RemAssign<isize>,
-    // Shl
-    for<'a> Self: Shl<i128, Output = Self> + Shl<&'a i128, Output = Self>,
-    for<'a> Self: Shl<i16, Output = Self> + Shl<&'a i16, Output = Self>,
-    for<'a> Self: Shl<i32, Output = Self> + Shl<&'a i32, Output = Self>,
-    for<'a> Self: Shl<i64, Output = Self> + Shl<&'a i64, Output = Self>,
-    for<'a> Self: Shl<i8, Output = Self> + Shl<&'a i8, Output = Self>,
-    for<'a> Self: Shl<isize, Output = Self> + Shl<&'a isize, Output = Self>,
-    for<'a> &'a Self: Shl<i128, Output = Self>
-        + Shl<i16, Output = Self>
-        + Shl<i32, Output = Self>
-        + Shl<i64, Output = Self>
-        + Shl<i8, Output = Self>
-        + Shl<isize, Output = Self>
-        + Shl<u128, Output = Self>
-        + Shl<u16, Output = Self>
-        + Shl<u32, Output = Self>
-        + Shl<u64, Output = Self>
-        + Shl<u8, Output = Self>
-        + Shl<usize, Output = Self>
-        + Shl<&'a i128, Output = Self>
-        + Shl<&'a i16, Output = Self>
-        + Shl<&'a i32, Output = Self>
-        + Shl<&'a i64, Output = Self>
-        + Shl<&'a i8, Output = Self>
-        + Shl<&'a isize, Output = Self>
-        + Shl<&'a u128, Output = Self>
-        + Shl<&'a u16, Output = Self>
-        + Shl<&'a u32, Output = Self>
-        + Shl<&'a u64, Output = Self>
-        + Shl<&'a u8, Output = Self>
-        + Shl<&'a usize, Output = Self>,
-    for<'a> Self: ShlAssign<i128>
-        + ShlAssign<i16>
-        + ShlAssign<i32>
-        + ShlAssign<i64>
-        + ShlAssign<i8>
-        + ShlAssign<isize>
-        + ShlAssign<u128>
-        + ShlAssign<u16>
-        + ShlAssign<u32>
-        + ShlAssign<u64>
-        + ShlAssign<u8>
-        + ShlAssign<usize>
-        + ShlAssign<&'a i128>
-        + ShlAssign<&'a i16>
-        + ShlAssign<&'a i32>
-        + ShlAssign<&'a i64>
-        + ShlAssign<&'a i8>
-        + ShlAssign<&'a isize>
-        + ShlAssign<&'a u128>
-        + ShlAssign<&'a u16>
-        + ShlAssign<&'a u32>
-        + ShlAssign<&'a u64>
-        + ShlAssign<&'a u8>
-        + ShlAssign<&'a usize>,
-    // Shr
-    for<'a> Self: Shr<i128, Output = Self> + Shr<&'a i128, Output = Self>,
-    for<'a> Self: Shr<i16, Output = Self> + Shr<&'a i16, Output = Self>,
-    for<'a> Self: Shr<i32, Output = Self> + Shr<&'a i32, Output = Self>,
-    for<'a> Self: Shr<i64, Output = Self> + Shr<&'a i64, Output = Self>,
-    for<'a> Self: Shr<i8, Output = Self> + Shr<&'a i8, Output = Self>,
-    for<'a> Self: Shr<isize, Output = Self> + Shr<&'a isize, Output = Self>,
-    for<'a> &'a Self: Shr<i128, Output = Self>
-        + Shr<i16, Output = Self>
-        + Shr<i32, Output = Self>
-        + Shr<i64, Output = Self>
-        + Shr<i8, Output = Self>
-        + Shr<isize, Output = Self>
-        + Shr<u128, Output = Self>
-        + Shr<u16, Output = Self>
-        + Shr<u32, Output = Self>
-        + Shr<u64, Output = Self>
-        + Shr<u8, Output = Self>
-        + Shr<usize, Output = Self>
-        + Shr<&'a i128, Output = Self>
-        + Shr<&'a i16, Output = Self>
-        + Shr<&'a i32, Output = Self>
-        + Shr<&'a i64, Output = Self>
-        + Shr<&'a i8, Output = Self>
-        + Shr<&'a isize, Output = Self>
-        + Shr<&'a u128, Output = Self>
-        + Shr<&'a u16, Output = Self>
-        + Shr<&'a u32, Output = Self>
-        + Shr<&'a u64, Output = Self>
-        + Shr<&'a u8, Output = Self>
-        + Shr<&'a usize, Output = Self>,
-    for<'a> Self: ShrAssign<i128>
-        + ShrAssign<i16>
-        + ShrAssign<i32>
-        + ShrAssign<i64>
-        + ShrAssign<i8>
-        + ShrAssign<isize>
-        + ShrAssign<u128>
-        + ShrAssign<u16>
-        + ShrAssign<u32>
-        + ShrAssign<u64>
-        + ShrAssign<u8>
-        + ShrAssign<usize>
-        + ShrAssign<&'a i128>
-        + ShrAssign<&'a i16>
-        + ShrAssign<&'a i32>
-        + ShrAssign<&'a i64>
-        + ShrAssign<&'a i8>
-        + ShrAssign<&'a isize>
-        + ShrAssign<&'a u128>
-        + ShrAssign<&'a u16>
-        + ShrAssign<&'a u32>
-        + ShrAssign<&'a u64>
-        + ShrAssign<&'a u8>
-        + ShrAssign<&'a usize>,
     // Sub
     for<'a> Self: Sub<Self, Output = Self> + Sub<&'a Self, Output = Self>,
     for<'a> Self: Sub<i128, Output = Self> + Sub<&'a i128, Output = Self>,
@@ -599,43 +449,6 @@ where
     /// ```
     fn to_u64_digits(&self) -> (Sign, Vec<u64>);
 
-    /// Returns an iterator of `u32` digits representation of the [`BigInteger`] ordered least
-    /// significant digit first.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use num_bigint::BigInt;
-    ///
-    /// assert_eq!(BigInt::from(-1125).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
-    /// assert_eq!(BigInt::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
-    /// assert_eq!(BigInt::from(4294967296u64).iter_u32_digits().collect::<Vec<u32>>(), vec![0, 1]);
-    /// assert_eq!(BigInt::from(-112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
-    /// assert_eq!(BigInt::from(112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
-    /// ```
-    fn iter_u32_digits(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_;
-
-    /// Returns an iterator of `u64` digits representation of the [`BigInteger`] ordered least
-    /// significant digit first.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use num_bigint::BigInt;
-    ///
-    /// assert_eq!(BigInt::from(-1125).iter_u64_digits().collect::<Vec<u64>>(), vec![1125u64]);
-    /// assert_eq!(BigInt::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295u64]);
-    /// assert_eq!(BigInt::from(4294967296u64).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967296u64]);
-    /// assert_eq!(BigInt::from(-112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
-    /// assert_eq!(BigInt::from(112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
-    /// assert_eq!(BigInt::from(1u128 << 64).iter_u64_digits().collect::<Vec<u64>>(), vec![0, 1]);
-    /// ```
-    fn iter_u64_digits(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_;
-
     /// Returns the two's-complement byte representation of the [`BigInteger`] in big-endian byte order.
     ///
     /// # Examples
@@ -659,19 +472,6 @@ where
     /// assert_eq!(i.to_signed_bytes_le(), vec![155, 251]);
     /// ```
     fn to_signed_bytes_le(&self) -> Vec<u8>;
-
-    /// Returns the integer formatted as a string in the given radix.
-    /// `radix` must be in the range `2...36`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use num_bigint::BigInt;
-    ///
-    /// let i = BigInt::parse_bytes(b"ff", 16).unwrap();
-    /// assert_eq!(i.to_str_radix(16), "ff");
-    /// ```
-    fn to_str_radix(&self, radix: u32) -> String;
 
     /// Returns the integer in the requested base in big-endian digit order.
     /// The output is not given in a human readable alphabet but as a zero
@@ -732,131 +532,13 @@ where
     /// ```
     fn into_parts(self) -> (Sign, BigUint);
 
-    /// Determines the fewest bits necessary to express the [`BigInteger`],
-    /// not including the sign.
-    fn bits(&self) -> u64;
-
     /// Converts this [`BigInteger`] into a [`BigUint`], if it's not negative.
     fn to_biguint(&self) -> Option<BigUint>;
-
-    fn checked_add(&self, v: &Self) -> Option<Self> {
-        Some(self + v)
-    }
-
-    fn checked_sub(&self, v: &Self) -> Option<Self> {
-        Some(self - v)
-    }
-
-    fn checked_mul(&self, v: &Self) -> Option<Self> {
-        Some(self * v)
-    }
-
-    fn checked_div(&self, v: &Self) -> Option<Self> {
-        if v.is_zero() {
-            return None;
-        }
-        Some(self / v)
-    }
-
-    /// Returns `self ^ exponent`.
-    fn pow(&self, exponent: u32) -> Self;
-
-    /// Returns `(self ^ exponent) mod modulus`
-    ///
-    /// Note that this rounds like `mod_floor`, not like the `%` operator,
-    /// which makes a difference when given a negative `self` or `modulus`.
-    /// The result will be in the interval `[0, modulus)` for `modulus > 0`,
-    /// or in the interval `(modulus, 0]` for `modulus < 0`
-    ///
-    /// Panics if the exponent is negative or the modulus is zero.
-    fn modpow(&self, exponent: &Self, modulus: &Self) -> Self;
-
-    /// Returns the modular multiplicative inverse if it exists, otherwise `None`.
-    ///
-    /// This solves for `x` such that `self * x ≡ 1 (mod modulus)`.
-    /// Note that this rounds like `mod_floor`, not like the `%` operator,
-    /// which makes a difference when given a negative `self` or `modulus`.
-    /// The solution will be in the interval `[0, modulus)` for `modulus > 0`,
-    /// or in the interval `(modulus, 0]` for `modulus < 0`,
-    /// and it exists if and only if `gcd(self, modulus) == 1`.
-    ///
-    /// ```
-    /// use num_bigint::BigInt;
-    /// use num_integer::Integer;
-    /// use num_traits::{One, Zero};
-    ///
-    /// let m = BigInt::from(383);
-    ///
-    /// // Trivial cases
-    /// assert_eq!(BigInt::zero().modinv(&m), None);
-    /// assert_eq!(BigInt::one().modinv(&m), Some(BigInt::one()));
-    /// let neg1 = &m - 1u32;
-    /// assert_eq!(neg1.modinv(&m), Some(neg1));
-    ///
-    /// // Positive self and modulus
-    /// let a = BigInt::from(271);
-    /// let x = a.modinv(&m).unwrap();
-    /// assert_eq!(x, BigInt::from(106));
-    /// assert_eq!(x.modinv(&m).unwrap(), a);
-    /// assert_eq!((&a * x).mod_floor(&m), BigInt::one());
-    ///
-    /// // Negative self and positive modulus
-    /// let b = -&a;
-    /// let x = b.modinv(&m).unwrap();
-    /// assert_eq!(x, BigInt::from(277));
-    /// assert_eq!((&b * x).mod_floor(&m), BigInt::one());
-    ///
-    /// // Positive self and negative modulus
-    /// let n = -&m;
-    /// let x = a.modinv(&n).unwrap();
-    /// assert_eq!(x, BigInt::from(-277));
-    /// assert_eq!((&a * x).mod_floor(&n), &n + 1);
-    ///
-    /// // Negative self and modulus
-    /// let x = b.modinv(&n).unwrap();
-    /// assert_eq!(x, BigInt::from(-106));
-    /// assert_eq!((&b * x).mod_floor(&n), &n + 1);
-    /// ```
-    fn modinv(&self, modulus: &Self) -> Option<Self>;
-
-    /// Returns the truncated principal square root of `self` --
-    /// see [`num_integer::Roots::sqrt()`].
-    fn sqrt(&self) -> Self {
-        Roots::sqrt(self)
-    }
-
-    /// Returns the truncated principal cube root of `self` --
-    /// see [`num_integer::Roots::cbrt()`].
-    fn cbrt(&self) -> Self {
-        Roots::cbrt(self)
-    }
-
-    /// Returns the truncated principal `n`th root of `self` --
-    /// See [`num_integer::Roots::nth_root()`].
-    fn nth_root(&self, n: u32) -> Self {
-        Roots::nth_root(self, n)
-    }
-
-    /// Returns the number of least-significant bits that are zero,
-    /// or `None` if the entire number is zero.
-    fn trailing_zeros(&self) -> Option<u64>;
-
-    /// Returns whether the bit in position `bit` is set,
-    /// using the two's complement for negative numbers
-    fn bit(&self, bit: u64) -> bool;
-
-    /// Sets or clears the bit in the given position,
-    /// using the two's complement for negative numbers
-    ///
-    /// Note that setting/clearing a bit (for positive/negative numbers,
-    /// respectively) greater than the current bit length, a reallocation
-    /// may be needed to store the new digits
-    fn set_bit(&mut self, bit: u64, value: bool);
 }
 
 macro_rules! impl_big_integer {
-    ($t:ty, $(<$lifetime_decl:lifetime>)?, $(<$lifetime_impl:lifetime>)?) => {
-        impl$(<$lifetime_decl>)? BigInteger for $t {
+    ($t:ty) => {
+        impl BigInteger for $t {
             fn new(sign: Sign, digits: Vec<u32>) -> Self {
                 Self::new(sign, digits)
             }
@@ -866,7 +548,7 @@ macro_rules! impl_big_integer {
             }
 
             fn from_slice(sign: Sign, slice: &[u32]) -> Self {
-                Self::from_biguint(sign, BigUint::from_slice(slice))
+                Self::from_slice(sign, slice)
             }
 
             fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
@@ -917,30 +599,12 @@ macro_rules! impl_big_integer {
                 self.to_u64_digits()
             }
 
-            fn iter_u32_digits(
-                &self,
-            ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_
-            {
-                self.iter_u32_digits()
-            }
-
-            fn iter_u64_digits(
-                &self,
-            ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_
-            {
-                self.iter_u64_digits()
-            }
-
             fn to_signed_bytes_be(&self) -> Vec<u8> {
                 self.to_signed_bytes_be()
             }
 
             fn to_signed_bytes_le(&self) -> Vec<u8> {
                 self.to_signed_bytes_le()
-            }
-
-            fn to_str_radix(&self, radix: u32) -> String {
-                self.to_str_radix(radix)
             }
 
             fn to_radix_be(&self, radix: u32) -> (Sign, Vec<u8>) {
@@ -959,52 +623,11 @@ macro_rules! impl_big_integer {
                 self.into_parts()
             }
 
-            fn bits(&self) -> u64 {
-                self.bits()
-            }
-
             fn to_biguint(&self) -> Option<BigUint> {
                 self.to_biguint()
-            }
-
-            fn pow(&self, exponent: u32) -> Self {
-                self.pow(exponent)
-            }
-
-            fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-                self.modpow(exponent, modulus)
-            }
-
-            fn modinv(&self, modulus: &Self) -> Option<Self> {
-                self.modinv(modulus)
-            }
-
-            fn sqrt(&self) -> Self {
-                self.sqrt()
-            }
-
-            fn cbrt(&self) -> Self {
-                self.cbrt()
-            }
-
-            fn nth_root(&self, n: u32) -> Self {
-                self.nth_root(n)
-            }
-
-            fn trailing_zeros(&self) -> Option<u64> {
-                self.trailing_zeros()
-            }
-
-            fn bit(&self, bit: u64) -> bool {
-                self.bit(bit)
-            }
-
-            fn set_bit(&mut self, bit: u64, value: bool) {
-                self.set_bit(bit, value)
             }
         }
     };
 }
 
-impl_big_integer!(BigInt, , );
-impl_big_integer!(CowBigInt<'static>, ,);
+impl_big_integer!(BigInt);

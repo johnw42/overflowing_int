@@ -64,14 +64,14 @@ impl CheckedDiv for RcBigInt {
 
 impl CheckedEuclid for RcBigInt {
     fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
-        self.to_cow()
-            .checked_rem_euclid(&v.to_cow())
+        self.big_cow()
+            .checked_rem_euclid(&v.big_cow())
             .map(Into::into)
     }
 
     fn checked_div_euclid(&self, v: &Self) -> Option<Self> {
-        self.to_cow()
-            .checked_div_euclid(&v.to_cow())
+        self.big_cow()
+            .checked_div_euclid(&v.big_cow())
             .map(Into::into)
     }
 }
@@ -109,11 +109,11 @@ impl<'a> Distribution<RcBigInt> for RandomBits {
 
 impl Euclid for RcBigInt {
     fn rem_euclid(&self, v: &Self) -> Self {
-        self.to_cow().rem_euclid(&v.to_cow()).into()
+        self.big_cow().rem_euclid(&v.big_cow()).into()
     }
 
     fn div_euclid(&self, v: &Self) -> Self {
-        self.to_cow().div_euclid(&v.to_cow()).into()
+        self.big_cow().div_euclid(&v.big_cow()).into()
     }
 }
 
@@ -154,7 +154,7 @@ impl Integer for RcBigInt {
         {
             return Integer::div_floor(&lhs, &rhs).into();
         }
-        self.to_cow().div_floor(&other.to_cow()).into()
+        self.big_cow().div_floor(&other.big_cow()).into()
     }
 
     fn mod_floor(&self, other: &Self) -> Self {
@@ -163,35 +163,35 @@ impl Integer for RcBigInt {
         {
             return Integer::mod_floor(&lhs, &rhs).into();
         }
-        self.to_cow().mod_floor(&other.to_cow()).into()
+        self.big_cow().mod_floor(&other.big_cow()).into()
     }
 
     fn gcd(&self, other: &Self) -> Self {
         if let Some((lhs, rhs)) = self.to_small_with(other) {
             return lhs.gcd(&rhs).into();
         }
-        self.to_cow().gcd(&other.to_cow()).into()
+        self.big_cow().gcd(&other.big_cow()).into()
     }
 
     fn lcm(&self, other: &Self) -> Self {
         if let Some((lhs, rhs)) = self.to_small_with(other) {
             return lhs.lcm(&rhs).into();
         }
-        self.to_cow().lcm(&other.to_cow()).into()
+        self.big_cow().lcm(&other.big_cow()).into()
     }
 
     fn divides(&self, other: &Self) -> bool {
         if let Some((lhs, rhs)) = self.to_small_with(other) {
             return lhs.is_multiple_of(&rhs);
         }
-        self.to_cow().is_multiple_of(&other.to_cow())
+        self.big_cow().is_multiple_of(&other.big_cow())
     }
 
     fn is_multiple_of(&self, other: &Self) -> bool {
         if let Some((lhs, rhs)) = self.to_small_with(other) {
             return lhs.is_multiple_of(&rhs);
         }
-        self.to_cow().is_multiple_of(&other.to_cow())
+        self.big_cow().is_multiple_of(&other.big_cow())
     }
 
     fn is_even(&self) -> bool {
@@ -215,7 +215,7 @@ impl Integer for RcBigInt {
             let (q, r) = lhs.div_rem(&rhs);
             return (q.into(), r.into());
         }
-        let (q, r) = self.to_cow().div_rem(&other.to_cow());
+        let (q, r) = self.big_cow().div_rem(&other.big_cow());
         (q.into(), r.into())
     }
 }
@@ -251,7 +251,7 @@ impl<'a> Neg for &RcBigInt {
         {
             return b.into();
         }
-        (&*self.to_cow()).neg().into()
+        (&*self.big_cow()).neg().into()
     }
 }
 
@@ -385,8 +385,8 @@ impl UniformSampler for UniformCBigInt {
         B2: SampleBorrow<Self::X> + Sized,
     {
         Self(UniformBigInt::new(
-            low.borrow().to_cow().borrow(),
-            high.borrow().to_cow().borrow(),
+            low.borrow().big_cow().borrow(),
+            high.borrow().big_cow().borrow(),
         ))
     }
 
@@ -396,8 +396,8 @@ impl UniformSampler for UniformCBigInt {
         B2: SampleBorrow<Self::X> + Sized,
     {
         Self(UniformBigInt::new_inclusive(
-            low.borrow().to_cow().borrow(),
-            high.borrow().to_cow().borrow(),
+            low.borrow().big_cow().borrow(),
+            high.borrow().big_cow().borrow(),
         ))
     }
 
@@ -411,7 +411,7 @@ impl<'a> Serialize for RcBigInt {
     where
         S: serde::Serializer,
     {
-        self.to_cow().serialize(serializer)
+        self.big_cow().serialize(serializer)
     }
 }
 

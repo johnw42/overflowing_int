@@ -1,66 +1,61 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
+use std::marker::PhantomData;
 
-use num_bigint::{BigInt, BigUint, Sign};
+use num_bigint::{BigUint, E::Big, Sign};
 use num_integer::Roots;
 use num_traits::ConstZero;
 
-use crate::rc_bigint::encoding::{Encoded, Encoding, RefEncoding};
-use crate::rc_bigint::small_num::{SmallInt, SmallUint, bytes_to_uint_be, bytes_to_uint_le};
+use crate::bignum_encoding::EncodedBigNum;
+use crate::rc_bigint::small_num::{E::Small, SmallUint, bytes_to_uint_be, bytes_to_uint_le};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct RcBigInt(pub(crate) Encoded<SmallInt, BigInt>);
+pub struct RcBigInt<'a, E: EncodedBigNum<'a>>(pub(crate) E, PhantomData<&'a ()>);
 
-#[test]
-fn test_size() {
-    use std::mem::size_of;
-
-    if size_of::<usize>() == 8 {
-        assert_eq!(size_of::<BigInt>(), 32);
-        assert_eq!(size_of::<RcBigInt>(), 32);
-    }
-    assert_eq!(size_of::<BigInt>(), size_of::<RcBigInt>());
-}
-
-impl RcBigInt {
-    pub(crate) fn to_small(&self) -> Option<SmallInt> {
+impl<'a, E: EncodedBigNum<'a>> RcBigInt<'a, E> {
+    pub(crate) fn to_small(&self) -> Option<E::Small> {
         match self.0.decode_ref() {
-            RefEncoding::Small(n) => Some(n),
-            RefEncoding::Big(_) => None,
+            Encoding::Small(n) => Some(n),
+            Encoding::Big(_) => None,
         }
     }
 
-    pub(crate) fn to_small_with(&self, other: &RcBigInt) -> Option<(SmallInt, SmallInt)> {
+    pub(crate) fn to_small_with<'b>(
+        &self,
+        other: &RcBigInt<'b, E>,
+    ) -> Option<(E::Small, E::Small)> {
         match (self.to_small(), other.to_small()) {
             (Some(a), Some(b)) => Some((a, b)),
             _ => None,
         }
     }
 
-    pub(crate) fn decode(self) -> Encoding<SmallInt, BigInt> {
+    pub(crate) fn decode(self) -> Encoding<E::Small, E::BigEncoding> {
         self.0.decode()
     }
 
-    pub(crate) fn decode_ref(&self) -> RefEncoding<SmallInt, BigInt> {
+    pub(crate) fn decode_ref(&self) -> Encoding<E::Small, &E::Big> {
         self.0.decode_ref()
     }
 
-    pub(crate) fn update_encoding(&mut self, f: impl FnOnce(&mut Encoding<SmallInt, BigInt>)) {
-        let mut encoding = self.decode();
-        f(&mut encoding);
-        self.0 = Encoded::from(encoding);
+    pub(crate) fn update_encoding(
+        &mut self,
+        f: impl FnOnce(&mut Encoding<E::Small, E::BigEncoding>),
+    ) {
+        self.0.update_encoding(f);
     }
 
-    pub(crate) fn to_cow(&self) -> Cow<BigInt> {
-        match self.decode_ref() {
-            RefEncoding::Small(n) => Cow::Owned(BigInt::from(n)),
-            RefEncoding::Big(n) => Cow::Borrowed(n),
-        }
+    pub(crate) fn big_cow(&self) -> Cow<E::Big> {
+        self.0.big_cow()
+        // match self.decode_ref() {
+        //     RefEncoding::Small(n) => Cow::Owned(E::Big::from(n)),
+        //     RefEncoding::Big(n) => Cow::Borrowed(n),
+        // }
     }
 
-    fn try_apply_sign(sign: Sign, magnitude: SmallUint) -> Option<Self> {
-        SmallInt::try_from(magnitude)
+    fn try_apply_sign(sign: Sign, magnitude: E::SmallUint) -> Option<Self> {
+        E::Small::try_from(magnitude)
             .ok()
             .map(|signed_magnitude| match sign {
                 Sign::Plus => signed_magnitude,
@@ -86,7 +81,7 @@ impl RcBigInt {
     /// ```
     pub fn magnitude(&self) -> BigUint {
         match self.decode_ref() {
-            RefEncoding::Small(n) => BigInt::from(n).magnitude().clone(),
+            RefEncoding::Small(n) => E::Big::from(n).magnitude().clone(),
             RefEncoding::Big(n) => n.magnitude().clone(),
         }
     }
@@ -100,28 +95,28 @@ impl RcBigInt {
         }
     }
 
-    /// Creates and initializes a BigInt.
+    /// Creates and initializes a E::Big.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn new(sign: Sign, digits: Vec<u32>) -> Self {
         if sign == Sign::NoSign {
             return RcBigInt::ZERO;
         }
-        BigInt::new(sign, digits).into()
+        E::Big::new(sign, digits).into()
     }
 
     /// Creates and initializes a `RcBigInt`.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub(crate) fn from_biguint(sign: Sign, data: BigUint) -> Self {
-        BigInt::from_biguint(sign, data).into()
+        E::Big::from_biguint(sign, data).into()
     }
 
     /// Creates and initializes a `RcBigInt`.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn from_slice(sign: Sign, slice: &[u32]) -> Self {
-        BigInt::from_slice(sign, slice).into()
+        E::Big::from_slice(sign, slice).into()
     }
 
     /// Reinitializes a `RcBigInt`.
@@ -155,7 +150,7 @@ impl RcBigInt {
         {
             return result;
         }
-        BigInt::from_bytes_be(sign, bytes).into()
+        E::Big::from_bytes_be(sign, bytes).into()
     }
 
     /// Creates and initializes a `RcBigInt`.
@@ -167,7 +162,7 @@ impl RcBigInt {
         {
             return result;
         }
-        BigInt::from_bytes_le(sign, bytes).into()
+        E::Big::from_bytes_le(sign, bytes).into()
     }
 
     /// Creates and initializes a `RcBigInt` from an array of bytes in
@@ -175,14 +170,14 @@ impl RcBigInt {
     ///
     /// The digits are in big-endian base 2<sup>8</sup>.
     pub fn from_signed_bytes_be(digits: &[u8]) -> Self {
-        BigInt::from_signed_bytes_be(digits).into()
+        E::Big::from_signed_bytes_be(digits).into()
     }
 
     /// Creates and initializes a `RcBigInt` from an array of bytes in two's complement.
     ///
     /// The digits are in little-endian base 2<sup>8</sup>.
     pub fn from_signed_bytes_le(digits: &[u8]) -> Self {
-        BigInt::from_signed_bytes_le(digits).into()
+        E::Big::from_signed_bytes_le(digits).into()
     }
 
     /// Creates and initializes a `RcBigInt`.
@@ -197,7 +192,7 @@ impl RcBigInt {
     /// assert_eq!(RcBigInt::parse_bytes(b"G", 16), None);
     /// ```
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
-        BigInt::parse_bytes(buf, radix).map(Self::from)
+        E::Big::parse_bytes(buf, radix).map(Self::from)
     }
 
     /// Creates and initializes a `RcBigInt`. Each u8 of the input slice is
@@ -217,7 +212,7 @@ impl RcBigInt {
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
     pub fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
-        BigInt::from_radix_be(sign, buf, radix).map(Self::from)
+        E::Big::from_radix_be(sign, buf, radix).map(Self::from)
     }
 
     /// Creates and initializes a `RcBigInt`. Each u8 of the input slice is
@@ -237,7 +232,7 @@ impl RcBigInt {
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
     pub fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
-        BigInt::from_radix_le(sign, buf, radix).map(Self::from)
+        E::Big::from_radix_le(sign, buf, radix).map(Self::from)
     }
 
     /// Returns the sign and the byte representation of the `RcBigInt` in big-endian byte order.
@@ -251,7 +246,7 @@ impl RcBigInt {
     /// assert_eq!(i.to_bytes_be(), (Sign::Minus, vec![4, 101]));
     /// ```
     pub fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
-        BigInt::from(self).to_bytes_be()
+        E::Big::from(self).to_bytes_be()
     }
 
     /// Returns the sign and the byte representation of the `RcBigInt` in little-endian byte order.
@@ -265,7 +260,7 @@ impl RcBigInt {
     /// assert_eq!(i.to_bytes_le(), (Sign::Minus, vec![101, 4]));
     /// ```
     pub fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
-        BigInt::from(self).to_bytes_le()
+        E::Big::from(self).to_bytes_le()
     }
 
     /// Returns the sign and the `u32` digits representation of the `RcBigInt` ordered least
@@ -283,7 +278,7 @@ impl RcBigInt {
     /// assert_eq!(RcBigInt::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
     /// ```
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
-        BigInt::from(self).to_u32_digits()
+        E::Big::from(self).to_u32_digits()
     }
 
     /// Returns the two's-complement byte representation of the `RcBigInt` in big-endian byte order.
@@ -297,7 +292,7 @@ impl RcBigInt {
     /// assert_eq!(i.to_signed_bytes_be(), vec![251, 155]);
     /// ```
     pub fn to_signed_bytes_be(&self) -> Vec<u8> {
-        BigInt::from(self).to_signed_bytes_be()
+        E::Big::from(self).to_signed_bytes_be()
     }
 
     /// Returns the two's-complement byte representation of the `RcBigInt` in little-endian byte order.
@@ -311,7 +306,7 @@ impl RcBigInt {
     /// assert_eq!(i.to_signed_bytes_le(), vec![155, 251]);
     /// ```
     pub fn to_signed_bytes_le(&self) -> Vec<u8> {
-        BigInt::from(self).to_signed_bytes_le()
+        E::Big::from(self).to_signed_bytes_le()
     }
 
     /// Returns the integer formatted as a string in the given radix.
@@ -326,7 +321,7 @@ impl RcBigInt {
     /// assert_eq!(i.to_str_radix(16), "ff");
     /// ```
     pub fn to_str_radix(&self, radix: u32) -> String {
-        self.to_cow().to_str_radix(radix)
+        self.big_cow().to_str_radix(radix)
     }
 
     /// Returns the integer in the requested base in big-endian digit order.
@@ -344,7 +339,7 @@ impl RcBigInt {
     /// // 0xFFFF = 65535 = 2*(159^2) + 94*159 + 27
     /// ```
     pub fn to_radix_be(&self, radix: u32) -> (Sign, Vec<u8>) {
-        self.to_cow().to_radix_be(radix)
+        self.big_cow().to_radix_be(radix)
     }
 
     /// Returns the integer in the requested base in little-endian digit order.
@@ -362,7 +357,7 @@ impl RcBigInt {
     /// // 0xFFFF = 65535 = 27 + 94*159 + 2*(159^2)
     /// ```
     pub fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>) {
-        self.to_cow().to_radix_le(radix)
+        self.big_cow().to_radix_le(radix)
     }
 
     /// Returns the sign of the `RcBigInt` as a `Sign`.
@@ -403,14 +398,14 @@ impl RcBigInt {
     /// assert_eq!(RcBigInt::zero().into_parts(), (Sign::NoSign, BigUint::zero()));
     /// ```
     pub fn into_parts(self) -> (Sign, BigUint) {
-        BigInt::from(self).into_parts()
+        E::Big::from(self).into_parts()
     }
 
     /// Returns whether the bit in position `bit` is set, using the two’s complement for negative numbers
     pub fn bit(&self, bit: u64) -> bool {
         match self.decode_ref() {
             RefEncoding::Small(small) => {
-                if bit < SmallInt::BITS as u64 {
+                if bit < E::Small::BITS as u64 {
                     (small >> (bit as u32)) & 1 == 1
                 } else {
                     small < 0
@@ -420,15 +415,15 @@ impl RcBigInt {
         }
     }
 
-    /// Determines the fewest bits necessary to express the `BigInt`,
+    /// Determines the fewest bits necessary to express the `E::Big`,
     /// not including the sign.
     pub fn bits(&self) -> u64 {
         match self.decode_ref() {
             RefEncoding::Small(n) => {
                 if n >= 0 {
-                    SmallInt::BITS as u32 - n.leading_zeros()
+                    E::Small::BITS as u32 - n.leading_zeros()
                 } else {
-                    SmallInt::BITS as u32 - n.unsigned_abs().leading_zeros()
+                    E::Small::BITS as u32 - n.unsigned_abs().leading_zeros()
                 }
             }
             .into(),
@@ -438,22 +433,22 @@ impl RcBigInt {
 
     /// Converts this `RcBigInt` into a `BigUint`, if it's not negative.
     pub fn to_biguint(&self) -> Option<BigUint> {
-        self.to_cow().to_biguint()
+        self.big_cow().to_biguint()
     }
 
-    pub fn checked_add(&self, v: &RcBigInt) -> Option<Self> {
+    pub fn checked_add(&self, v: &Self) -> Option<Self> {
         Some(self + v)
     }
 
-    pub fn checked_sub(&self, v: &RcBigInt) -> Option<Self> {
+    pub fn checked_sub(&self, v: &Self) -> Option<Self> {
         Some(self - v)
     }
 
-    pub fn checked_mul(&self, v: &RcBigInt) -> Option<Self> {
+    pub fn checked_mul(&self, v: &Self) -> Option<Self> {
         Some(self * v)
     }
 
-    pub fn checked_div(&self, v: &RcBigInt) -> Option<Self> {
+    pub fn checked_div(&self, v: &Self) -> Option<Self> {
         if v.is_zero() { None } else { Some(self / v) }
     }
 
@@ -464,7 +459,7 @@ impl RcBigInt {
         {
             return a.into();
         }
-        self.to_cow().pow(exponent).into()
+        self.big_cow().pow(exponent).into()
     }
 
     /// Returns `(self ^ exponent) mod modulus`
@@ -476,13 +471,13 @@ impl RcBigInt {
     ///
     /// Panics if the exponent is negative or the modulus is zero.
     pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-        self.to_cow()
-            .modpow(&exponent.to_cow(), &modulus.to_cow())
+        self.big_cow()
+            .modpow(&exponent.big_cow(), &modulus.big_cow())
             .into()
     }
 
     /// Returns the truncated principal square root of self.
-    pub fn sqrt(&self) -> RcBigInt<'a> {
+    pub fn sqrt(&self) -> Self {
         match self.decode_ref() {
             Encoding::Small(n) => Self::from(n.sqrt()),
             Encoding::Big(n) => Self::from(n.sqrt()),
@@ -490,7 +485,7 @@ impl RcBigInt {
     }
 
     /// Returns the truncated principal cube root of self.
-    pub fn cbrt(&self) -> RcBigInt<'a> {
+    pub fn cbrt(&self) -> Self {
         match self.decode_ref() {
             Encoding::Small(n) => Self::from(n.cbrt()),
             Encoding::Big(n) => Self::from(n.cbrt()),
@@ -498,7 +493,7 @@ impl RcBigInt {
     }
 
     /// Returns the truncated principal nth root of self.
-    pub fn nth_root(&self, n: u32) -> RcBigInt<'a> {
+    pub fn nth_root(&self, n: u32) -> Self {
         match self.decode_ref() {
             Encoding::Small(x) => Self::from(x.nth_root(n)),
             Encoding::Big(x) => Self::from(x.nth_root(n)),
@@ -508,17 +503,17 @@ impl RcBigInt {
     /// Returns the number of least-significant bits that are zero,
     /// or `None` if the entire number is zero.
     pub fn trailing_zeros(&self) -> Option<u64> {
-        BigInt::from(self).trailing_zeros()
+        E::Big::from(self).trailing_zeros()
     }
 
     pub fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
-        self.to_cow().to_u64_digits()
+        self.big_cow().to_u64_digits()
     }
 
     pub fn iter_u32_digits(
         &self,
     ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_ {
-        BigInt::from(self)
+        E::Big::from(self)
             .iter_u32_digits()
             .collect::<Vec<_>>()
             .into_iter()
@@ -527,14 +522,16 @@ impl RcBigInt {
     pub fn iter_u64_digits(
         &self,
     ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_ {
-        BigInt::from(self)
+        E::Big::from(self)
             .iter_u64_digits()
             .collect::<Vec<_>>()
             .into_iter()
     }
 
     pub fn modinv(&self, modulus: &Self) -> Option<Self> {
-        BigInt::from(self).modinv(&modulus.to_cow()).map(Self::from)
+        E::Big::from(self)
+            .modinv(&modulus.big_cow())
+            .map(Self::from)
     }
 
     pub fn set_bit(&mut self, bit: u64, value: bool) {
@@ -548,7 +545,7 @@ impl RcBigInt {
                 }
             }
             Encoding::Small(n) => {
-                let mut big = BigInt::from(*n);
+                let mut big = E::Big::from(*n);
                 big.set_bit(bit, value);
                 *encoding = Encoding::Big(Cow::Owned(big));
             }
@@ -566,14 +563,14 @@ impl RcBigInt {
     }
 }
 
-impl<'a> From<Encoding<'a, SmallInt, BigInt>> for RcBigInt<'a> {
-    fn from(x: Encoding<'a, SmallInt, BigInt>) -> Self {
+impl<'a> From<Encoding<'a, E::Small, E::Big>> for RcBigInt<'a> {
+    fn from(x: Encoding<'a, E::Small, E::Big>) -> Self {
         RcBigInt(x.into())
     }
 }
 
-impl<'a> From<Encoded<'a, SmallInt, BigInt>> for RcBigInt<'a> {
-    fn from(x: Encoded<'a, SmallInt, BigInt>) -> Self {
+impl<'a> From<Encoded<'a, E::Small, E::Big>> for RcBigInt<'a> {
+    fn from(x: Encoded<'a, E::Small, E::Big>) -> Self {
         RcBigInt(x)
     }
 }
@@ -628,154 +625,154 @@ mod tests {
 
     #[quickcheck]
     fn prop_new_matches_bigint(sign: ArbSign, digits: Vec<u32>) -> bool {
-        BigInt::from(RcBigInt::new(sign.0, digits.clone())) == BigInt::new(sign.0, digits)
+        E::Big::from(RcBigInt::new(sign.0, digits.clone())) == E::Big::new(sign.0, digits)
     }
 
     #[quickcheck]
     fn prop_from_slice_matches_bigint(sign: ArbSign, digits: Vec<u32>) -> bool {
-        BigInt::from(RcBigInt::from_slice(sign.0, &digits)) == BigInt::from_slice(sign.0, &digits)
+        E::Big::from(RcBigInt::from_slice(sign.0, &digits)) == E::Big::from_slice(sign.0, &digits)
     }
 
     #[quickcheck]
     fn prop_from_bytes_be_matches_bigint(sign: ArbSign, bytes: Vec<u8>) -> bool {
-        BigInt::from(RcBigInt::from_bytes_be(sign.0, &bytes))
-            == BigInt::from_bytes_be(sign.0, &bytes)
+        E::Big::from(RcBigInt::from_bytes_be(sign.0, &bytes))
+            == E::Big::from_bytes_be(sign.0, &bytes)
     }
 
     #[quickcheck]
     fn prop_from_bytes_le_matches_bigint(sign: ArbSign, bytes: Vec<u8>) -> bool {
-        BigInt::from(RcBigInt::from_bytes_le(sign.0, &bytes))
-            == BigInt::from_bytes_le(sign.0, &bytes)
+        E::Big::from(RcBigInt::from_bytes_le(sign.0, &bytes))
+            == E::Big::from_bytes_le(sign.0, &bytes)
     }
 
     #[quickcheck]
     fn prop_from_signed_bytes_be_matches_bigint(bytes: Vec<u8>) {
         assert_eq!(
-            BigInt::from(RcBigInt::from_signed_bytes_be(&bytes)),
-            BigInt::from_signed_bytes_be(&bytes)
+            E::Big::from(RcBigInt::from_signed_bytes_be(&bytes)),
+            E::Big::from_signed_bytes_be(&bytes)
         );
     }
 
     #[quickcheck]
     fn prop_from_signed_bytes_le_matches_bigint(bytes: Vec<u8>) -> bool {
-        BigInt::from(RcBigInt::from_signed_bytes_le(&bytes)) == BigInt::from_signed_bytes_le(&bytes)
+        E::Big::from(RcBigInt::from_signed_bytes_le(&bytes)) == E::Big::from_signed_bytes_le(&bytes)
     }
 
     #[quickcheck]
     fn prop_to_bytes_be_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).to_bytes_be() == n.to_bytes_be()
+        E::Big::from(&n).to_bytes_be() == n.to_bytes_be()
     }
 
     #[quickcheck]
     fn prop_to_bytes_le_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).to_bytes_le() == n.to_bytes_le()
+        E::Big::from(&n).to_bytes_le() == n.to_bytes_le()
     }
 
     #[quickcheck]
     fn prop_to_signed_bytes_be_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).to_signed_bytes_be() == n.to_signed_bytes_be()
+        E::Big::from(&n).to_signed_bytes_be() == n.to_signed_bytes_be()
     }
 
     #[quickcheck]
     fn prop_to_signed_bytes_le_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).to_signed_bytes_le() == n.to_signed_bytes_le()
+        E::Big::from(&n).to_signed_bytes_le() == n.to_signed_bytes_le()
     }
 
     #[quickcheck]
     fn prop_sign_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).sign() == n.sign()
+        E::Big::from(&n).sign() == n.sign()
     }
 
     #[quickcheck]
     fn prop_bit_matches_bigint(n: RcBigInt, bit: u64) {
         let bit = bit % 1024;
-        assert_eq!(BigInt::from(n.clone()).bit(bit), n.bit(bit));
+        assert_eq!(E::Big::from(n.clone()).bit(bit), n.bit(bit));
     }
 
     #[quickcheck]
     fn prop_bits_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).bits() == n.bits()
+        E::Big::from(&n).bits() == n.bits()
     }
 
     #[quickcheck]
     fn prop_to_biguint_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).to_biguint() == n.to_biguint()
+        E::Big::from(&n).to_biguint() == n.to_biguint()
     }
 
     #[quickcheck]
     fn prop_checked_add_matches_bigint(n1: RcBigInt, n2: RcBigInt) -> bool {
-        n1.checked_add(&n2).into() == BigInt::from(&n1).checked_add(&BigInt::from(&n2))
+        n1.checked_add(&n2).into() == E::Big::from(&n1).checked_add(&E::Big::from(&n2))
     }
 
     #[quickcheck]
     fn prop_checked_sub_matches_bigint(n1: RcBigInt, n2: RcBigInt) -> bool {
-        n1.checked_sub(&n2).into() == BigInt::from(&n1).checked_sub(&BigInt::from(&n2))
+        n1.checked_sub(&n2).into() == E::Big::from(&n1).checked_sub(&E::Big::from(&n2))
     }
 
     #[quickcheck]
     fn prop_checked_mul_matches_bigint(n1: RcBigInt, n2: RcBigInt) -> bool {
-        n1.checked_mul(&n2).into() == BigInt::from(&n1).checked_mul(&BigInt::from(&n2))
+        n1.checked_mul(&n2).into() == E::Big::from(&n1).checked_mul(&E::Big::from(&n2))
     }
 
     #[quickcheck]
     fn prop_checked_div_matches_bigint(n1: RcBigInt, n2: RcBigInt) -> bool {
-        n1.checked_div(&n2).into() == BigInt::from(&n1).checked_div(&BigInt::from(&n2))
+        n1.checked_div(&n2).into() == E::Big::from(&n1).checked_div(&E::Big::from(&n2))
     }
 
     #[quickcheck]
     fn prop_pow_matches_bigint(n: RcBigInt, exp: u32) -> bool {
         let k = exp % 16;
-        BigInt::from(&n).pow(k) == n.pow(k).into()
+        E::Big::from(&n).pow(k) == n.pow(k).into()
     }
 
     #[quickcheck]
     fn prop_modpow_matches_bigint(n: RcBigInt, exp: RcBigInt, modulus: RcBigInt) -> bool {
-        BigInt::from(&n).modpow(&BigInt::from(&exp), &BigInt::from(&modulus))
+        E::Big::from(&n).modpow(&E::Big::from(&exp), &E::Big::from(&modulus))
             == n.modpow(&exp, &modulus).into()
     }
 
     #[quickcheck]
     fn prop_sqrt_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).sqrt() == n.sqrt().into()
+        E::Big::from(&n).sqrt() == n.sqrt().into()
     }
 
     #[quickcheck]
     fn prop_cbrt_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).cbrt() == n.cbrt().into()
+        E::Big::from(&n).cbrt() == n.cbrt().into()
     }
 
     #[quickcheck]
     fn prop_nth_root_matches_bigint(n: RcBigInt, k: u32) -> bool {
         let k = k % 16 + 1;
-        BigInt::from(&n).nth_root(k) == n.nth_root(k).into()
+        E::Big::from(&n).nth_root(k) == n.nth_root(k).into()
     }
 
     #[quickcheck]
     fn prop_to_u32_digits_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).to_u32_digits().eq(&mut n.to_u32_digits())
+        E::Big::from(&n).to_u32_digits().eq(&mut n.to_u32_digits())
     }
 
     #[quickcheck]
     fn prop_to_u64_digits_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).to_u64_digits().eq(&mut n.to_u64_digits())
+        E::Big::from(&n).to_u64_digits().eq(&mut n.to_u64_digits())
     }
 
     #[quickcheck]
     fn prop_modinv_matches_bigint(n: RcBigInt, modulus: RcBigInt) -> bool {
-        BigInt::from(&n).modinv(&BigInt::from(&modulus)) == n.modinv(&modulus).map(BigInt::from)
+        E::Big::from(&n).modinv(&E::Big::from(&modulus)) == n.modinv(&modulus).map(E::Big::from)
     }
 
     #[quickcheck]
     fn prop_trailing_zeros_matches_bigint(n: RcBigInt) -> bool {
-        BigInt::from(&n).trailing_zeros() == n.trailing_zeros()
+        E::Big::from(&n).trailing_zeros() == n.trailing_zeros()
     }
 
     #[quickcheck]
     fn prop_set_bit_matches_bigint(mut n1: RcBigInt, bit: u64, value: bool) -> bool {
         let bit = bit % (n1.bits() + 16);
-        let mut n2 = BigInt::from(&n1);
+        let mut n2 = E::Big::from(&n1);
         n1.set_bit(bit, value);
         n2.set_bit(bit, value);
-        BigInt::from(n1) == n2
+        E::Big::from(n1) == n2
     }
 }
