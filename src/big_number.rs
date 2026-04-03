@@ -2,207 +2,306 @@
 
 use std::fmt::{Binary, Debug, Display, LowerHex, Octal, UpperHex};
 use std::hash::Hash;
+use std::iter::FusedIterator;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
-    Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+    Mul, MulAssign, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::str::FromStr;
 
-use num_bigint::{BigInt, BigUint, ParseBigIntError, RandomBits, ToBigInt, ToBigUint};
+use num_bigint::{BigInt, BigUint, ParseBigIntError, RandomBits, Sign, ToBigInt, ToBigUint};
 use num_integer::{Integer, Roots};
 use num_traits::{
     CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, ConstZero, Euclid, FromBytes,
-    FromPrimitive, Num, One, Pow, ToBytes, ToPrimitive, Zero,
+    FromPrimitive, Num, One, Pow, Signed, ToBytes, ToPrimitive, Unsigned, Zero,
 };
 use rand::distributions::uniform::SampleUniform;
 use rand::prelude::Distribution;
 use serde::{Deserialize, Serialize};
 
-// A trait covering the common functionality of BigInt and BigUint.
-pub trait BigNumber: Sized {
-    /// Creates and initializes a [`BigInteger`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use num_bigint::{BigInt, ToBigInt};
-    ///
-    /// assert_eq!(BigInt::parse_bytes(b"1234", 10), ToBigInt::to_bigint(&1234));
-    /// assert_eq!(BigInt::parse_bytes(b"ABCD", 16), ToBigInt::to_bigint(&0xABCD));
-    /// assert_eq!(BigInt::parse_bytes(b"G", 16), None);
-    /// ```
+use crate::{
+    duplicate_arith_ops, duplicate_bit_ops, duplicate_iprims, duplicate_prims, duplicate_shift_ops,
+    duplicate_uprims,
+};
+
+use paste::paste;
+
+/// A trait covering iterators over the digits of a big number, in a particular
+/// base.  The digits are ordered least-significant first.
+pub trait BigNumberDigits<'a, T>:
+    DoubleEndedIterator<Item = T> + ExactSizeIterator<Item = T> + FusedIterator<Item = T> + 'a
+{
+}
+
+impl<'a, T, I> BigNumberDigits<'a, T> for I where
+    I: DoubleEndedIterator<Item = T> + ExactSizeIterator<Item = T> + FusedIterator<Item = T> + 'a
+{
+}
+
+pub enum ArithOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+}
+
+pub enum BitOp {
+    BitAnd,
+    BitOr,
+    BitXor,
+}
+
+pub enum ShiftOp {
+    Shl,
+    Shr,
+}
+
+macro_rules! identity {
+    ($($body:tt)*) => {
+        $($body)*
+    };
+}
+
+macro_rules! declare_binary_ops {
+    ($op_fn:ident, $lhs:ty, $rhs:ty) => {
+        paste! {
+            fn [<$op_fn _ $lhs:lower _ $rhs:lower>](lhs: $lhs, rhs: $rhs) -> Self;
+            fn [<$op_fn _ $lhs:lower _ref_ $rhs:lower>](lhs: $lhs, rhs: &$rhs) -> Self;
+            fn [<$op_fn _ref_ $lhs:lower _ $rhs:lower>](lhs: &$lhs, rhs: $rhs) -> Self;
+            fn [<$op_fn _ref_ $lhs:lower _ref_ $rhs:lower>](lhs: &$lhs, rhs: &$rhs) -> Self;
+        }
+    };
+}
+macro_rules! declare_binary_assign_ops {
+    ($op_fn:ident, $rhs:ty) => {
+        paste! {
+            fn [<$op_fn _asssign_ $rhs:lower>](&mut self, rhs: $rhs);
+        }
+    };
+}
+
+macro_rules! impl_binary_ops {
+    ($op_fn:ident, $lhs:ty, $rhs:ty) => {
+        paste! {
+            fn [<$op_fn _ $lhs:lower _ $rhs:lower>](lhs: $lhs, rhs: $rhs) -> Self {
+                lhs.$op_fn(rhs)
+            }
+            fn [<$op_fn _ $lhs:lower _ref_ $rhs:lower>](lhs: $lhs, rhs: &$rhs) -> Self {
+                lhs.$op_fn(rhs)
+            }
+            fn [<$op_fn _ref_ $lhs:lower _ $rhs:lower>](lhs: &$lhs, rhs: $rhs) -> Self {
+                lhs.$op_fn(rhs)
+            }
+            fn [<$op_fn _ref_ $lhs:lower _ref_ $rhs:lower>](lhs: &$lhs, rhs: &$rhs) -> Self {
+                lhs.$op_fn(rhs)
+            }
+        }
+    };
+}
+macro_rules! impl_binary_assign_ops {
+    ($op_fn:ident, $rhs:ty) => {
+        paste! {
+            fn [<$op_fn _asssign_ $rhs:lower>](&mut self, rhs: $rhs) {
+                self.[<$op_fn _assign>](rhs);
+            }
+        }
+    };
+}
+
+identity! {
+pub trait BigNumber
+where
+    Self: Binary,
+    Self: CheckedAdd,
+    Self: CheckedDiv,
+    Self: CheckedEuclid,
+    Self: CheckedMul,
+    Self: CheckedSub,
+    Self: Clone,
+    Self: ConstZero,
+    Self: Debug,
+    Self: Default,
+    Self: Display,
+    Self: Eq,
+    Self: Euclid,
+    Self: FromBytes,
+    Self: FromPrimitive,
+    Self: FromStr,
+    Self: Hash,
+    Self: Integer,
+    Self: LowerHex,
+    Self: Num<FromStrRadixErr = ParseBigIntError>,
+    Self: Octal,
+    Self: One,
+    Self: Ord,
+    Self: PartialEq,
+    Self: PartialOrd,
+    Self: RefUnwindSafe,
+    Self: Roots,
+    Self: SampleUniform,
+    Self: Send,
+    Self: Serialize,
+    Self: Sync,
+    Self: ToBigInt,
+    Self: ToBigUint,
+    Self: ToBytes,
+    Self: ToPrimitive,
+    Self: Unpin,
+    Self: UnwindSafe,
+    Self: UpperHex,
+    Self: Zero,
+    Self: quickcheck::Arbitrary,
+    for<'a> Self: arbitrary::Arbitrary<'a>,
+    for<'de> Self: Deserialize<'de>,
+    // From bounds
+    Self: From<BigUint>,
+    Self: From<bool>,
+    Self: From<u128>,
+    Self: From<u16>,
+    Self: From<u32>,
+    Self: From<u64>,
+    Self: From<u8>,
+    Self: From<usize>,
+    // TryInto bounds
+    Self: TryInto<u128>,
+    Self: TryInto<u16>,
+    Self: TryInto<u32>,
+    Self: TryInto<u64>,
+    Self: TryInto<u8>,
+    Self: TryInto<usize>,
+{
+    duplicate_arith_ops! {
+        paste! {
+            declare_binary_ops!(op_fn, Self, Self);
+            declare_binary_assign_ops!(op_fn, Self);
+        }
+        duplicate_uprims! { paste! {
+            declare_binary_ops!(op_fn, Self, prim);
+            declare_binary_ops!(op_fn, prim, Self);
+            declare_binary_assign_ops!(op_fn, prim);
+        } }
+    }
+    duplicate_shift_ops! {
+        duplicate_prims! { paste! {
+            declare_binary_ops!(op_fn, Self, prim);
+            declare_binary_assign_ops!(op_fn, prim);
+        } }
+    }
+    duplicate_bit_ops! {
+        paste! {
+            declare_binary_ops!(op_fn, Self, Self);
+            declare_binary_assign_ops!(op_fn, Self);
+        }
+    }
+    fn pow_self_ref_biguint(lhs: Self, rhs: &BigUint) -> Self;
+    duplicate_uprims! { paste! {
+        //fn [<pow_self_ prim>](lhs: Self, rhs: prim) -> Self;
+        fn [<pow_self_ref_ prim>](lhs: Self, rhs: &prim) -> Self;
+    } }
+
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self>;
-
-    /// Returns an iterator of `u32` digits representation of the [`BigInteger`] ordered least
-    /// significant digit first.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use num_bigint::BigInt;
-    ///
-    /// assert_eq!(BigInt::from(-1125).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
-    /// assert_eq!(BigInt::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
-    /// assert_eq!(BigInt::from(4294967296u64).iter_u32_digits().collect::<Vec<u32>>(), vec![0, 1]);
-    /// assert_eq!(BigInt::from(-112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
-    /// assert_eq!(BigInt::from(112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
-    /// ```
-    fn iter_u32_digits(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_;
-
-    /// Returns an iterator of `u64` digits representation of the [`BigInteger`] ordered least
-    /// significant digit first.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use num_bigint::BigInt;
-    ///
-    /// assert_eq!(BigInt::from(-1125).iter_u64_digits().collect::<Vec<u64>>(), vec![1125u64]);
-    /// assert_eq!(BigInt::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295u64]);
-    /// assert_eq!(BigInt::from(4294967296u64).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967296u64]);
-    /// assert_eq!(BigInt::from(-112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
-    /// assert_eq!(BigInt::from(112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
-    /// assert_eq!(BigInt::from(1u128 << 64).iter_u64_digits().collect::<Vec<u64>>(), vec![0, 1]);
-    /// ```
-    fn iter_u64_digits(
-        &self,
-    ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_;
-
-    /// Returns the integer formatted as a string in the given radix.
-    /// `radix` must be in the range `2...36`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use num_bigint::BigInt;
-    ///
-    /// let i = BigInt::parse_bytes(b"ff", 16).unwrap();
-    /// assert_eq!(i.to_str_radix(16), "ff");
-    /// ```
+    fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32>;
+    fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64>;
     fn to_str_radix(&self, radix: u32) -> String;
-
-    /// Determines the fewest bits necessary to express the [`BigInteger`],
-    /// not including the sign.
     fn bits(&self) -> u64;
-
     fn checked_add(&self, v: &Self) -> Option<Self>;
-
     fn checked_sub(&self, v: &Self) -> Option<Self>;
-
     fn checked_mul(&self, v: &Self) -> Option<Self>;
-
     fn checked_div(&self, v: &Self) -> Option<Self>;
-
-    /// Returns `self ^ exponent`.
     fn pow(&self, exponent: u32) -> Self;
-
-    /// Returns `(self ^ exponent) mod modulus`
-    ///
-    /// Note that this rounds like `mod_floor`, not like the `%` operator,
-    /// which makes a difference when given a negative `self` or `modulus`.
-    /// The result will be in the interval `[0, modulus)` for `modulus > 0`,
-    /// or in the interval `(modulus, 0]` for `modulus < 0`
-    ///
-    /// Panics if the exponent is negative or the modulus is zero.
     fn modpow(&self, exponent: &Self, modulus: &Self) -> Self;
-
-    /// Returns the modular multiplicative inverse if it exists, otherwise `None`.
-    ///
-    /// This solves for `x` such that `self * x ≡ 1 (mod modulus)`.
-    /// Note that this rounds like `mod_floor`, not like the `%` operator,
-    /// which makes a difference when given a negative `self` or `modulus`.
-    /// The solution will be in the interval `[0, modulus)` for `modulus > 0`,
-    /// or in the interval `(modulus, 0]` for `modulus < 0`,
-    /// and it exists if and only if `gcd(self, modulus) == 1`.
-    ///
-    /// ```
-    /// use num_bigint::BigInt;
-    /// use num_integer::Integer;
-    /// use num_traits::{One, Zero};
-    ///
-    /// let m = BigInt::from(383);
-    ///
-    /// // Trivial cases
-    /// assert_eq!(BigInt::zero().modinv(&m), None);
-    /// assert_eq!(BigInt::one().modinv(&m), Some(BigInt::one()));
-    /// let neg1 = &m - 1u32;
-    /// assert_eq!(neg1.modinv(&m), Some(neg1));
-    ///
-    /// // Positive self and modulus
-    /// let a = BigInt::from(271);
-    /// let x = a.modinv(&m).unwrap();
-    /// assert_eq!(x, BigInt::from(106));
-    /// assert_eq!(x.modinv(&m).unwrap(), a);
-    /// assert_eq!((&a * x).mod_floor(&m), BigInt::one());
-    ///
-    /// // Negative self and positive modulus
-    /// let b = -&a;
-    /// let x = b.modinv(&m).unwrap();
-    /// assert_eq!(x, BigInt::from(277));
-    /// assert_eq!((&b * x).mod_floor(&m), BigInt::one());
-    ///
-    /// // Positive self and negative modulus
-    /// let n = -&m;
-    /// let x = a.modinv(&n).unwrap();
-    /// assert_eq!(x, BigInt::from(-277));
-    /// assert_eq!((&a * x).mod_floor(&n), &n + 1);
-    ///
-    /// // Negative self and modulus
-    /// let x = b.modinv(&n).unwrap();
-    /// assert_eq!(x, BigInt::from(-106));
-    /// assert_eq!((&b * x).mod_floor(&n), &n + 1);
-    /// ```
     fn modinv(&self, modulus: &Self) -> Option<Self>;
-
-    /// Returns the truncated principal square root of `self` --
-    /// see [`num_integer::Roots::sqrt()`].
-    fn sqrt(&self) -> Self;
-
-    /// Returns the truncated principal cube root of `self` --
-    /// see [`num_integer::Roots::cbrt()`].
-    fn cbrt(&self) -> Self;
-
-    /// Returns the truncated principal `n`th root of `self` --
-    /// See [`num_integer::Roots::nth_root()`].
-    fn nth_root(&self, n: u32) -> Self;
-
-    /// Returns the number of least-significant bits that are zero,
-    /// or `None` if the entire number is zero.
     fn trailing_zeros(&self) -> Option<u64>;
-
-    /// Returns whether the bit in position `bit` is set,
-    /// using the two's complement for negative numbers
     fn bit(&self, bit: u64) -> bool;
-
-    /// Sets or clears the bit in the given position,
-    /// using the two's complement for negative numbers
-    ///
-    /// Note that setting/clearing a bit (for positive/negative numbers,
-    /// respectively) greater than the current bit length, a reallocation
-    /// may be needed to store the new digits
     fn set_bit(&mut self, bit: u64, value: bool);
+}
+}
+
+pub trait BigSigned: BigNumber + Signed {
+    duplicate_arith_ops! { duplicate_iprims! { paste! {
+        declare_binary_ops!(op_fn, Self, prim);
+        declare_binary_ops!(op_fn, prim, Self);
+        declare_binary_assign_ops!(op_fn, prim);
+    } } }
+
+    fn new(sign: Sign, digits: Vec<u32>) -> Self;
+    fn from_biguint(sign: Sign, data: BigUint) -> Self;
+    fn from_slice(sign: Sign, slice: &[u32]) -> Self;
+    fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]);
+    fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self;
+    fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self;
+    fn from_signed_bytes_be(digits: &[u8]) -> Self;
+    fn from_signed_bytes_le(digits: &[u8]) -> Self;
+    fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self>;
+    fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self>;
+    fn to_bytes_be(&self) -> (Sign, Vec<u8>);
+    fn to_bytes_le(&self) -> (Sign, Vec<u8>);
+    fn sign(&self) -> Sign;
+    fn magnitude(&self) -> &BigUint;
+    fn into_parts(self) -> (Sign, BigUint);
+}
+
+pub trait BigUnsigned: BigNumber + Unsigned {
+    fn new(digits: Vec<u32>) -> Self;
+    fn from_slice(slice: &[u32]) -> Self;
+    fn assign_from_slice(&mut self, slice: &[u32]);
+    fn from_bytes_be(bytes: &[u8]) -> Self;
+    fn from_bytes_le(bytes: &[u8]) -> Self;
+    fn from_radix_be(buf: &[u8], radix: u32) -> Option<Self>;
+    fn from_radix_le(buf: &[u8], radix: u32) -> Option<Self>;
+    fn to_bytes_be(&self) -> Vec<u8>;
+    fn to_bytes_le(&self) -> Vec<u8>;
+    fn to_radix_be(&self, radix: u32) -> Vec<u8>;
+    fn to_radix_le(&self, radix: u32) -> Vec<u8>;
+    fn trailing_ones(&self) -> u64;
+    fn count_ones(&self) -> u64;
 }
 
 #[macro_export]
 macro_rules! impl_big_number {
     ($t:ty) => {
         impl BigNumber for $t {
+            duplicate_arith_ops! {
+                paste! {
+                    impl_binary_ops!(op_fn, Self, Self);
+                    impl_binary_assign_ops!(op_fn, Self);
+                }
+                duplicate_uprims! { paste! {
+                    impl_binary_ops!(op_fn, Self, prim);
+                    impl_binary_ops!(op_fn, prim, Self);
+                    impl_binary_assign_ops!(op_fn, prim);
+                }}
+            }
+            duplicate_shift_ops! {
+                duplicate_prims! { paste! {
+                    impl_binary_ops!(op_fn, Self, prim);
+                    impl_binary_assign_ops!(op_fn, prim);
+                }}
+            }
+            duplicate_bit_ops! {
+                paste! {
+                    impl_binary_ops!(op_fn, Self, Self);
+                    impl_binary_assign_ops!(op_fn, Self);
+                }
+            }
+            fn pow_self_ref_biguint(lhs: Self, rhs: &BigUint) -> Self {
+                lhs.pow(rhs)
+            }
+            duplicate_uprims! { paste! {
+                fn [<pow_self_ref_ prim>](lhs: Self, rhs: &prim) -> Self { lhs.pow(rhs) }
+            } }
+
             fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
                 Self::parse_bytes(buf, radix)
             }
 
-            fn iter_u32_digits(
-                &self,
-            ) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator<Item = u32> + '_ {
+            fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
                 self.iter_u32_digits()
             }
 
-            fn iter_u64_digits(
-                &self,
-            ) -> impl DoubleEndedIterator<Item = u64> + ExactSizeIterator<Item = u64> + '_ {
+            fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
                 self.iter_u64_digits()
             }
 
@@ -212,10 +311,6 @@ macro_rules! impl_big_number {
 
             fn bits(&self) -> u64 {
                 self.bits()
-            }
-
-            fn pow(&self, exponent: u32) -> Self {
-                self.pow(exponent)
             }
 
             fn checked_add(&self, v: &Self) -> Option<Self> {
@@ -234,24 +329,16 @@ macro_rules! impl_big_number {
                 CheckedDiv::checked_div(self, v)
             }
 
+            fn pow(&self, exponent: u32) -> Self {
+                self.pow(exponent)
+            }
+
             fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
                 self.modpow(exponent, modulus)
             }
 
             fn modinv(&self, modulus: &Self) -> Option<Self> {
                 self.modinv(modulus)
-            }
-
-            fn sqrt(&self) -> Self {
-                self.sqrt()
-            }
-
-            fn cbrt(&self) -> Self {
-                self.cbrt()
-            }
-
-            fn nth_root(&self, n: u32) -> Self {
-                self.nth_root(n)
             }
 
             fn trailing_zeros(&self) -> Option<u64> {
@@ -271,3 +358,125 @@ macro_rules! impl_big_number {
 
 impl_big_number!(BigInt);
 impl_big_number!(BigUint);
+
+impl BigSigned for BigInt {
+    duplicate_arith_ops! { duplicate_iprims! { paste! {
+        impl_binary_ops!(op_fn, Self, prim);
+        impl_binary_ops!(op_fn, prim, Self);
+        impl_binary_assign_ops!(op_fn, prim);
+    } } }
+
+    fn new(sign: Sign, digits: Vec<u32>) -> Self {
+        Self::new(sign, digits)
+    }
+
+    fn from_biguint(sign: Sign, data: BigUint) -> Self {
+        Self::from_biguint(sign, data)
+    }
+
+    fn from_slice(sign: Sign, slice: &[u32]) -> Self {
+        Self::from_slice(sign, slice)
+    }
+
+    fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
+        self.assign_from_slice(sign, slice)
+    }
+
+    fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self {
+        Self::from_bytes_be(sign, bytes)
+    }
+
+    fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self {
+        Self::from_bytes_le(sign, bytes)
+    }
+
+    fn from_signed_bytes_be(digits: &[u8]) -> Self {
+        Self::from_signed_bytes_be(digits)
+    }
+
+    fn from_signed_bytes_le(digits: &[u8]) -> Self {
+        Self::from_signed_bytes_le(digits)
+    }
+
+    fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
+        Self::from_radix_be(sign, buf, radix)
+    }
+
+    fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
+        Self::from_radix_le(sign, buf, radix)
+    }
+
+    fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
+        self.to_bytes_be()
+    }
+
+    fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
+        self.to_bytes_le()
+    }
+
+    fn sign(&self) -> Sign {
+        self.sign()
+    }
+
+    fn magnitude(&self) -> &BigUint {
+        self.magnitude()
+    }
+
+    fn into_parts(self) -> (Sign, BigUint) {
+        self.into_parts()
+    }
+}
+
+impl BigUnsigned for BigUint {
+    fn new(digits: Vec<u32>) -> Self {
+        Self::new(digits)
+    }
+
+    fn from_slice(slice: &[u32]) -> Self {
+        Self::from_slice(slice)
+    }
+
+    fn assign_from_slice(&mut self, slice: &[u32]) {
+        self.assign_from_slice(slice)
+    }
+
+    fn from_bytes_be(bytes: &[u8]) -> Self {
+        Self::from_bytes_be(bytes)
+    }
+
+    fn from_bytes_le(bytes: &[u8]) -> Self {
+        Self::from_bytes_le(bytes)
+    }
+
+    fn from_radix_be(buf: &[u8], radix: u32) -> Option<Self> {
+        Self::from_radix_be(buf, radix)
+    }
+
+    fn from_radix_le(buf: &[u8], radix: u32) -> Option<Self> {
+        Self::from_radix_le(buf, radix)
+    }
+
+    fn to_bytes_be(&self) -> Vec<u8> {
+        self.to_bytes_be()
+    }
+
+    fn to_bytes_le(&self) -> Vec<u8> {
+        self.to_bytes_le()
+    }
+
+    fn to_radix_be(&self, radix: u32) -> Vec<u8> {
+        self.to_radix_be(radix)
+    }
+
+    fn to_radix_le(&self, radix: u32) -> Vec<u8> {
+        self.to_radix_le(radix)
+    }
+
+    fn trailing_ones(&self) -> u64 {
+        self.trailing_ones()
+    }
+
+    fn count_ones(&self) -> u64 {
+        self.count_ones()
+    }
+}

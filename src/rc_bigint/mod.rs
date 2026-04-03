@@ -2,10 +2,9 @@
 mod encoding;
 mod num_trait_impls;
 // mod ops;
-mod convert;
+//mod convert;
 mod shifted;
-mod small_num;
 
-pub mod bigint_impl;
+pub mod rc_bigint_impl;
 
-pub use bigint_impl::*;
+pub use rc_bigint_impl::*;

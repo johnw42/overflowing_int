@@ -1,4 +1,4 @@
-use crate::rc_bigint::small_num::SmallNum;
+use crate::small_num::SmallNum;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Shifted<S>(S);

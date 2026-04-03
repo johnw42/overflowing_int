@@ -1,12 +1,9 @@
-use std::fmt::Debug;
 use std::hash::Hash;
 use std::mem::ManuallyDrop;
 use std::rc::Rc;
-
-use num_bigint::{BigInt, BigUint};
+use std::{borrow::Cow, fmt::Debug};
 
 use crate::rc_bigint::shifted::Shifted;
-use crate::rc_bigint::small_num::{SmallInt, SmallNum, SmallUint};
 
 /// A wrapper type around `Encoding` that maintains the the invariant that
 /// values that can be represented as `SmallInt` or `SmallUint` are always
@@ -15,74 +12,57 @@ use crate::rc_bigint::small_num::{SmallInt, SmallNum, SmallUint};
 /// content of `CBigInt` and `CBigUint`, which implement high-level operations
 /// and traits.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Encoded<S, T>(EncodedRepr<S, T>)
+pub struct RcEncoded<S, T>(RcEncodedRepr<S, T>)
 where
     S: SmallNum;
 
-impl<S, T> Encoded<S, T>
+impl<S, T> EncodedBigNum<'static> for RcEncoded<S, T>
 where
     S: SmallNum,
-    T: From<S>,
+    T: BigNumber,
 {
-    pub const fn from_small(s: S) -> Self {
-        Self(EncodedRepr {
+    type Small = S;
+    type Big = T;
+    type BigEncoding = Rc<T>;
+
+    fn from_small(s: S) -> Self {
+        Self(RcEncodedRepr {
             small: Shifted::try_new(s).unwrap(),
         })
     }
 
-    pub fn decode_ref(&self) -> RefEncoding<S, T> {
+    fn decode(self) -> Encoding<Self::Small, Self::BigEncoding> {
+        self.0.clone().into()
+    }
+
+    fn decode_ref(&self) -> Encoding<Self::Small, &Self::Big> {
         unsafe {
             if let Some(small) = self.0.small.validate() {
-                RefEncoding::Small(small)
+                Encoding::Small(small)
             } else {
-                RefEncoding::Big(&self.0.big)
+                Encoding::Big(&self.0.big)
             }
         }
     }
 
-    pub fn decode(self) -> Encoding<S, T> {
-        self.0.clone().into()
-    }
-
-    pub fn small(&self) -> Option<S> {
+    fn small(&self) -> Option<<Self as EncodedBigNum>::Small> {
         self.0.small()
     }
 
-    pub fn big_ref(&self) -> Option<&T> {
+    fn big_ref(&self) -> Option<&<Self as EncodedBigNum>::Big> {
         self.0.big()
     }
-}
 
-impl<S, T> From<EncodedRepr<S, T>> for Encoded<S, T>
-where
-    S: SmallNum,
-{
-    fn from(value: EncodedRepr<S, T>) -> Self {
-        Encoded(value)
+    fn big_cow<'b>(&'b self) -> Cow<'b, <Self as EncodedBigNum>::Big> {
+        if let Some(small) = self.0.small() {
+            Cow::Owned(<Self as EncodedBigNum>::Big::from(small))
+        } else {
+            Cow::Borrowed(self.0.big())
+        }
     }
 }
 
-impl<S, T> From<Encoding<S, T>> for Encoded<S, T>
-where
-    S: SmallNum,
-    T: From<S>,
-{
-    fn from(value: Encoding<S, T>) -> Self {
-        Encoded(value.into())
-    }
-}
-
-pub enum Encoding<S, T> {
-    Small(S),
-    Big(Rc<T>),
-}
-
-pub enum RefEncoding<'a, S, T> {
-    Small(S),
-    Big(&'a T),
-}
-
-union EncodedRepr<S: SmallNum, T> {
+union RcEncodedRepr<S: SmallNum, T> {
     small: Shifted<S>,
     big: ManuallyDrop<Rc<T>>,
 }
@@ -94,7 +74,7 @@ const _: () = {
     assert!(size_of::<Rc<BigUint>>() == size_of::<SmallUint>());
 };
 
-impl<S, T> EncodedRepr<S, T>
+impl<S, T> RcEncodedRepr<S, T>
 where
     S: SmallNum,
 {
@@ -113,16 +93,16 @@ where
     }
 }
 
-impl<S, T> Clone for EncodedRepr<S, T>
+impl<S, T> Clone for RcEncodedRepr<S, T>
 where
     S: SmallNum,
 {
     fn clone(&self) -> Self {
         unsafe {
             if self.small.validate().is_some() {
-                EncodedRepr { small: self.small }
+                RcEncodedRepr { small: self.small }
             } else {
-                EncodedRepr {
+                RcEncodedRepr {
                     big: ManuallyDrop::new(Rc::clone(&self.big)),
                 }
             }
@@ -130,7 +110,7 @@ where
     }
 }
 
-impl<S, T> Drop for EncodedRepr<S, T>
+impl<S, T> Drop for RcEncodedRepr<S, T>
 where
     S: SmallNum,
 {
@@ -143,11 +123,11 @@ where
     }
 }
 
-impl<S, T> From<EncodedRepr<S, T>> for Encoding<S, T>
+impl<S, T> From<RcEncodedRepr<S, T>> for Encoding<S, T>
 where
     S: SmallNum,
 {
-    fn from(mut value: EncodedRepr<S, T>) -> Self {
+    fn from(mut value: RcEncodedRepr<S, T>) -> Self {
         unsafe {
             if let Some(small) = value.small.validate() {
                 Encoding::Small(small)
@@ -158,7 +138,7 @@ where
     }
 }
 
-impl<S, T> From<Encoding<S, T>> for EncodedRepr<S, T>
+impl<S, T> From<Encoding<S, T>> for RcEncodedRepr<S, T>
 where
     S: SmallNum,
     T: From<S>,
@@ -167,21 +147,21 @@ where
         match value {
             Encoding::Small(s) => {
                 if let Some(small) = Shifted::try_new(s) {
-                    EncodedRepr { small }
+                    RcEncodedRepr { small }
                 } else {
-                    EncodedRepr {
+                    RcEncodedRepr {
                         big: ManuallyDrop::new(Rc::new(T::from(s))),
                     }
                 }
             }
-            Encoding::Big(b) => EncodedRepr {
+            Encoding::Big(b) => RcEncodedRepr {
                 big: ManuallyDrop::new(b),
             },
         }
     }
 }
 
-impl<S, T> Debug for EncodedRepr<S, T>
+impl<S, T> Debug for RcEncodedRepr<S, T>
 where
     S: SmallNum + Debug,
     T: Debug,
@@ -194,7 +174,7 @@ where
     }
 }
 
-impl<S, T> Hash for EncodedRepr<S, T>
+impl<S, T> Hash for RcEncodedRepr<S, T>
 where
     S: SmallNum + Hash,
     T: Hash,
@@ -207,7 +187,7 @@ where
     }
 }
 
-impl<S, T> PartialEq for EncodedRepr<S, T>
+impl<S, T> PartialEq for RcEncodedRepr<S, T>
 where
     S: SmallNum + PartialEq,
     T: PartialEq,
@@ -221,7 +201,7 @@ where
     }
 }
 
-impl<S, T> Eq for EncodedRepr<S, T>
+impl<S, T> Eq for RcEncodedRepr<S, T>
 where
     S: SmallNum + Eq,
     T: Eq,

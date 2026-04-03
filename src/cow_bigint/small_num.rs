@@ -7,4 +7,4 @@ const _: () = {
     assert!(size_of::<SmallInt>() == size_of::<SmallUint>());
 };
 
-crate::bytes_to_uint!();
+crate::small_num!();
