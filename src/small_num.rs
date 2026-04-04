@@ -1,6 +1,6 @@
 use std::{
     fmt::{Debug, Display},
-    ops::{Add, BitAnd, BitOr, Shl, Shr},
+    ops::{BitAnd, BitOr, Shl, Shr},
 };
 
 use num_bigint::{BigInt, BigUint};
@@ -11,7 +11,7 @@ use num_traits::{
 };
 use paste::paste;
 
-use crate::{BigNumber, duplicate_arith_ops};
+use crate::{big_number::BigNumber, duplicate_arith_ops};
 
 /// A trait implemented by primitive integer types that can be used as the
 /// "small" part of a big integer encoding.
@@ -33,6 +33,7 @@ pub trait SmallNumber:
     + From<u8>
     + From<bool>
     + Into<BigInt>
+    + Into<Self::Big>
     + One
     + Ord
     + PrimInt
@@ -53,20 +54,6 @@ pub trait SmallNumber:
     + TryFrom<Self::Unsigned>
     + TryInto<BigUint>
     + Zero
-where
-    for<'a> &'a Self: Add<&'a Self, Output = Self>,
-    for<'a> &'a Self: Add<&'a u128, Output = Self>,
-    for<'a> &'a Self: Add<&'a u16, Output = Self>,
-    for<'a> &'a Self: Add<&'a u32, Output = Self>,
-    for<'a> &'a Self: Add<&'a u64, Output = Self>,
-    for<'a> &'a Self: Add<&'a u8, Output = Self>,
-    for<'a> &'a Self: Add<&'a usize, Output = Self>,
-    for<'a> &'a Self: Add<Self, Output = Self>,
-    for<'a> &'a Self: Add<u128, Output = Self>,
-    for<'a> &'a Self: Add<u16, Output = Self>,
-    for<'a> &'a Self: Add<u32, Output = Self>,
-    for<'a> &'a Self: Add<u64, Output = Self>,
-    for<'a> &'a Self: Add<u8, Output = Self>,
 {
     type Big: BigNumber;
     type Unsigned: SmallNumber + Unsigned;
@@ -75,6 +62,16 @@ where
 
     fn try_from_unsigned(u: Self::Unsigned) -> Option<Self> {
         Self::try_from(u).ok()
+    }
+
+    fn try_from_big(b: Self::Big) -> Option<Self>;
+
+    fn to_big(self) -> Self::Big {
+        self.into()
+    }
+
+    fn to_bigint(self) -> BigInt {
+        self.into()
     }
 
     /// Calls the primitive's `unsigned_abs` method, which returns the unsigned
@@ -96,11 +93,11 @@ where
         if size_of::<Self>() < bytes.len() {
             return None;
         }
-        let mut result = Self::zero();
+        let mut result = Self::Unsigned::zero();
         for &byte in bytes {
-            result = (result << 8u32) | <Self as From<u8>>::from(byte);
+            result = (result << 8u32) | <Self::Unsigned as From<u8>>::from(byte);
         }
-        Some(result)
+        Self::try_from(result).ok()
     }
 
     fn from_bytes_le(bytes: &[u8]) -> Option<Self> {
@@ -108,37 +105,49 @@ where
         if size_of::<Self>() < bytes.len() {
             return None;
         }
-        let mut result = Self::zero();
+        let mut result = Self::Unsigned::zero();
         for &byte in bytes.iter().rev() {
-            result = (result << 8u32) | <Self as From<u8>>::from(byte);
+            result = (result << 8u32) | <Self::Unsigned as From<u8>>::from(byte);
         }
-        Some(result)
+        Self::try_from(result).ok()
     }
 
     duplicate_arith_ops!(paste! {
-        fn [<op_fn _bigint_left>](lhs: Self, rhs: Self::Big) -> Self::Big;
-        fn [<op_fn _bigint_right>](lhs: Self::Big, rhs: Self) -> Self::Big;
-        fn [<op_fn _bigint_ref_left>](lhs: Self, rhs: &Self::Big) -> Self::Big;
-        fn [<op_fn _bigint_ref_right>](lhs: &Self::Big, rhs: Self) -> Self::Big;
+        fn [<op_fn _small_big>](lhs: Self, rhs: Self::Big) -> Self::Big;
+        fn [<op_fn _small_big_ref>](lhs: Self, rhs: &Self::Big) -> Self::Big;
+        fn [<op_fn _big_small>](lhs: Self::Big, rhs: Self) -> Self::Big;
+        fn [<op_fn _big_ref_small>](lhs: &Self::Big, rhs: Self) -> Self::Big;
+        fn [<op_fn _assign_small>](lhs: &mut Self::Big, rhs: Self);
     });
+    fn pow_big_usmall(lhs: Self::Big, rhs: Self::Unsigned) -> Self::Big;
+    fn pow_big_ref_usmall(lhs: &Self::Big, rhs: Self::Unsigned) -> Self::Big;
 }
 
-macro_rules! impl_arith_ops {
+macro_rules! impl_binary_ops {
     () => {
         duplicate_arith_ops!(paste! {
-            fn [<op_fn _bigint_left>](lhs: Self, rhs: Self::Big) -> Self::Big {
+            fn [<op_fn _small_big>](lhs: Self, rhs: Self::Big) -> Self::Big {
                 std::ops::op_trait::op_fn(lhs, rhs)
             }
-            fn [<op_fn _bigint_right>](lhs: Self::Big, rhs: Self) -> Self::Big {
+            fn [<op_fn _small_big_ref>](lhs: Self, rhs: &Self::Big) -> Self::Big {
                 std::ops::op_trait::op_fn(lhs, rhs)
             }
-            fn [<op_fn _bigint_ref_left>](lhs: Self, rhs: &Self::Big) -> Self::Big {
+            fn [<op_fn _big_small>](lhs: Self::Big, rhs: Self) -> Self::Big {
                 std::ops::op_trait::op_fn(lhs, rhs)
             }
-            fn [<op_fn _bigint_ref_right>](lhs: &Self::Big, rhs: Self) -> Self::Big {
+            fn [<op_fn _big_ref_small>](lhs: &Self::Big, rhs: Self) -> Self::Big {
                 std::ops::op_trait::op_fn(lhs, rhs)
+            }
+            fn [<op_fn _assign_small>](lhs: &mut Self::Big, rhs: Self) {
+                std::ops::[<op_trait Assign>]::[<op_fn _assign>](lhs, rhs)
             }
         });
+        fn pow_big_usmall(lhs: Self::Big, rhs: Self::Unsigned) -> Self::Big {
+            num_traits::Pow::pow(lhs, rhs)
+        }
+        fn pow_big_ref_usmall(lhs: &Self::Big, rhs: Self::Unsigned) -> Self::Big {
+            num_traits::Pow::pow(lhs, rhs)
+        }
     };
 }
 
@@ -157,7 +166,11 @@ macro_rules! impl_small_num {
                 self.overflowing_pow(exp)
             }
 
-            impl_arith_ops!();
+            fn try_from_big(b: Self::Big) -> Option<Self> {
+                Self::try_from(b).ok()
+            }
+
+            impl_binary_ops!();
         }
 
         impl SmallNumber for $unsigned {
@@ -173,7 +186,11 @@ macro_rules! impl_small_num {
                 self.overflowing_pow(exp)
             }
 
-            impl_arith_ops!();
+            fn try_from_big(b: Self::Big) -> Option<Self> {
+                Self::try_from(b).ok()
+            }
+
+            impl_binary_ops!();
         }
     };
 }

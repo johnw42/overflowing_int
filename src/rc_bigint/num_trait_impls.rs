@@ -20,28 +20,28 @@ use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformSampler};
 use rand::prelude::Distribution;
 use serde::{Deserialize, Serialize};
 
-use crate::rc_bigint::GenericBigInt;
+use crate::rc_bigint::GenericBigNum;
 use crate::rc_bigint::encoding::RefEncoding;
 
-impl quickcheck::Arbitrary for GenericBigInt {
+impl quickcheck::Arbitrary for GenericBigNum {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         match bool::arbitrary(g) {
-            true => GenericBigInt::from(i128::arbitrary(g)),
-            false => GenericBigInt::from(BigInt::arbitrary(g)),
+            true => GenericBigNum::from(i128::arbitrary(g)),
+            false => GenericBigNum::from(BigInt::arbitrary(g)),
         }
     }
 }
 
-impl arbitrary::Arbitrary<'_> for GenericBigInt {
+impl arbitrary::Arbitrary<'_> for GenericBigNum {
     fn arbitrary(g: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
         match bool::arbitrary(g)? {
-            true => Ok(GenericBigInt::from(i128::arbitrary(g)?)),
-            false => Ok(GenericBigInt::from(BigInt::arbitrary(g)?)),
+            true => Ok(GenericBigNum::from(i128::arbitrary(g)?)),
+            false => Ok(GenericBigNum::from(BigInt::arbitrary(g)?)),
         }
     }
 }
 
-impl Binary for GenericBigInt {
+impl Binary for GenericBigNum {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.decode_ref() {
             RefEncoding::Small(n) => Binary::fmt(&n, f),
@@ -50,19 +50,19 @@ impl Binary for GenericBigInt {
     }
 }
 
-impl CheckedAdd for GenericBigInt {
+impl CheckedAdd for GenericBigNum {
     fn checked_add(&self, v: &Self) -> Option<Self> {
         self.checked_add(v)
     }
 }
 
-impl CheckedDiv for GenericBigInt {
+impl CheckedDiv for GenericBigNum {
     fn checked_div(&self, v: &Self) -> Option<Self> {
         self.checked_div(v)
     }
 }
 
-impl CheckedEuclid for GenericBigInt {
+impl CheckedEuclid for GenericBigNum {
     fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
         self.big_cow()
             .checked_rem_euclid(&v.big_cow())
@@ -76,38 +76,38 @@ impl CheckedEuclid for GenericBigInt {
     }
 }
 
-impl CheckedMul for GenericBigInt {
+impl CheckedMul for GenericBigNum {
     fn checked_mul(&self, v: &Self) -> Option<Self> {
         self.checked_mul(v)
     }
 }
 
-impl CheckedSub for GenericBigInt {
+impl CheckedSub for GenericBigNum {
     fn checked_sub(&self, v: &Self) -> Option<Self> {
         self.checked_sub(v)
     }
 }
 
-impl ConstZero for GenericBigInt {
+impl ConstZero for GenericBigNum {
     const ZERO: Self = Self(Encoded::from_small(0));
 }
 
-impl<'a, 'de> Deserialize<'de> for GenericBigInt {
+impl<'a, 'de> Deserialize<'de> for GenericBigNum {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        BigInt::deserialize(deserializer).map(GenericBigInt::from)
+        BigInt::deserialize(deserializer).map(GenericBigNum::from)
     }
 }
 
-impl<'a> Distribution<GenericBigInt> for RandomBits {
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> GenericBigInt {
+impl<'a> Distribution<GenericBigNum> for RandomBits {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> GenericBigNum {
         <RandomBits as Distribution<BigInt>>::sample(self, rng).into()
     }
 }
 
-impl Euclid for GenericBigInt {
+impl Euclid for GenericBigNum {
     fn rem_euclid(&self, v: &Self) -> Self {
         self.big_cow().rem_euclid(&v.big_cow()).into()
     }
@@ -117,7 +117,7 @@ impl Euclid for GenericBigInt {
     }
 }
 
-impl FromBytes for GenericBigInt {
+impl FromBytes for GenericBigNum {
     type Bytes = [u8];
 
     fn from_be_bytes(bytes: &[u8]) -> Self {
@@ -129,17 +129,17 @@ impl FromBytes for GenericBigInt {
     }
 }
 
-impl FromPrimitive for GenericBigInt {
+impl FromPrimitive for GenericBigNum {
     fn from_i64(n: i64) -> Option<Self> {
-        Some(GenericBigInt::from(n))
+        Some(GenericBigNum::from(n))
     }
 
     fn from_u64(n: u64) -> Option<Self> {
-        Some(GenericBigInt::from(n))
+        Some(GenericBigNum::from(n))
     }
 }
 
-impl FromStr for GenericBigInt {
+impl FromStr for GenericBigNum {
     type Err = num_bigint::ParseBigIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -147,7 +147,7 @@ impl FromStr for GenericBigInt {
     }
 }
 
-impl Integer for GenericBigInt {
+impl Integer for GenericBigNum {
     fn div_floor(&self, other: &Self) -> Self {
         if let Some((lhs, rhs)) = self.to_small_with(other)
             && (lhs, rhs) != (SmallInt::MIN, -1)
@@ -220,7 +220,7 @@ impl Integer for GenericBigInt {
     }
 }
 
-impl LowerHex for GenericBigInt {
+impl LowerHex for GenericBigNum {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.decode_ref() {
             RefEncoding::Small(n) => LowerHex::fmt(&n, f),
@@ -229,8 +229,8 @@ impl LowerHex for GenericBigInt {
     }
 }
 
-impl<'a> Neg for GenericBigInt {
-    type Output = GenericBigInt;
+impl<'a> Neg for GenericBigNum {
+    type Output = GenericBigNum;
 
     fn neg(self) -> Self::Output {
         if let Some(a) = self.to_small()
@@ -242,8 +242,8 @@ impl<'a> Neg for GenericBigInt {
     }
 }
 
-impl<'a> Neg for &GenericBigInt {
-    type Output = GenericBigInt;
+impl<'a> Neg for &GenericBigNum {
+    type Output = GenericBigNum;
 
     fn neg(self) -> Self::Output {
         if let Some(a) = self.to_small()
@@ -255,16 +255,16 @@ impl<'a> Neg for &GenericBigInt {
     }
 }
 
-impl Num for GenericBigInt {
+impl Num for GenericBigNum {
     type FromStrRadixErr = ParseBigIntError;
 
     fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-        BigInt::from_str_radix(str, radix).map(GenericBigInt::from)
+        BigInt::from_str_radix(str, radix).map(GenericBigNum::from)
     }
 }
 
-impl<'a> Not for GenericBigInt {
-    type Output = GenericBigInt;
+impl<'a> Not for GenericBigNum {
+    type Output = GenericBigNum;
 
     fn not(self) -> Self::Output {
         match self.into_encoding() {
@@ -275,8 +275,8 @@ impl<'a> Not for GenericBigInt {
     }
 }
 
-impl<'a> Not for &GenericBigInt {
-    type Output = GenericBigInt;
+impl<'a> Not for &GenericBigNum {
+    type Output = GenericBigNum;
 
     fn not(self) -> Self::Output {
         match self.into_encoding() {
@@ -287,7 +287,7 @@ impl<'a> Not for &GenericBigInt {
     }
 }
 
-impl Octal for GenericBigInt {
+impl Octal for GenericBigNum {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.decode_ref() {
             Encoding::Small(n) => Octal::fmt(n, f),
@@ -296,7 +296,7 @@ impl Octal for GenericBigInt {
     }
 }
 
-impl Ord for GenericBigInt {
+impl Ord for GenericBigNum {
     fn cmp(&self, other: &Self) -> Ordering {
         use Encoding::*;
         use Ordering::*;
@@ -324,28 +324,30 @@ impl Ord for GenericBigInt {
 }
 
 #[quickcheck]
-fn test_round_trip1(a: GenericBigInt) -> bool {
-    GenericBigInt::from(BigInt::from(a.clone())) == a && a.clone() == GenericBigInt::from(BigInt::from(a))
+fn test_round_trip1(a: GenericBigNum) -> bool {
+    GenericBigNum::from(BigInt::from(a.clone())) == a
+        && a.clone() == GenericBigNum::from(BigInt::from(a))
 }
 
 #[quickcheck]
 fn test_round_trip2(a: BigInt) -> bool {
-    BigInt::from(GenericBigInt::from(a.clone())) == a && a.clone() == BigInt::from(GenericBigInt::from(a))
+    BigInt::from(GenericBigNum::from(a.clone())) == a
+        && a.clone() == BigInt::from(GenericBigNum::from(a))
 }
 
 #[quickcheck]
-fn test_to_string(a: GenericBigInt) -> bool {
+fn test_to_string(a: GenericBigNum) -> bool {
     a.to_string() == BigInt::from(a).to_string()
 }
 
 #[quickcheck]
-fn test_ord(a: GenericBigInt, b: GenericBigInt) -> bool {
+fn test_ord(a: GenericBigNum, b: GenericBigNum) -> bool {
     a.cmp(&b) == BigInt::from(a).cmp(&BigInt::from(b))
 }
 
-impl<'a> One for GenericBigInt {
+impl<'a> One for GenericBigNum {
     fn one() -> Self {
-        GenericBigInt(Encoded::from_small(1))
+        GenericBigNum(Encoded::from_small(1))
     }
 
     fn is_one(&self) -> bool {
@@ -353,15 +355,15 @@ impl<'a> One for GenericBigInt {
     }
 }
 
-impl<'a> PartialOrd for GenericBigInt {
+impl<'a> PartialOrd for GenericBigNum {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a> RefUnwindSafe for GenericBigInt {}
+impl<'a> RefUnwindSafe for GenericBigNum {}
 
-impl<'a> Roots for GenericBigInt {
+impl<'a> Roots for GenericBigNum {
     fn nth_root(&self, n: u32) -> Self {
         match self.into_encoding() {
             Encoding::Small(a) => a.nth_root(n).into(),
@@ -370,14 +372,14 @@ impl<'a> Roots for GenericBigInt {
     }
 }
 
-impl SampleUniform for GenericBigInt {
+impl SampleUniform for GenericBigNum {
     type Sampler = UniformCBigInt;
 }
 
 pub struct UniformCBigInt(UniformBigInt);
 
 impl UniformSampler for UniformCBigInt {
-    type X = GenericBigInt;
+    type X = GenericBigNum;
 
     fn new<B1, B2>(low: B1, high: B2) -> Self
     where
@@ -406,7 +408,7 @@ impl UniformSampler for UniformCBigInt {
     }
 }
 
-impl<'a> Serialize for GenericBigInt {
+impl<'a> Serialize for GenericBigNum {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -415,7 +417,7 @@ impl<'a> Serialize for GenericBigInt {
     }
 }
 
-impl<'a> Signed for GenericBigInt {
+impl<'a> Signed for GenericBigNum {
     fn abs(&self) -> Self {
         match self.decode_ref() {
             Encoding::Small(a) => {
@@ -451,7 +453,7 @@ impl<'a> Signed for GenericBigInt {
     }
 }
 
-impl<'a> ToBytes for GenericBigInt {
+impl<'a> ToBytes for GenericBigNum {
     type Bytes = Vec<u8>;
 
     fn to_be_bytes(&self) -> Self::Bytes {
@@ -469,7 +471,7 @@ impl<'a> ToBytes for GenericBigInt {
     }
 }
 
-impl<'a> ToPrimitive for GenericBigInt {
+impl<'a> ToPrimitive for GenericBigNum {
     #[duplicate::duplicate_item(
         prim;
         [i8];
@@ -497,7 +499,7 @@ impl<'a> ToPrimitive for GenericBigInt {
     }
 }
 
-impl<'a> UpperHex for GenericBigInt {
+impl<'a> UpperHex for GenericBigNum {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self.decode_ref() {
             Encoding::Small(n) => UpperHex::fmt(n, f),
@@ -506,9 +508,9 @@ impl<'a> UpperHex for GenericBigInt {
     }
 }
 
-impl<'a> Zero for GenericBigInt {
+impl<'a> Zero for GenericBigNum {
     fn zero() -> Self {
-        GenericBigInt(Encoded::from_small(0))
+        GenericBigNum(Encoded::from_small(0))
     }
 
     fn is_zero(&self) -> bool {
@@ -518,22 +520,22 @@ impl<'a> Zero for GenericBigInt {
 
 #[test]
 fn test_gcd() {
-    let small = GenericBigInt::from(5);
-    let huge = GenericBigInt::from(i128::MAX).pow(2);
-    assert_eq!(huge.gcd(&small), GenericBigInt::from(1));
-    assert_eq!(small.gcd(&huge), GenericBigInt::from(1));
+    let small = GenericBigNum::from(5);
+    let huge = GenericBigNum::from(i128::MAX).pow(2);
+    assert_eq!(huge.gcd(&small), GenericBigNum::from(1));
+    assert_eq!(small.gcd(&huge), GenericBigNum::from(1));
 }
 
 #[test]
 fn test_one() {
-    assert!(GenericBigInt::one().is_one());
-    assert_eq!(GenericBigInt::one(), GenericBigInt::from(1));
-    assert!(!GenericBigInt::from(2).is_one());
+    assert!(GenericBigNum::one().is_one());
+    assert_eq!(GenericBigNum::one(), GenericBigNum::from(1));
+    assert!(!GenericBigNum::from(2).is_one());
 }
 
 #[test]
 fn test_zero() {
-    assert!(GenericBigInt::zero().is_zero());
-    assert_eq!(GenericBigInt::zero(), GenericBigInt::from(0));
-    assert!(!GenericBigInt::from(1).is_zero());
+    assert!(GenericBigNum::zero().is_zero());
+    assert_eq!(GenericBigNum::zero(), GenericBigNum::from(0));
+    assert!(!GenericBigNum::from(1).is_zero());
 }

@@ -6,7 +6,8 @@ pub use num_bigint::{
 
 pub mod big_number;
 //pub mod cow_bigint;
-// mod generic_bigint;
+mod generic_bignum;
 mod macros;
 //pub mod rc_bigint;
-// mod small_num;
+pub mod generic_bigint;
+mod small_num;

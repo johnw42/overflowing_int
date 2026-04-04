@@ -39,25 +39,6 @@ impl<'a, T, I> BigNumberDigits<'a, T> for I where
 {
 }
 
-pub enum ArithOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-}
-
-pub enum BitOp {
-    BitAnd,
-    BitOr,
-    BitXor,
-}
-
-pub enum ShiftOp {
-    Shl,
-    Shr,
-}
-
 macro_rules! identity {
     ($($body:tt)*) => {
         $($body)*
@@ -67,17 +48,24 @@ macro_rules! identity {
 macro_rules! declare_binary_ops {
     ($op_fn:ident, $lhs:ty, $rhs:ty) => {
         paste! {
-            fn [<$op_fn _ $lhs:lower _ $rhs:lower>](lhs: $lhs, rhs: $rhs) -> Self;
-            fn [<$op_fn _ $lhs:lower _ref_ $rhs:lower>](lhs: $lhs, rhs: &$rhs) -> Self;
-            fn [<$op_fn _ref_ $lhs:lower _ $rhs:lower>](lhs: &$lhs, rhs: $rhs) -> Self;
-            fn [<$op_fn _ref_ $lhs:lower _ref_ $rhs:lower>](lhs: &$lhs, rhs: &$rhs) -> Self;
+            fn [<$op_fn _ $lhs:lower _and_ $rhs:lower>](lhs: $lhs, rhs: $rhs) -> Self;
+            fn [<$op_fn _ $lhs:lower _and_ref_ $rhs:lower>](lhs: $lhs, rhs: &$rhs) -> Self;
+            fn [<$op_fn _ref_ $lhs:lower _and_ $rhs:lower>](lhs: &$lhs, rhs: $rhs) -> Self;
+            fn [<$op_fn _ref_ $lhs:lower _and_ref_ $rhs:lower>](lhs: &$lhs, rhs: &$rhs) -> Self;
         }
     };
 }
-macro_rules! declare_binary_assign_ops {
+macro_rules! declare_binary_assign_op {
     ($op_fn:ident, $rhs:ty) => {
         paste! {
-            fn [<$op_fn _asssign_ $rhs:lower>](&mut self, rhs: $rhs);
+            fn [<$op_fn _assign_ $rhs:lower>](&mut self, rhs: $rhs);
+        }
+    };
+}
+macro_rules! declare_binary_assign_ref_op {
+    ($op_fn:ident) => {
+        paste! {
+            fn [<$op_fn _assign_ref_self>](&mut self, rhs: &Self);
         }
     };
 }
@@ -85,31 +73,41 @@ macro_rules! declare_binary_assign_ops {
 macro_rules! impl_binary_ops {
     ($op_fn:ident, $lhs:ty, $rhs:ty) => {
         paste! {
-            fn [<$op_fn _ $lhs:lower _ $rhs:lower>](lhs: $lhs, rhs: $rhs) -> Self {
+            fn [<$op_fn _ $lhs:lower _and_ $rhs:lower>](lhs: $lhs, rhs: $rhs) -> Self {
                 lhs.$op_fn(rhs)
             }
-            fn [<$op_fn _ $lhs:lower _ref_ $rhs:lower>](lhs: $lhs, rhs: &$rhs) -> Self {
+            fn [<$op_fn _ $lhs:lower _and_ref_ $rhs:lower>](lhs: $lhs, rhs: &$rhs) -> Self {
                 lhs.$op_fn(rhs)
             }
-            fn [<$op_fn _ref_ $lhs:lower _ $rhs:lower>](lhs: &$lhs, rhs: $rhs) -> Self {
+            fn [<$op_fn _ref_ $lhs:lower _and_ $rhs:lower>](lhs: &$lhs, rhs: $rhs) -> Self {
                 lhs.$op_fn(rhs)
             }
-            fn [<$op_fn _ref_ $lhs:lower _ref_ $rhs:lower>](lhs: &$lhs, rhs: &$rhs) -> Self {
+            fn [<$op_fn _ref_ $lhs:lower _and_ref_ $rhs:lower>](lhs: &$lhs, rhs: &$rhs) -> Self {
                 lhs.$op_fn(rhs)
             }
         }
     };
 }
-macro_rules! impl_binary_assign_ops {
+macro_rules! impl_binary_assign_op {
     ($op_fn:ident, $rhs:ty) => {
         paste! {
-            fn [<$op_fn _asssign_ $rhs:lower>](&mut self, rhs: $rhs) {
+            fn [<$op_fn _assign_ $rhs:lower>](&mut self, rhs: $rhs) {
+                self.[<$op_fn _assign>](rhs);
+            }
+        }
+    };
+}
+macro_rules! impl_binary_assign_ref_op {
+    ($op_fn:ident) => {
+        paste! {
+            fn [<$op_fn _assign_ref_self>](&mut self, rhs: &Self) {
                 self.[<$op_fn _assign>](rhs);
             }
         }
     };
 }
 
+// TODO: Handle config settings
 identity! {
 pub trait BigNumber
 where
@@ -175,30 +173,31 @@ where
     duplicate_arith_ops! {
         paste! {
             declare_binary_ops!(op_fn, Self, Self);
-            declare_binary_assign_ops!(op_fn, Self);
+            declare_binary_assign_op!(op_fn, Self);
+            declare_binary_assign_ref_op!(op_fn);
         }
         duplicate_uprims! { paste! {
             declare_binary_ops!(op_fn, Self, prim);
             declare_binary_ops!(op_fn, prim, Self);
-            declare_binary_assign_ops!(op_fn, prim);
+            declare_binary_assign_op!(op_fn, prim);
         } }
     }
     duplicate_shift_ops! {
         duplicate_prims! { paste! {
             declare_binary_ops!(op_fn, Self, prim);
-            declare_binary_assign_ops!(op_fn, prim);
+            declare_binary_assign_op!(op_fn, prim);
         } }
     }
     duplicate_bit_ops! {
         paste! {
             declare_binary_ops!(op_fn, Self, Self);
-            declare_binary_assign_ops!(op_fn, Self);
+            declare_binary_assign_op!(op_fn, Self);
+            declare_binary_assign_ref_op!(op_fn);
         }
     }
-    fn pow_self_ref_biguint(lhs: Self, rhs: &BigUint) -> Self;
+    fn pow_self_and_ref_biguint(lhs: Self, rhs: &BigUint) -> Self;
     duplicate_uprims! { paste! {
-        //fn [<pow_self_ prim>](lhs: Self, rhs: prim) -> Self;
-        fn [<pow_self_ref_ prim>](lhs: Self, rhs: &prim) -> Self;
+        fn [<pow_self_and_ref_ prim>](lhs: Self, rhs: &prim) -> Self;
     } }
 
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self>;
@@ -223,7 +222,7 @@ pub trait BigSigned: BigNumber + Signed {
     duplicate_arith_ops! { duplicate_iprims! { paste! {
         declare_binary_ops!(op_fn, Self, prim);
         declare_binary_ops!(op_fn, prim, Self);
-        declare_binary_assign_ops!(op_fn, prim);
+        declare_binary_assign_op!(op_fn, prim);
     } } }
 
     fn new(sign: Sign, digits: Vec<u32>) -> Self;
@@ -238,6 +237,8 @@ pub trait BigSigned: BigNumber + Signed {
     fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self>;
     fn to_bytes_be(&self) -> (Sign, Vec<u8>);
     fn to_bytes_le(&self) -> (Sign, Vec<u8>);
+    fn to_signed_bytes_be(&self) -> Vec<u8>;
+    fn to_signed_bytes_le(&self) -> Vec<u8>;
     fn sign(&self) -> Sign;
     fn magnitude(&self) -> &BigUint;
     fn into_parts(self) -> (Sign, BigUint);
@@ -266,31 +267,33 @@ macro_rules! impl_big_number {
             duplicate_arith_ops! {
                 paste! {
                     impl_binary_ops!(op_fn, Self, Self);
-                    impl_binary_assign_ops!(op_fn, Self);
+                    impl_binary_assign_op!(op_fn, Self);
+                    impl_binary_assign_ref_op!(op_fn);
                 }
                 duplicate_uprims! { paste! {
                     impl_binary_ops!(op_fn, Self, prim);
                     impl_binary_ops!(op_fn, prim, Self);
-                    impl_binary_assign_ops!(op_fn, prim);
+                    impl_binary_assign_op!(op_fn, prim);
                 }}
             }
             duplicate_shift_ops! {
                 duplicate_prims! { paste! {
                     impl_binary_ops!(op_fn, Self, prim);
-                    impl_binary_assign_ops!(op_fn, prim);
+                    impl_binary_assign_op!(op_fn, prim);
                 }}
             }
             duplicate_bit_ops! {
                 paste! {
                     impl_binary_ops!(op_fn, Self, Self);
-                    impl_binary_assign_ops!(op_fn, Self);
+                    impl_binary_assign_op!(op_fn, Self);
+                    impl_binary_assign_ref_op!(op_fn);
                 }
             }
-            fn pow_self_ref_biguint(lhs: Self, rhs: &BigUint) -> Self {
+            fn pow_self_and_ref_biguint(lhs: Self, rhs: &BigUint) -> Self {
                 lhs.pow(rhs)
             }
             duplicate_uprims! { paste! {
-                fn [<pow_self_ref_ prim>](lhs: Self, rhs: &prim) -> Self { lhs.pow(rhs) }
+                fn [<pow_self_and_ref_ prim>](lhs: Self, rhs: &prim) -> Self { lhs.pow(rhs) }
             } }
 
             fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
@@ -363,7 +366,7 @@ impl BigSigned for BigInt {
     duplicate_arith_ops! { duplicate_iprims! { paste! {
         impl_binary_ops!(op_fn, Self, prim);
         impl_binary_ops!(op_fn, prim, Self);
-        impl_binary_assign_ops!(op_fn, prim);
+        impl_binary_assign_op!(op_fn, prim);
     } } }
 
     fn new(sign: Sign, digits: Vec<u32>) -> Self {
@@ -412,6 +415,14 @@ impl BigSigned for BigInt {
 
     fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
         self.to_bytes_le()
+    }
+
+    fn to_signed_bytes_be(&self) -> Vec<u8> {
+        self.to_signed_bytes_be()
+    }
+
+    fn to_signed_bytes_le(&self) -> Vec<u8> {
+        self.to_signed_bytes_le()
     }
 
     fn sign(&self) -> Sign {
