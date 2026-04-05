@@ -5,8 +5,8 @@ use std::borrow::Cow;
 use std::convert::{TryFrom, TryInto};
 
 use crate::duplicate_prims;
+use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decoded, EncodedBigNum};
-use crate::generic_bignum::struct_def::GenericBigNum;
 
 // impl<'a, E: EncodedBigNum<'a>> ToBigInt for GenericBigNum<'a, E> {
 //     fn to_bigint(&self) -> Option<BigInt> {

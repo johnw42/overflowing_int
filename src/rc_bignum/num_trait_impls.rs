@@ -20,8 +20,8 @@ use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformSampler};
 use rand::prelude::Distribution;
 use serde::{Deserialize, Serialize};
 
-use crate::rc_bigint::GenericBigNum;
-use crate::rc_bigint::encoding::RefEncoding;
+use crate::rc_bignum::GenericBigNum;
+use crate::rc_bignum::encoding::RefEncoding;
 
 impl quickcheck::Arbitrary for GenericBigNum {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {

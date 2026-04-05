@@ -5,8 +5,8 @@ use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::Zero;
 
 use crate::big_number::BigNumberDigits;
+use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decoded, EncodedBigNum};
-use crate::generic_bignum::struct_def::GenericBigNum;
 use crate::small_num::SmallNumber;
 
 #[derive(Clone, PartialEq, Eq, Hash)]

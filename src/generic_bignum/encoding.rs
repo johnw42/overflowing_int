@@ -7,7 +7,7 @@ use num_bigint::BigInt;
 use quickcheck::Gen;
 
 use crate::{big_number::BigNumber, duplicate_prims};
-use crate::{generic_bignum::struct_def::GenericBigNum, small_num::SmallNumber};
+use crate::{generic_bignum::GenericBigNum, small_num::SmallNumber};
 
 pub trait EncodedBigNum<'a>
 where

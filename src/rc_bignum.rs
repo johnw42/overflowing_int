@@ -1,3 +1,10 @@
+// mod convert;
+mod encoding;
+mod num_trait_impls;
+// mod ops;
+//mod convert;
+mod shifted;
+
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};

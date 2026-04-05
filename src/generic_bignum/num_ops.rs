@@ -1,6 +1,6 @@
 use crate::big_number::BigNumber;
+use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decoded, EncodedBigNum, InspectEncoding};
-use crate::generic_bignum::struct_def::GenericBigNum;
 use crate::small_num::SmallNumber as _;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,

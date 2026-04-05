@@ -3,7 +3,7 @@ use std::mem::ManuallyDrop;
 use std::rc::Rc;
 use std::{borrow::Cow, fmt::Debug};
 
-use crate::rc_bigint::shifted::Shifted;
+use crate::rc_bignum::shifted::Shifted;
 
 /// A wrapper type around `Encoding` that maintains the the invariant that
 /// values that can be represented as `SmallInt` or `SmallUint` are always
