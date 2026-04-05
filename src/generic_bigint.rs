@@ -1,13 +1,22 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::ops::Neg;
+use std::ops::{
+    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
+    Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+};
 
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::Zero;
+use paste::paste;
 
 use crate::big_number::BigNumberDigits;
 use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decoded, EncodedBigNum};
 use crate::small_num::SmallNumber;
+use crate::{
+    duplicate_arith_ops, duplicate_bit_ops, duplicate_iprims, duplicate_prims, duplicate_shift_ops,
+    duplicate_uprims,
+};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct GenericBigInt<'a, E: EncodedBigNum<'a>>(pub(crate) GenericBigNum<'a, E>);
@@ -48,7 +57,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn new(sign: Sign, digits: Vec<u32>) -> Self {
         Self(if sign == Sign::NoSign {
-            GenericBigNum::ZERO
+            GenericBigNum::from_small(E::Small::zero())
         } else {
             GenericBigNum::from_big(E::Big::new(sign, digits))
         })
@@ -458,3 +467,189 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
         self.0.set_bit(bit, value);
     }
 }
+
+impl<'a, E: EncodedBigNum<'a, Big = BigInt>> From<GenericBigNum<'a, E>> for GenericBigInt<'a, E> {
+    fn from(value: GenericBigNum<'a, E>) -> Self {
+        Self(value)
+    }
+}
+
+impl<'a, E: EncodedBigNum<'a, Big = BigInt>> From<BigInt> for GenericBigInt<'a, E> {
+    fn from(value: BigInt) -> Self {
+        Self(GenericBigNum::from_big(value))
+    }
+}
+
+impl<'a, E: EncodedBigNum<'a, Big = BigInt>> From<GenericBigInt<'a, E>> for GenericBigNum<'a, E> {
+    fn from(value: GenericBigInt<'a, E>) -> Self {
+        value.0
+    }
+}
+
+impl<'a, E: EncodedBigNum<'a>> EncodedBigNum<'a> for GenericBigInt<'a, E> {
+    type Small = E::Small;
+    type Big = E::Big;
+    type Repr = E::Repr;
+
+    fn from_decoded(enc: Decoded<E::Small, Cow<'a, E::Big>>) -> Self {
+        Self(GenericBigNum::from_encoding(E::from_decoded(enc)))
+    }
+
+    fn from_small(s: E::Small) -> Self {
+        Self(GenericBigNum::from_encoding(E::from_small(s)))
+    }
+
+    fn from_big(b: E::Big) -> Self {
+        Self(GenericBigNum::from_encoding(E::from_big(b)))
+    }
+
+    fn from_big_cow(b: Cow<'a, E::Big>) -> Self {
+        Self(GenericBigNum::from_encoding(E::from_big_cow(b)))
+    }
+
+    fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+        self.0.decode()
+    }
+
+    fn decode_ref(&self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+        self.0.decode_ref()
+    }
+
+    fn small(&self) -> Option<E::Small> {
+        self.0.small()
+    }
+
+    fn big_ref(&self) -> Option<&'a E::Big> {
+        self.0.big_ref()
+    }
+
+    fn big_cow(&self) -> Cow<'a, E::Big> {
+        self.0.big_cow()
+    }
+
+    fn into_big_cow(self) -> Cow<'a, E::Big> {
+        self.0.into_big_cow()
+    }
+
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, E::Big>)) {
+        self.0.update_encoding(f);
+    }
+}
+
+macro_rules! impl_binary_op_traits {
+    ($trait:ident,
+        $op_fn:ident,
+        $lhs_type:ty,
+        $lhs_param:ident,
+        $lhs_expr:expr,
+        $lhs_ref_expr:expr,
+        $rhs_type:ty,
+        $rhs_param:ident,
+        $rhs_expr:expr,
+        $rhs_ref_expr:expr
+    ) => {
+        impl<'a, E: EncodedBigNum<'a, Big = BigInt>> $trait<$rhs_type> for $lhs_type {
+            type Output = GenericBigInt<'a, E>;
+
+            fn $op_fn($lhs_param: Self, $rhs_param: $rhs_type) -> GenericBigInt<'a, E> {
+                GenericBigInt($lhs_expr.$op_fn($rhs_expr))
+            }
+        }
+
+        impl<'a, E: EncodedBigNum<'a, Big = BigInt>> $trait<&$rhs_type> for $lhs_type {
+            type Output = GenericBigInt<'a, E>;
+
+            fn $op_fn($lhs_param: Self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
+                GenericBigInt($lhs_expr.$op_fn($rhs_ref_expr))
+            }
+        }
+
+        impl<'a, E: EncodedBigNum<'a, Big = BigInt>> $trait<$rhs_type> for &$lhs_type {
+            type Output = GenericBigInt<'a, E>;
+
+            fn $op_fn($lhs_param: Self, $rhs_param: $rhs_type) -> GenericBigInt<'a, E> {
+                GenericBigInt($lhs_ref_expr.$op_fn($rhs_expr))
+            }
+        }
+
+        impl<'a, E: EncodedBigNum<'a, Big = BigInt>> $trait<&$rhs_type> for &$lhs_type {
+            type Output = GenericBigInt<'a, E>;
+
+            fn $op_fn($lhs_param: Self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
+                GenericBigInt($lhs_ref_expr.$op_fn($rhs_ref_expr))
+            }
+        }
+    };
+}
+
+macro_rules! impl_binary_assign_op_trait {
+    ($trait:ident, $op_fn:ident, $rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
+        paste! {
+            impl<'a, E: EncodedBigNum<'a, Big = BigInt>> [<$trait Assign>]<$rhs_type> for GenericBigInt<'a, E> {
+                fn [<$op_fn _assign>](&mut self, $rhs_param: $rhs_type) {
+                    self.0.[<$op_fn _assign>]($rhs_expr)
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_binary_assign_ref_op_trait {
+    ($trait:ident, $op_fn:ident) => {
+        paste! {
+            impl<'a, E: EncodedBigNum<'a, Big = BigInt>> [<$trait Assign>]<&GenericBigInt<'a, E>> for GenericBigInt<'a, E> {
+                fn [<$op_fn _assign>](&mut self, rhs: &GenericBigInt<'a, E>) {
+                    self.0.[<$op_fn _assign>](&rhs.0)
+                }
+            }
+        }
+    };
+}
+
+duplicate_prims! {
+    impl<'a, E: EncodedBigNum<'a, Big = BigInt>> From<prim> for GenericBigInt<'a, E> {
+        fn from(value: prim) -> Self {
+            Self(GenericBigNum::from(value))
+        }
+    }
+}
+
+duplicate_arith_ops! {
+    paste! {
+        impl_binary_op_traits!(op_trait, op_fn,
+             GenericBigInt<'a, E>, self, self.0, &self.0,
+             GenericBigInt<'a, E>, rhs,  rhs.0,  &rhs.0);
+        impl_binary_assign_op_trait!(op_trait, op_fn, GenericBigInt<'a, E>, rhs, rhs.0, &rhs.0);
+        impl_binary_assign_ref_op_trait!(op_trait, op_fn);
+    }
+    duplicate_prims! { paste! {
+        impl_binary_op_traits!(op_trait, op_fn,
+             GenericBigInt<'a, E>, self, self.0, &self.0,
+             prim, rhs, rhs, rhs);
+        impl_binary_op_traits!(op_trait, op_fn,
+             prim, self, self, self,
+             GenericBigInt<'a, E>, rhs, rhs.0, &rhs.0);
+        impl_binary_assign_op_trait!(op_trait, op_fn, prim, rhs, rhs, rhs);
+    } }
+}
+duplicate_shift_ops! {
+    duplicate_prims! { paste! {
+        impl_binary_op_traits!(op_trait, op_fn,
+             GenericBigInt<'a, E>, self, self.0, &self.0,
+             prim, rhs, rhs, rhs);
+        impl_binary_assign_op_trait!(op_trait, op_fn, prim, rhs, rhs, rhs);
+    } }
+}
+duplicate_bit_ops! {
+    paste! {
+        impl_binary_op_traits!(op_trait, op_fn,
+             GenericBigInt<'a, E>, self, self.0, &self.0,
+             GenericBigInt<'a, E>, rhs,  rhs.0,  &rhs.0);
+        impl_binary_assign_op_trait!(op_trait, op_fn, GenericBigInt<'a, E>, rhs, rhs.0, &rhs.0);
+        impl_binary_assign_ref_op_trait!(op_trait, op_fn);
+    }
+}
+// fn pow_self_and_ref_biguint(lhs: Self, rhs: &BigUint) -> Self;
+// duplicate_uprims! { paste! {
+//     fn [<pow_self_and_ref_ prim>](lhs: Self, rhs: &prim) -> Self;
+// } }

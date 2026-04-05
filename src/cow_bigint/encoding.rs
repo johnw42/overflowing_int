@@ -6,7 +6,6 @@ use num_bigint::BigUint;
 
 use duplicate::duplicate;
 
-use crate::CowBigInt;
 use crate::cow_bigint::small_num::{SmallInt, SmallUint};
 use crate::{duplicate_prims, duplicate_uprims};
 

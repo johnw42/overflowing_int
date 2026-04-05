@@ -105,7 +105,7 @@ macro_rules! duplicate_uprims {
 #[macro_export]
 macro_rules! duplicate_prims {
     ($($body:tt)*) => {
-        crate::duplicate_iprims! { $($body)* }
         crate::duplicate_uprims! { $($body)* }
+        crate::duplicate_iprims! { $($body)* }
     }
 }

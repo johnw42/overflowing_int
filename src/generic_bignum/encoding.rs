@@ -1,25 +1,21 @@
 use std::{
     borrow::{Borrow, Cow},
+    hash::Hash,
     rc::Rc,
 };
 
 use num_bigint::BigInt;
-use quickcheck::Gen;
 
 use crate::{big_number::BigNumber, duplicate_prims};
 use crate::{generic_bignum::GenericBigNum, small_num::SmallNumber};
 
-pub trait EncodedBigNum<'a>
+pub trait EncodedBigNum<'a>: Sized + Clone + Eq + Hash
 where
-    Self: Sized + Clone,
     Self::Big: Into<BigInt>,
 {
     type Small: SmallNumber<Big = Self::Big>;
     type Big: BigNumber;
     type Repr: EncodedRepr<'a, Self::Small, Self::Big>;
-
-    const ZERO: Self;
-    const ONE: Self;
 
     /// Encodes a value.  Prefer [`Self::from_small`] or [`Self::from_big`] when possible.
     fn from_decoded(enc: Decoded<Self::Small, Cow<'a, Self::Big>>) -> Self {
@@ -50,11 +46,17 @@ where
     /// Gets the small value if it is small, or `None` if it is big.
     fn small(&self) -> Option<Self::Small>;
 
+    // TODO: Rename to try_big_ref
     /// Gets the big value by reference if it is big, or `None` if it is small.
     fn big_ref(&self) -> Option<&'a Self::Big>;
 
     /// Gets the big value as a `Cow`, cloning if necessary.
     fn big_cow(&self) -> Cow<'a, Self::Big>;
+
+    /// Gets the big value as an instance of `Self::Big`, cloning if necessary.
+    fn into_big(self) -> Self::Big {
+        self.into_big_cow().into_owned()
+    }
 
     /// Gets the big value as a `Cow`, cloning if necessary.
     fn into_big_cow(self) -> Cow<'a, Self::Big>;
@@ -78,17 +80,8 @@ pub trait InspectEncoding<'a, S: SmallNumber, B: BigNumber>: Sized {
     /// Decodes the value, preferably without cloning.
     fn decode(self) -> Decoded<S, Cow<'a, B>>;
 
-    // /// Decodes the value by reference, preferably without cloning.
-    // fn decode_ref(&'a self) -> Decoded<S, Cow<'a, B>>;
-
     /// Gets the small value if it is small, or `None` if it is big.
     fn small(&self) -> Option<S>;
-
-    // /// Gets the big value by reference if it is big, or `None` if it is small.
-    // fn big_ref(&'a self) -> Option<&'a B>;
-
-    // /// Gets the big value as a `Cow`, cloning if necessary.
-    // fn big_cow(&'a self) -> Cow<'a, B>;
 
     /// Gets the big value as a `Cow`, cloning if necessary.
     fn into_big_cow(self) -> Cow<'a, B>;
@@ -125,7 +118,7 @@ impl<'a, E: EncodedBigNum<'a>> InspectEncoding<'a, E::Small, E::Big> for &Generi
 duplicate_prims! {
     impl<'a, S: SmallNumber, B: BigNumber> InspectEncoding<'a, S, B> for prim
     where
-        B: From<Self>
+        B: From<prim>
     {
         fn decode(self) -> Decoded<S, Cow<'a, B>> {
             #[allow(irrefutable_let_patterns)]
@@ -137,27 +130,9 @@ duplicate_prims! {
             }
         }
 
-        // fn decode_ref(&self) -> Decoded<S, Cow<'a, B>> {
-        //     #[allow(irrefutable_let_patterns)]
-        //     #[allow(clippy::unnecessary_fallible_conversions)]
-        //     if let Ok(small) = S::try_from(*self) {
-        //         Decoded::Small(small)
-        //     } else {
-        //         Decoded::Big(Cow::Owned(B::from(*self)))
-        //     }
-        // }
-
         fn small(&self) -> Option<S> {
             S::try_from(*self).ok()
         }
-
-        // fn big_ref(&self) -> Option<&'a B> {
-        //     None
-        // }
-
-        // fn big_cow(&self) -> Cow<'a, B> {
-        //     Cow::Owned(B::from(*self))
-        // }
 
         fn into_big_cow(self) -> Cow<'a, B> {
             Cow::Owned(B::from(self))
@@ -166,43 +141,25 @@ duplicate_prims! {
 
     impl<'a, S: SmallNumber, B: BigNumber> InspectEncoding<'a, S, B> for &prim
     where
-        B: From<Self> + From<S>,
-        S: TryFrom<Self> + TryFrom<B>,
+        B: From<prim>,
+        S: TryFrom<prim>
     {
         fn decode(self) -> Decoded<S, Cow<'a, B>> {
             #[allow(irrefutable_let_patterns)]
             #[allow(clippy::unnecessary_fallible_conversions)]
-            if let Ok(small) = S::try_from(self) {
+            if let Ok(small) = S::try_from(*self) {
                 Decoded::Small(small)
             } else {
-                Decoded::Big(Cow::Owned(B::from(self)))
+                Decoded::Big(Cow::Owned(B::from(*self)))
             }
         }
 
-        // fn decode_ref(&self) -> Decoded<S, Cow<'a, B>> {
-        //     #[allow(irrefutable_let_patterns)]
-        //     #[allow(clippy::unnecessary_fallible_conversions)]
-        //     if let Ok(small) = S::try_from(*self) {
-        //         Decoded::Small(small)
-        //     } else {
-        //         Decoded::Big(Cow::Owned(B::from(*self)))
-        //     }
-        // }
-
         fn small(&self) -> Option<S> {
-            S::try_from(*self).ok()
+            S::try_from(**self).ok()
         }
 
-        // fn big_ref(&self) -> Option<&'a B> {
-        //     None
-        // }
-
-        // fn big_cow(&'a self) -> Cow<'a, B> {
-        //     Cow::Owned(B::from(*self))
-        // }
-
         fn into_big_cow(self) -> Cow<'a, B> {
-            Cow::Owned(B::from(self))
+            Cow::Owned(B::from(*self))
         }
     }
 
@@ -217,21 +174,9 @@ where
         Decoded::Big(self)
     }
 
-    // fn decode_ref(&'a self) -> Decoded<S, Cow<'a, B>> {
-    //     Decoded::Big(Cow::Borrowed(self.borrow()))
-    // }
-
     fn small(&self) -> Option<S> {
         None
     }
-
-    // fn big_ref(&'a self) -> Option<&'a B> {
-    //     Some(self.borrow())
-    // }
-
-    // fn big_cow(&'a self) -> Cow<'a, B> {
-    //     Cow::Borrowed(self.borrow())
-    // }
 
     fn into_big_cow(self) -> Cow<'a, B> {
         self
@@ -247,21 +192,9 @@ where
         Decoded::Big(Cow::Owned((*self).clone()))
     }
 
-    // fn decode_ref(&'a self) -> Decoded<S, Cow<'a, B>> {
-    //     Decoded::Big(Cow::Borrowed(self.borrow()))
-    // }
-
     fn small(&self) -> Option<S> {
         None
     }
-
-    // fn big_ref(&'a self) -> Option<&'a B> {
-    //     Some(self.borrow())
-    // }
-
-    // fn big_cow(&'a self) -> Cow<'a, B> {
-    //     Cow::Borrowed(self.borrow())
-    // }
 
     fn into_big_cow(self) -> Cow<'a, B> {
         match Rc::try_unwrap(self) {

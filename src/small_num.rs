@@ -1,13 +1,13 @@
 use std::{
-    fmt::{Debug, Display},
+    fmt::{Binary, Debug, Display, LowerHex, Octal, UpperHex},
     ops::{BitAnd, BitOr, Shl, Shr},
 };
 
 use num_bigint::{BigInt, BigUint};
 use num_integer::Roots;
 use num_traits::{
-    CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, Num, One, PrimInt, ToPrimitive,
-    Unsigned, Zero,
+    CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, Num, One, PrimInt, ToBytes,
+    ToPrimitive, Unsigned, Zero,
 };
 use paste::paste;
 
@@ -21,6 +21,8 @@ pub trait SmallNumber:
     + Display
     + Eq
     + Num
+    + for<'a> arbitrary::Arbitrary<'a>
+    + Binary
     + BitAnd<Output = Self>
     + BitOr<Output = Self>
     + CheckedAdd
@@ -28,16 +30,19 @@ pub trait SmallNumber:
     + CheckedMul
     + CheckedRem
     + CheckedSub
+    + LowerHex
     + Shl<u32, Output = Self>
     + Shr<u32, Output = Self>
     + From<u8>
     + From<bool>
     + Into<BigInt>
     + Into<Self::Big>
+    + Octal
     + One
     + Ord
     + PrimInt
     + Roots
+    + ToBytes
     + ToPrimitive
     + TryFrom<i8>
     + TryFrom<i16>
@@ -53,12 +58,16 @@ pub trait SmallNumber:
     + TryFrom<usize>
     + TryFrom<Self::Unsigned>
     + TryInto<BigUint>
+    + quickcheck::Arbitrary
+    + UpperHex
     + Zero
 {
     type Big: BigNumber;
     type Unsigned: SmallNumber + Unsigned;
 
     const BITS: u32;
+    const MIN: Self;
+    const MINUS_ONE: Self;
 
     fn try_from_unsigned(u: Self::Unsigned) -> Option<Self> {
         Self::try_from(u).ok()
@@ -79,8 +88,16 @@ pub trait SmallNumber:
     /// identity function.
     fn unsigned_abs(self) -> Self::Unsigned;
 
+    /// Calls the primitive's `overflowing_abs` method.
+    fn overflowing_abs(self) -> (Self, bool);
+
     /// Calls the primitive's `overflowing_pow` method.
     fn overflowing_pow(self, exp: u32) -> (Self, bool);
+
+    /// Calls the primitive's `overflowing_neg` method.
+    fn overflowing_neg(self) -> (Self, bool);
+
+    fn signum(self) -> Self;
 
     fn from_bytes_be(bytes: &[u8]) -> Option<Self> {
         // Ideally this would be implemented using `from_be_bytes` on the
@@ -157,13 +174,27 @@ macro_rules! impl_small_num {
             type Big = BigInt;
             type Unsigned = $unsigned;
             const BITS: u32 = <$signed>::BITS;
+            const MIN: Self = <$signed>::MIN;
+            const MINUS_ONE: Self = -1;
 
             fn unsigned_abs(self) -> Self::Unsigned {
                 self.unsigned_abs()
             }
 
+            fn overflowing_abs(self) -> (Self, bool) {
+                self.overflowing_abs()
+            }
+
+            fn overflowing_neg(self) -> (Self, bool) {
+                self.overflowing_neg()
+            }
+
             fn overflowing_pow(self, exp: u32) -> (Self, bool) {
                 self.overflowing_pow(exp)
+            }
+
+            fn signum(self) -> Self {
+                self.signum()
             }
 
             fn try_from_big(b: Self::Big) -> Option<Self> {
@@ -177,13 +208,27 @@ macro_rules! impl_small_num {
             type Big = BigUint;
             type Unsigned = $unsigned;
             const BITS: u32 = <$unsigned>::BITS;
+            const MIN: Self = <$unsigned>::MIN;
+            const MINUS_ONE: Self = <$unsigned>::MAX;
 
             fn unsigned_abs(self) -> Self::Unsigned {
                 self
             }
 
+            fn overflowing_abs(self) -> (Self, bool) {
+                (self, false)
+            }
+
+            fn overflowing_neg(self) -> (Self, bool) {
+                (0, self == 0)
+            }
+
             fn overflowing_pow(self, exp: u32) -> (Self, bool) {
                 self.overflowing_pow(exp)
+            }
+
+            fn signum(self) -> Self {
+                if self == 0 { 0 } else { 1 }
             }
 
             fn try_from_big(b: Self::Big) -> Option<Self> {

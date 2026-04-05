@@ -1,11 +1,11 @@
-use crate::big_number::BigNumber;
+use crate::big_number::{BigNumber, BigSigned};
 use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decoded, EncodedBigNum, InspectEncoding};
 use crate::small_num::SmallNumber as _;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
 };
-use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, Pow};
+use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, Pow, Signed};
 use paste::paste;
 use std::borrow::Cow;
 use std::ops::{
@@ -275,6 +275,56 @@ duplicate_arith_ops! {
         {
             fn [<op_fn _assign>](&mut self, rhs: T) {
                 [<op_trait Op>]::call_update(self, rhs);
+            }
+        }
+    }
+
+    crate::duplicate_iprims! {
+        paste! {
+            impl<'a, E: EncodedBigNum<'a>> op_trait<GenericBigNum<'a, E>> for prim
+            where
+                E::Big: BigSigned,
+            {
+                type Output = GenericBigNum<'a, E>;
+
+                #[inline(never)]
+                fn op_fn(self, rhs: GenericBigNum<'a, E>) -> Self::Output {
+                    [<op_trait Op>]::call(self, rhs)
+                }
+            }
+
+            impl<'a, E: EncodedBigNum<'a>> op_trait<GenericBigNum<'a, E>> for &prim
+            where
+                E::Big: BigSigned,
+            {
+                type Output = GenericBigNum<'a, E>;
+
+                fn op_fn(self, rhs: GenericBigNum<'a, E>) -> Self::Output {
+                    (*self).op_fn(rhs)
+                }
+            }
+
+            impl<'a, E: EncodedBigNum<'a>> op_trait<&GenericBigNum<'a, E>> for prim
+            where
+                E::Big: BigSigned,
+            {
+                type Output = GenericBigNum<'a, E>;
+
+                #[inline(never)]
+                fn op_fn(self, rhs: &GenericBigNum<'a, E>) -> Self::Output {
+                    [<op_trait Op>]::call(self, rhs)
+                }
+            }
+
+            impl<'a, E: EncodedBigNum<'a>> op_trait<&GenericBigNum<'a, E>> for &prim
+            where
+                E::Big: BigSigned,
+            {
+                type Output = GenericBigNum<'a, E>;
+
+                fn op_fn(self, rhs: &GenericBigNum<'a, E>) -> Self::Output {
+                    (*self).op_fn(rhs)
+                }
             }
         }
     }

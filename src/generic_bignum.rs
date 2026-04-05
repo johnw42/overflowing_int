@@ -1,8 +1,3 @@
-pub mod convert;
-pub mod encoding;
-pub mod num_ops;
-pub mod struct_def;
-
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
@@ -17,22 +12,17 @@ use crate::big_number::{BigNumber, BigNumberDigits};
 use crate::generic_bignum::encoding::{Decoded, EncodedBigNum};
 use crate::small_num::SmallNumber;
 
+pub mod convert;
+pub mod encoding;
+pub mod num_ops;
+mod trait_impls;
+
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(crate) struct GenericBigNum<'a, E: EncodedBigNum<'a>>(pub(crate) E, PhantomData<&'a ()>);
 
 impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
     pub fn from_encoding(enc: E) -> Self {
         Self(enc, PhantomData)
-    }
-
-    pub fn small_with<'b, E2: EncodedBigNum<'b, Small = E::Small, Big = E::Big>>(
-        &self,
-        right: &GenericBigNum<'b, E2>,
-    ) -> Option<(E::Small, E::Small)> {
-        match (self.small(), right.small()) {
-            (Some(a), Some(b)) => Some((a, b)),
-            _ => None,
-        }
     }
 
     pub fn to_big(&self) -> E::Big {
@@ -94,19 +84,19 @@ impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
         }
     }
 
-    pub fn checked_add(&self, v: &'a Self) -> Option<Self> {
+    pub fn checked_add(&self, v: &Self) -> Option<Self> {
         self.big_cow().checked_add(&v.big_cow()).map(Self::from_big)
     }
 
-    pub fn checked_sub(&self, v: &'a Self) -> Option<Self> {
+    pub fn checked_sub(&self, v: &Self) -> Option<Self> {
         self.big_cow().checked_sub(&v.big_cow()).map(Self::from_big)
     }
 
-    pub fn checked_mul(&self, v: &'a Self) -> Option<Self> {
+    pub fn checked_mul(&self, v: &Self) -> Option<Self> {
         self.big_cow().checked_mul(&v.big_cow()).map(Self::from_big)
     }
 
-    pub fn checked_div(&self, v: &'a Self) -> Option<Self> {
+    pub fn checked_div(&self, v: &Self) -> Option<Self> {
         self.big_cow().checked_div(&v.big_cow()).map(Self::from_big)
     }
 
@@ -119,7 +109,7 @@ impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
         Self::from_big(self.big_cow().pow(exponent))
     }
 
-    pub fn modpow(&self, exponent: &'a Self, modulus: &'a Self) -> Self {
+    pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         Self::from_big(
             self.big_cow()
                 .modpow(&exponent.big_cow(), &modulus.big_cow()),
@@ -163,13 +153,13 @@ impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
         digits.into_iter()
     }
 
-    pub fn modinv(&self, modulus: &'a Self) -> Option<Self> {
+    pub fn modinv(&self, modulus: &Self) -> Option<Self> {
         self.big_cow()
             .modinv(&modulus.big_cow())
             .map(Self::from_big)
     }
 
-    pub fn set_bit(&'a mut self, bit: u64, value: bool) {
+    pub fn set_bit(&mut self, bit: u64, value: bool) {
         self.update_encoding(|encoding| match encoding {
             Decoded::Small(n) if (bit as u32) < E::Small::BITS - 1 => {
                 let to_set = E::Small::one() << bit as u32;
@@ -193,9 +183,6 @@ impl<'a, E: EncodedBigNum<'a>> EncodedBigNum<'a> for GenericBigNum<'a, E> {
     type Small = E::Small;
     type Big = E::Big;
     type Repr = E::Repr;
-
-    const ZERO: Self = Self::ZERO;
-    const ONE: Self = Self(E::ONE, PhantomData);
 
     fn from_decoded(enc: Decoded<E::Small, Cow<'a, E::Big>>) -> Self {
         Self::from_encoding(E::from_decoded(enc))

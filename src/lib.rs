@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 pub use num_bigint::{
     BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint, TryFromBigIntError,
 };

@@ -218,7 +218,24 @@ where
 }
 }
 
-pub trait BigSigned: BigNumber + Signed {
+pub trait BigSigned: BigNumber + Signed
+where
+    // From bounds
+    Self: From<BigInt>,
+    Self: From<i128>,
+    Self: From<i16>,
+    Self: From<i32>,
+    Self: From<i64>,
+    Self: From<i8>,
+    Self: From<isize>,
+    // TryInto bounds
+    Self: TryInto<i128>,
+    Self: TryInto<i16>,
+    Self: TryInto<i32>,
+    Self: TryInto<i64>,
+    Self: TryInto<i8>,
+    Self: TryInto<isize>,
+{
     duplicate_arith_ops! { duplicate_iprims! { paste! {
         declare_binary_ops!(op_fn, Self, prim);
         declare_binary_ops!(op_fn, prim, Self);
