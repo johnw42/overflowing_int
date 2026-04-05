@@ -7,7 +7,7 @@ pub use num_bigint::{
 //pub use crate::cow_bigint::bigint_impl::CowBigInt;
 
 pub mod big_number;
-//pub mod cow_bigint;
+pub mod cow_bigint;
 pub mod generic_bigint;
 mod generic_bignum;
 mod macros;

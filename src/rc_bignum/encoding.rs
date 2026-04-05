@@ -36,12 +36,10 @@ where
     }
 
     fn decode_ref(&self) -> Encoding<Self::Small, &Self::Big> {
-        unsafe {
-            if let Some(small) = self.0.small.validate() {
-                Encoding::Small(small)
-            } else {
-                Encoding::Big(&self.0.big)
-            }
+        if let Some(small) = self.0.small.validate() {
+            Encoding::Small(small)
+        } else {
+            Encoding::Big(&self.0.big)
         }
     }
 

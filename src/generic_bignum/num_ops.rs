@@ -61,22 +61,22 @@ trait ArithOp<'e, E: EncodedBigNum<'e>> {
                 Decoded::Small(small_rhs) => match Self::on_small(*small_lhs, small_rhs) {
                     Ok(out) => *encoding = Decoded::Small(out),
                     Err(()) => {
-                        *encoding = Decoded::Big(Self::on_small_big(
+                        *encoding = Decoded::Big(Cow::Owned(Self::on_small_big(
                             *small_lhs,
                             Cow::Owned(small_rhs.to_big()),
-                        ));
+                        )));
                     }
                 },
                 Decoded::Big(big_rhs) => {
-                    *encoding = Decoded::Big(Self::on_small_big(*small_lhs, big_rhs));
+                    *encoding = Decoded::Big(Cow::Owned(Self::on_small_big(*small_lhs, big_rhs)));
                 }
             },
             Decoded::Big(big_lhs) => match rhs.decode() {
                 Decoded::Small(small_rhs) => {
-                    Self::update_small(big_lhs, small_rhs);
+                    Self::update_small(big_lhs.to_mut(), small_rhs);
                 }
                 Decoded::Big(big_rhs) => {
-                    Self::update_big(big_lhs, big_rhs);
+                    Self::update_big(big_lhs.to_mut(), big_rhs);
                 }
             },
         });
@@ -93,7 +93,7 @@ trait BitOp<'e, E: EncodedBigNum<'e>> {
         L: InspectEncoding<'a, E::Small, E::Big>,
         R: InspectEncoding<'b, E::Small, E::Big>,
     {
-        GenericBigNum::from_big(Self::on_big(lhs.into_big_cow(), rhs.into_big_cow()))
+        GenericBigNum::from_big(lhs.with_big_refs(&rhs, |lhs, rhs| Self::on_big(lhs, rhs)))
     }
 
     #[inline]
@@ -103,13 +103,13 @@ trait BitOp<'e, E: EncodedBigNum<'e>> {
     {
         lhs.update_encoding(|encoding| match encoding {
             Decoded::Small(small_lhs) => {
-                *encoding = Decoded::Big(Self::on_big(
+                *encoding = Decoded::Big(Cow::Owned(Self::on_big(
                     Cow::Owned(small_lhs.to_big()),
                     rhs.into_big_cow(),
-                ));
+                )));
             }
             Decoded::Big(big_lhs) => {
-                Self::update_big(big_lhs, rhs.into_big_cow());
+                Self::update_big(big_lhs.to_mut(), rhs.into_big_cow());
             }
         });
     }
@@ -131,13 +131,13 @@ trait ShiftOp<'e, E: EncodedBigNum<'e>> {
             fn [<call_update_big_ prim>](lhs: &mut GenericBigNum<'e, E>, rhs: prim) {
                 lhs.update_encoding(|encoding| match encoding {
                     Decoded::Small(small_lhs) => {
-                        *encoding = Decoded::Big(Self::[<on_big_ prim>](
+                        *encoding = Decoded::Big(Cow::Owned(Self::[<on_big_ prim>](
                             Cow::Owned(small_lhs.to_big()),
                             rhs,
-                        ));
+                        )));
                     }
                     Decoded::Big(big_lhs) => {
-                        Self::[<update_big_ prim>](big_lhs, rhs);
+                        Self::[<update_big_ prim>](big_lhs.to_mut(), rhs);
                     }
                 });
             }
@@ -461,7 +461,7 @@ duplicate_uprims! {
             type Output = GenericBigNum<'a, E>;
 
             fn pow(self, rhs: prim) -> Self::Output {
-                GenericBigNum::from_big(E::Big::[<pow_self_and_ref_ prim>](self.big_cow().into_owned(), &rhs))
+                self.with_big_ref(|lhs| GenericBigNum::from_big(E::Big::[<pow_self_and_ref_ prim>](lhs.into_owned(), &rhs)))
             }
         }
 
@@ -469,7 +469,7 @@ duplicate_uprims! {
             type Output = GenericBigNum<'a, E>;
 
             fn pow(self, rhs: &prim) -> Self::Output {
-                GenericBigNum::from_big(E::Big::[<pow_self_and_ref_ prim>](self.big_cow().into_owned(), rhs))
+                self.with_big_ref(|lhs| GenericBigNum::from_big(E::Big::[<pow_self_and_ref_ prim>](lhs.into_owned(), rhs)))
             }
         }
     }

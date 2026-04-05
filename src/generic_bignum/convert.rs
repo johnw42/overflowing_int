@@ -40,19 +40,13 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> From<BigUint> for GenericBigNum<'a,
 
 impl<'a, E: EncodedBigNum<'a, Big = BigInt>> From<GenericBigNum<'a, E>> for BigInt {
     fn from(value: GenericBigNum<'a, E>) -> Self {
-        match value.decode() {
-            Decoded::Small(n) => n.into(),
-            Decoded::Big(n) => n.into_owned(),
-        }
+        value.0.into_big()
     }
 }
 
 impl<'a, E: EncodedBigNum<'a, Big = BigInt>> From<&GenericBigNum<'a, E>> for BigInt {
     fn from(value: &GenericBigNum<'a, E>) -> Self {
-        match value.decode_ref() {
-            Decoded::Small(n) => n.into(),
-            Decoded::Big(n) => n.into_owned(),
-        }
+        value.clone().0.into_big()
     }
 }
 
@@ -60,7 +54,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> TryFrom<GenericBigNum<'a, E>> for B
     type Error = ();
 
     fn try_from(value: GenericBigNum<'a, E>) -> Result<Self, Self::Error> {
-        match value.decode() {
+        match value.0.decode() {
             Decoded::Small(n) => n.try_into().map_err(|_| ()),
             Decoded::Big(n) => n.into_owned().try_into().map_err(|_| ()),
         }
@@ -77,7 +71,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> TryFrom<&GenericBigNum<'a, E>> for 
 
 impl<'a, E: EncodedBigNum<'a, Big = BigInt>> From<bool> for GenericBigNum<'a, E> {
     fn from(value: bool) -> Self {
-        (value as u8).into()
+        u8::from(value).into()
     }
 }
 
@@ -106,7 +100,7 @@ duplicate_prims! {
         impl<'a, E: EncodedBigNum<'a, Big=BigInt>> TryFrom<&GenericBigNum<'a, E>> for prim {
             type Error = ();
             fn try_from(value: &GenericBigNum<'a, E>) -> Result<Self, Self::Error> {
-                match value.decode_ref() {
+                match value.0.clone().decode() {
                     Decoded::Small(n) => n.[<to_ prim>]().ok_or(()),
                     Decoded::Big(n) => n.[<to_ prim>]().ok_or(()),
                 }

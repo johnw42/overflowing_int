@@ -27,7 +27,7 @@ use crate::big_number::BigSigned;
 use crate::duplicate_prims;
 use crate::generic_bigint::GenericBigInt;
 use crate::generic_bignum::GenericBigNum;
-use crate::generic_bignum::encoding::{Decoded, EncodedBigNum};
+use crate::generic_bignum::encoding::{Decoded, EncodedBigNum, InspectEncoding};
 use crate::small_num::SmallNumber;
 
 #[duplicate_item(
@@ -65,10 +65,10 @@ pub mod mod_name {
 
     impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> Binary for GenericBigNumWrapper<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            match self.decode_ref() {
+            self.with_decoded_ref(|encoded| match encoded {
                 Decoded::Small(n) => Binary::fmt(&n, f),
                 Decoded::Big(n) => Binary::fmt(n.as_ref(), f),
-            }
+            })
         }
     }
 
@@ -86,15 +86,15 @@ pub mod mod_name {
 
     impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> CheckedEuclid for GenericBigNumWrapper<'a, E> {
         fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
-            self.big_cow()
-                .checked_rem_euclid(&v.big_cow())
-                .map(Into::into)
+            self.with_big_refs(v, |lhs, rhs| {
+                lhs.checked_rem_euclid(rhs.as_ref()).map(Into::into)
+            })
         }
 
         fn checked_div_euclid(&self, v: &Self) -> Option<Self> {
-            self.big_cow()
-                .checked_div_euclid(&v.big_cow())
-                .map(Into::into)
+            self.with_big_refs(v, |lhs, rhs| {
+                lhs.checked_div_euclid(rhs.as_ref()).map(Into::into)
+            })
         }
     }
 
@@ -131,11 +131,11 @@ pub mod mod_name {
 
     impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> Euclid for GenericBigNumWrapper<'a, E> {
         fn rem_euclid(&self, v: &Self) -> Self {
-            self.big_cow().rem_euclid(&v.big_cow()).into()
+            self.with_big_refs(v, |lhs, rhs| lhs.rem_euclid(rhs.as_ref()).into())
         }
 
         fn div_euclid(&self, v: &Self) -> Self {
-            self.big_cow().div_euclid(&v.big_cow()).into()
+            self.with_big_refs(v, |lhs, rhs| lhs.div_euclid(rhs.as_ref()).into())
         }
     }
 
@@ -175,7 +175,7 @@ pub mod mod_name {
             {
                 return Self::from_small(Integer::div_floor(&lhs, &rhs));
             }
-            self.big_cow().div_floor(&other.big_cow()).into()
+            self.with_big_refs(other, |lhs, rhs| lhs.div_floor(rhs.as_ref()).into())
         }
 
         fn mod_floor(&self, other: &Self) -> Self {
@@ -185,7 +185,7 @@ pub mod mod_name {
             {
                 return Self::from_small(Integer::mod_floor(&lhs, &rhs));
             }
-            self.big_cow().mod_floor(&other.big_cow()).into()
+            self.with_big_refs(other, |lhs, rhs| lhs.mod_floor(rhs.as_ref()).into())
         }
 
         fn gcd(&self, other: &Self) -> Self {
@@ -194,7 +194,7 @@ pub mod mod_name {
             {
                 return Self::from_small(lhs.gcd(&rhs));
             }
-            self.big_cow().gcd(&other.big_cow()).into()
+            self.with_big_refs(other, |lhs, rhs| lhs.gcd(rhs.as_ref()).into())
         }
 
         fn lcm(&self, other: &Self) -> Self {
@@ -203,7 +203,7 @@ pub mod mod_name {
             {
                 return Self::from_small(lhs.lcm(&rhs));
             }
-            self.big_cow().lcm(&other.big_cow()).into()
+            self.with_big_refs(other, |lhs, rhs| lhs.lcm(rhs.as_ref()).into())
         }
 
         fn divides(&self, other: &Self) -> bool {
@@ -212,7 +212,7 @@ pub mod mod_name {
             {
                 return lhs.is_multiple_of(&rhs);
             }
-            self.big_cow().is_multiple_of(&other.big_cow())
+            self.with_big_refs(other, |lhs, rhs| lhs.is_multiple_of(rhs.as_ref()))
         }
 
         fn is_multiple_of(&self, other: &Self) -> bool {
@@ -221,21 +221,21 @@ pub mod mod_name {
             {
                 return lhs.is_multiple_of(&rhs);
             }
-            self.big_cow().is_multiple_of(&other.big_cow())
+            self.with_big_refs(other, |lhs, rhs| lhs.is_multiple_of(rhs.as_ref()))
         }
 
         fn is_even(&self) -> bool {
-            match self.decode_ref() {
+            self.with_decoded_ref(|decoded| match decoded {
                 Decoded::Small(n) => n.is_even(),
                 Decoded::Big(n) => n.is_even(),
-            }
+            })
         }
 
         fn is_odd(&self) -> bool {
-            match self.decode_ref() {
+            self.with_decoded_ref(|decoded| match decoded {
                 Decoded::Small(n) => n.is_odd(),
                 Decoded::Big(n) => n.is_odd(),
-            }
+            })
         }
 
         fn div_rem(&self, other: &Self) -> (Self, Self) {
@@ -246,7 +246,7 @@ pub mod mod_name {
                 let (q, r) = lhs.div_rem(&rhs);
                 return (Self::from_small(q), Self::from_small(r));
             }
-            let (q, r) = self.big_cow().div_rem(&other.big_cow());
+            let (q, r) = self.with_big_refs(other, |lhs, rhs| lhs.div_rem(rhs.as_ref()));
             (Self::from_big(q), Self::from_big(r))
         }
     }
@@ -265,24 +265,26 @@ pub mod mod_name {
             use Ordering::*;
             use Sign::*;
 
-            match (&self.decode_ref(), other.decode_ref()) {
-                (Small(a), Small(b)) => a.cmp(&b),
-                (Small(a), Big(b)) => match (a.cmp(&E::Small::zero()), b.sign()) {
-                    (_, Minus) => Greater,
-                    (_, Plus) => Less,
-                    (Equal, NoSign) => Equal,
-                    (Less, NoSign) => Less,
-                    (Greater, NoSign) => Greater,
-                },
-                (Big(a), Small(b)) => match (a.sign(), b.cmp(&E::Small::zero())) {
-                    (Plus, _) => Greater,
-                    (Minus, _) => Less,
-                    (NoSign, Less) => Greater,
-                    (NoSign, Equal) => Equal,
-                    (NoSign, Greater) => Less,
-                },
-                (Big(a), Big(b)) => a.as_ref().cmp(b.as_ref()),
-            }
+            self.with_decoded_ref(|lhs| {
+                other.with_decoded_ref(|rhs| match (lhs, rhs) {
+                    (Small(a), Small(b)) => a.cmp(&b),
+                    (Small(a), Big(b)) => match (a.cmp(&E::Small::zero()), b.sign()) {
+                        (_, Minus) => Greater,
+                        (_, Plus) => Less,
+                        (Equal, NoSign) => Equal,
+                        (Less, NoSign) => Less,
+                        (Greater, NoSign) => Greater,
+                    },
+                    (Big(a), Small(b)) => match (a.sign(), b.cmp(&E::Small::zero())) {
+                        (Plus, _) => Greater,
+                        (Minus, _) => Less,
+                        (NoSign, Less) => Greater,
+                        (NoSign, Equal) => Equal,
+                        (NoSign, Greater) => Less,
+                    },
+                    (Big(a), Big(b)) => a.as_ref().cmp(b.as_ref()),
+                })
+            })
         }
     }
 
@@ -328,10 +330,10 @@ pub mod mod_name {
 
     impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> Roots for GenericBigNumWrapper<'a, E> {
         fn nth_root(&self, n: u32) -> Self {
-            match self.decode_ref() {
+            self.with_decoded_ref(|encoded| match encoded {
                 Decoded::Small(a) => Self::from_small(a.nth_root(n)),
                 Decoded::Big(a) => Self::from_big(a.nth_root(n)),
-            }
+            })
         }
     }
 
@@ -349,24 +351,28 @@ pub mod mod_name {
 
             fn new<B1, B2>(low: B1, high: B2) -> Self
             where
-            B1: SampleBorrow<Self::X> + Sized,
-            B2: SampleBorrow<Self::X> + Sized,
+                B1: SampleBorrow<Self::X> + Sized,
+                B2: SampleBorrow<Self::X> + Sized,
             {
-                Self([<Uniform BigNumType>]::new(
-                    low.borrow().big_cow().borrow(),
-                    high.borrow().big_cow().borrow(),
-                ), PhantomData)
+                low.borrow().with_big_refs(high.borrow(), |low, high| {
+                        Self([<Uniform BigNumType>]::new(
+                            low.as_ref(),
+                            high.as_ref(),
+                        ), PhantomData)
+                })
             }
 
             fn new_inclusive<B1, B2>(low: B1, high: B2) -> Self
             where
-            B1: SampleBorrow<Self::X> + Sized,
-            B2: SampleBorrow<Self::X> + Sized,
+                B1: SampleBorrow<Self::X> + Sized,
+                B2: SampleBorrow<Self::X> + Sized,
             {
-                Self([<Uniform BigNumType>]::new_inclusive(
-                    low.borrow().big_cow().borrow(),
-                    high.borrow().big_cow().borrow(),
-                ), PhantomData)
+                low.borrow().with_big_refs(high.borrow(), |low, high| {
+                    Self([<Uniform BigNumType>]::new_inclusive(
+                        low.as_ref(),
+                        high.as_ref(),
+                    ), PhantomData)
+                })
             }
 
             fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Self::X {
@@ -379,28 +385,28 @@ pub mod mod_name {
         type Bytes = Vec<u8>;
 
         fn to_be_bytes(&self) -> Self::Bytes {
-            match self.decode_ref() {
+            self.with_decoded_ref(|encoded| match encoded {
                 Decoded::Small(n) => n.to_be_bytes().borrow().to_vec(),
                 Decoded::Big(n) => n.to_be_bytes(),
-            }
+            })
         }
 
         fn to_le_bytes(&self) -> Self::Bytes {
-            match self.decode_ref() {
+            self.with_decoded_ref(|encoded| match encoded {
                 Decoded::Small(n) => n.to_le_bytes().borrow().to_vec(),
                 Decoded::Big(n) => n.to_le_bytes(),
-            }
+            })
         }
     }
 
-    impl<'a, E: EncodedBigNum<'a>> ToPrimitive for GenericBigNumWrapper<'a, E> {
+    impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> ToPrimitive for GenericBigNumWrapper<'a, E> {
         duplicate_prims! {
             paste! {
                 fn [< to_ prim >](&self) -> Option<prim> {
-                    match self.decode_ref() {
+                    self.with_decoded_ref(|encoded| match encoded {
                         Decoded::Small(value) => value.[< to_ prim >](),
                         Decoded::Big(value) => value.[< to_ prim >](),
-                    }
+                    })
                 }
             }
         }
@@ -432,19 +438,19 @@ pub mod mod_name {
 
     impl<'a, E: EncodedBigNum<'a>> LowerHex for GenericBigNum<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            match self.decode_ref() {
+            self.with_decoded_ref(|encoded| match encoded {
                 Decoded::Small(n) => LowerHex::fmt(&n, f),
                 Decoded::Big(n) => LowerHex::fmt(n.as_ref(), f),
-            }
+            })
         }
     }
 
-    impl<'a, E: EncodedBigNum<'a>> UpperHex for GenericBigNumWrapper<'a, E> {
+    impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> UpperHex for GenericBigNumWrapper<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            match self.decode_ref() {
+            self.with_decoded_ref(|encoded| match encoded {
                 Decoded::Small(n) => UpperHex::fmt(&n, f),
                 Decoded::Big(n) => UpperHex::fmt(n.as_ref(), f),
-            }
+            })
         }
     }
 
@@ -458,23 +464,23 @@ pub mod mod_name {
         }
     }
 
-    impl<'a, E: EncodedBigNum<'a>> Octal for GenericBigNumWrapper<'a, E> {
+    impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> Octal for GenericBigNumWrapper<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            match self.decode_ref() {
+            self.with_decoded_ref(|encoded| match encoded {
                 Decoded::Small(n) => Octal::fmt(&n, f),
                 Decoded::Big(n) => Octal::fmt(n.as_ref(), f),
-            }
+            })
         }
     }
 
     impl<'a, E: EncodedBigNum<'a>> RefUnwindSafe for GenericBigNumWrapper<'a, E> {}
 
-    impl<'a, E: EncodedBigNum<'a>> Serialize for GenericBigNumWrapper<'a, E> {
+    impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> Serialize for GenericBigNumWrapper<'a, E> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {
-            self.big_cow().serialize(serializer)
+            self.with_big_ref(|big| big.serialize(serializer))
         }
     }
 }
@@ -488,7 +494,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> Neg for GenericBigInt<'a, E> {
         {
             Self::Output::from_small(b)
         } else {
-            self.into_big().neg().into()
+            self.with_big_ref(|big| big.as_ref().neg()).into()
         }
     }
 }
@@ -502,7 +508,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> Neg for &GenericBigInt<'a, E> {
         {
             Self::Output::from_small(b)
         } else {
-            self.big_cow().as_ref().neg().into()
+            self.with_big_ref(|big| big.as_ref().neg()).into()
         }
     }
 }
@@ -511,11 +517,13 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> Not for GenericBigInt<'a, E> {
     type Output = GenericBigInt<'a, E>;
 
     fn not(self) -> Self::Output {
-        match self.decode_ref() {
-            Decoded::Small(n) => Self::from_small(n.not()),
-            Decoded::Big(n) => Self::from_big(n.into_owned().not()),
-        }
-        .into()
+        self.with_decoded_ref(|encoded| {
+            match encoded {
+                Decoded::Small(n) => Self::from_small(n.not()),
+                Decoded::Big(n) => Self::from_big(n.as_ref().not()),
+            }
+            .into()
+        })
     }
 }
 
@@ -523,50 +531,52 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> Not for &GenericBigInt<'a, E> {
     type Output = GenericBigInt<'a, E>;
 
     fn not(self) -> Self::Output {
-        match self.decode_ref() {
-            Decoded::Small(n) => GenericBigInt::from_small(n.not()),
-            Decoded::Big(n) => GenericBigInt::from_big(n.as_ref().not()),
-        }
-        .into()
+        self.with_decoded_ref(|encoded| {
+            match encoded {
+                Decoded::Small(n) => GenericBigInt::from_small(n.not()),
+                Decoded::Big(n) => GenericBigInt::from_big(n.as_ref().not()),
+            }
+            .into()
+        })
     }
 }
 
 impl<'a, E: EncodedBigNum<'a, Big = BigInt>> Signed for GenericBigInt<'a, E> {
     fn abs(&self) -> Self {
-        match self.decode_ref() {
+        self.with_decoded_ref(|decoded| match decoded {
             Decoded::Small(a) => {
                 if let (b, false) = a.overflowing_abs() {
                     Self::from_small(b)
                 } else {
-                    self.big_cow().abs().into()
+                    self.with_big_ref(|big| big.as_ref().abs()).into()
                 }
             }
-            Decoded::Big(a) => a.abs().into(),
-        }
+            Decoded::Big(a) => a.as_ref().abs().into(),
+        })
     }
 
     fn abs_sub(&self, other: &Self) -> Self {
-        (self.clone() - other.clone()).abs()
+        (self - other).abs()
     }
 
     fn signum(&self) -> Self {
-        match self.0.decode_ref() {
+        self.with_decoded_ref(|decoded| match decoded {
             Decoded::Small(n) => Self::from_small(n.signum()),
             Decoded::Big(n) => Self::from_big(n.signum()),
-        }
+        })
     }
 
     fn is_positive(&self) -> bool {
-        match self.decode_ref() {
+        self.with_decoded_ref(|decoded| match decoded {
             Decoded::Small(n) => n.signum() > E::Small::zero(),
             Decoded::Big(n) => n.is_positive(),
-        }
+        })
     }
 
     fn is_negative(&self) -> bool {
-        match self.decode_ref() {
+        self.with_decoded_ref(|decoded| match decoded {
             Decoded::Small(n) => n.signum() < E::Small::zero(),
             Decoded::Big(n) => n.is_negative(),
-        }
+        })
     }
 }

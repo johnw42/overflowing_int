@@ -1,5 +1,6 @@
 use std::{
     fmt::{Binary, Debug, Display, LowerHex, Octal, UpperHex},
+    hash::Hash,
     ops::{BitAnd, BitOr, Shl, Shr},
 };
 
@@ -35,6 +36,7 @@ pub trait SmallNumber:
     + Shr<u32, Output = Self>
     + From<u8>
     + From<bool>
+    + Hash
     + Into<BigInt>
     + Into<Self::Big>
     + Octal
@@ -57,6 +59,7 @@ pub trait SmallNumber:
     + TryFrom<u128>
     + TryFrom<usize>
     + TryFrom<Self::Unsigned>
+    + for<'a> TryFrom<&'a Self::Big>
     + TryInto<BigUint>
     + quickcheck::Arbitrary
     + UpperHex

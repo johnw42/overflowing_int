@@ -43,10 +43,10 @@ impl arbitrary::Arbitrary<'_> for GenericBigNum {
 
 impl Binary for GenericBigNum {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self.decode_ref() {
+        self.with_decoded_ref(|encoded| match encoded {
             RefEncoding::Small(n) => Binary::fmt(&n, f),
             RefEncoding::Big(n) => Binary::fmt(n, f),
-        }
+        })
     }
 }
 
@@ -195,37 +195,46 @@ impl Integer for GenericBigNum {
     }
 
     fn is_even(&self) -> bool {
-        match self.decode_ref() {
-            RefEncoding::Small(n) => n.is_even(),
-            RefEncoding::Big(n) => n.is_even(),
-        }
+        self.with_decoded_ref(|encoded| match encoded {
+            Decoded::Small(n) => n.is_even(),
+            Decoded::Big(n) => n.is_even(),
+        })
     }
 
     fn is_odd(&self) -> bool {
-        match self.decode_ref() {
-            RefEncoding::Small(n) => n.is_odd(),
-            RefEncoding::Big(n) => n.is_odd(),
-        }
+        self.with_decoded_ref(|encoded| match encoded {
+            Decoded::Small(n) => n.is_odd(),
+            Decoded::Big(n) => n.is_odd(),
+        })
     }
 
     fn div_rem(&self, other: &Self) -> (Self, Self) {
-        if let Some((lhs, rhs)) = self.to_small_with(other)
-            && (lhs, rhs) != (SmallInt::MIN, -1)
-        {
-            let (q, r) = lhs.div_rem(&rhs);
-            return (q.into(), r.into());
-        }
-        let (q, r) = self.big_cow().div_rem(&other.big_cow());
-        (q.into(), r.into())
+        self.with_matching_refs(other, |encoded| match encoded {
+            Decoded::Small((lhs, rhs)) => {
+                if (lhs, rhs) != (SmallInt::MIN, -1) {
+                    let (q, r) = lhs.div_rem(&rhs);
+                    return (q.into(), r.into());
+                }
+                // Fall back to big division to avoid overflow
+                let lhs = BigInt::from(lhs);
+                let rhs = BigInt::from(rhs);
+                let (q, r) = lhs.div_rem(&rhs);
+                return (q.into(), r.into());
+            }
+            Decoded::Big((lhs, rhs)) => {
+                let (q, r) = lhs.as_ref().div_rem(rhs.as_ref());
+                return (q.into(), r.into());
+            }
+        })
     }
 }
 
 impl LowerHex for GenericBigNum {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self.decode_ref() {
-            RefEncoding::Small(n) => LowerHex::fmt(&n, f),
-            RefEncoding::Big(n) => LowerHex::fmt(n, f),
-        }
+        self.with_decoded_ref(|encoded| match encoded {
+            Decoded::Small(n) => LowerHex::fmt(&n, f),
+            Decoded::Big(n) => LowerHex::fmt(n, f),
+        })
     }
 }
 
@@ -289,10 +298,10 @@ impl<'a> Not for &GenericBigNum {
 
 impl Octal for GenericBigNum {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self.decode_ref() {
-            Encoding::Small(n) => Octal::fmt(n, f),
-            Encoding::Big(n) => Octal::fmt(n.borrow(), f),
-        }
+        self.with_decoded_ref(|encoded| match encoded {
+            Decoded::Small(n) => Octal::fmt(&n, f),
+            Decoded::Big(n) => Octal::fmt(n, f),
+        })
     }
 }
 
