@@ -20,15 +20,15 @@ use crate::{duplicate_prims, duplicate_uprims};
 /// content of `CBigInt` and `CBigUint`, which implement high-level operations
 /// and traits.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CowEncoding<'a, S: SmallNumber<Big = T>, T: BigNumber>(Decoded<S, Cow<'a, T>>);
+pub struct CowEncoding<'a, S: SmallNumber<Big = B>, B: BigNumber>(Decoded<S, Cow<'a, B>>);
 
-impl<'a, S: SmallNumber<Big = T>, T: BigNumber> CowEncoding<'a, S, T> {
+impl<'a, S: SmallNumber<Big = B>, B: BigNumber> CowEncoding<'a, S, B> {
     fn normalize(&mut self) {
         if let Decoded::Big(big) = &self.0
             && let Some(small) = S::try_from(big.as_ref()).ok()
         {
             self.0 = Decoded::Small(small);
-        }
+        };
     }
 }
 
@@ -75,11 +75,41 @@ where
     }
 
     fn from_big_cow(b: Cow<'a, Self::Big>) -> Self {
-        Self(Decoded::Big(b))
+        let mut r = Self(Decoded::Big(b));
+        r.normalize();
+        r
     }
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<'a, Self::Big>>)) {
         f(&mut self.0);
         self.normalize();
+    }
+}
+
+impl<S: SmallNumber<Big = B>, B: BigNumber> quickcheck::Arbitrary for CowEncoding<'static, S, B> {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        if bool::arbitrary(g) {
+            Self(Decoded::Small(<S as quickcheck::Arbitrary>::arbitrary(g)))
+        } else {
+            Self(Decoded::Big(Cow::Owned(
+                <B as quickcheck::Arbitrary>::arbitrary(g),
+            )))
+        }
+    }
+}
+
+impl<S: SmallNumber<Big = B>, B: BigNumber> arbitrary::Arbitrary<'_>
+    for CowEncoding<'static, S, B>
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        if bool::arbitrary(u)? {
+            Ok(Self(Decoded::Small(
+                <S as arbitrary::Arbitrary>::arbitrary(u)?,
+            )))
+        } else {
+            Ok(Self(Decoded::Big(Cow::Owned(
+                <B as arbitrary::Arbitrary>::arbitrary(u)?,
+            ))))
+        }
     }
 }

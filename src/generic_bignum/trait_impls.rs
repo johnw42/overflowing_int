@@ -1,4 +1,5 @@
 use duplicate::duplicate_item;
+use quickcheck::TestResult;
 
 use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
@@ -24,18 +25,23 @@ use rand::prelude::Distribution;
 use serde::{Deserialize, Serialize};
 
 use crate::big_number::BigSigned;
-use crate::duplicate_prims;
 use crate::generic_bigint::GenericBigInt;
 use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decoded, EncodedBigNum, InspectEncoding};
 use crate::small_num::SmallNumber;
+use crate::{CowBigInt, duplicate_prims};
 
 #[duplicate_item(
     mod_name BigNumType GenericBigNumWrapper;
     [bigint] [BigInt]   [GenericBigInt];
 )]
 pub mod mod_name {
-    use std::marker::PhantomData;
+    use std::{
+        fmt::{Debug, Display},
+        marker::PhantomData,
+    };
+
+    use crate::CowBigInt;
 
     use super::*;
 
@@ -110,6 +116,12 @@ pub mod mod_name {
         }
     }
 
+    impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> Debug for GenericBigNumWrapper<'a, E> {
+        fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+            self.with_decoded_ref(|encoded| Debug::fmt(&encoded, f))
+        }
+    }
+
     impl<'a, 'de, E: EncodedBigNum<'a, Big = BigNumType>> Deserialize<'de>
         for GenericBigNumWrapper<'a, E>
     {
@@ -118,6 +130,15 @@ pub mod mod_name {
             D: serde::Deserializer<'de>,
         {
             BigNumType::deserialize(deserializer).map(Into::into)
+        }
+    }
+
+    impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> Display for GenericBigNumWrapper<'a, E> {
+        fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+            self.with_decoded_ref(|encoded| match encoded {
+                Decoded::Small(n) => Display::fmt(&n, f),
+                Decoded::Big(n) => Display::fmt(n.as_ref(), f),
+            })
         }
     }
 
@@ -136,6 +157,15 @@ pub mod mod_name {
 
         fn div_euclid(&self, v: &Self) -> Self {
             self.with_big_refs(v, |lhs, rhs| lhs.div_euclid(rhs.as_ref()).into())
+        }
+    }
+
+    impl<'a, E: EncodedBigNum<'a, Big = BigInt>> From<GenericBigNumWrapper<'a, E>> for BigInt {
+        fn from(value: GenericBigNumWrapper<'a, E>) -> Self {
+            value.0.with_decoded_ref(|encoded| match encoded {
+                Decoded::Small(n) => n.to_big(),
+                Decoded::Big(n) => n.as_ref().clone(),
+            })
         }
     }
 
@@ -288,30 +318,6 @@ pub mod mod_name {
         }
     }
 
-    // TODO
-
-    // #[quickcheck]
-    // fn test_round_trip1(a: GenericBigNum) -> bool {
-    //     GenericBigNum::from(BigNumType::from(a.clone())) == a
-    //         && a.clone() == GenericBigNum::from(BigNumType::from(a))
-    // }
-
-    // #[quickcheck]
-    // fn test_round_trip2(a: BigNumType) -> bool {
-    //     BigNumType::from(GenericBigNum::from(a.clone())) == a
-    //         && a.clone() == BigNumType::from(GenericBigNum::from(a))
-    // }
-
-    // #[quickcheck]
-    // fn test_to_string(a: GenericBigNum) -> bool {
-    //     a.to_string() == BigNumType::from(a).to_string()
-    // }
-
-    // #[quickcheck]
-    // fn test_ord(a: GenericBigNum, b: GenericBigNum) -> bool {
-    //     a.cmp(&b) == BigNumType::from(a).cmp(&BigNumType::from(b))
-    // }
-
     impl<'a, E: EncodedBigNum<'a, Big = BigNumType>> One for GenericBigNumWrapper<'a, E> {
         fn one() -> Self {
             Self::from_small(E::Small::one())
@@ -411,30 +417,6 @@ pub mod mod_name {
             }
         }
     }
-
-    // TODO
-
-    // #[test]
-    // fn test_gcd() {
-    //     let small = GenericBigNum::from(5);
-    //     let huge = GenericBigNum::from(i128::MAX).pow(2);
-    //     assert_eq!(huge.gcd(&small), GenericBigNum::from(1));
-    //     assert_eq!(small.gcd(&huge), GenericBigNum::from(1));
-    // }
-
-    // #[test]
-    // fn test_one() {
-    //     assert!(GenericBigNum::one().is_one());
-    //     assert_eq!(GenericBigNum::one(), GenericBigNum::from(1));
-    //     assert!(!GenericBigNum::from(2).is_one());
-    // }
-
-    // #[test]
-    // fn test_zero() {
-    //     assert!(GenericBigNum::zero().is_zero());
-    //     assert_eq!(GenericBigNum::zero(), GenericBigNum::from(0));
-    //     assert!(!GenericBigNum::from(1).is_zero());
-    // }
 
     impl<'a, E: EncodedBigNum<'a>> LowerHex for GenericBigNum<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
@@ -579,4 +561,60 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> Signed for GenericBigInt<'a, E> {
             Decoded::Big(n) => n.is_negative(),
         })
     }
+}
+
+#[test]
+fn test_gcd() {
+    let small = CowBigInt::from(5);
+    let huge = CowBigInt::from(i128::MAX).pow(2);
+    assert_eq!(huge.gcd(&small), CowBigInt::from(1));
+    assert_eq!(small.gcd(&huge), CowBigInt::from(1));
+}
+
+#[test]
+fn test_one() {
+    assert!(CowBigInt::one().is_one());
+    assert_eq!(CowBigInt::one(), CowBigInt::from(1));
+    assert!(!CowBigInt::from(2).is_one());
+}
+
+#[test]
+fn test_zero() {
+    assert!(CowBigInt::zero().is_zero());
+    assert_eq!(CowBigInt::zero(), CowBigInt::from(0));
+    assert!(!CowBigInt::from(1).is_zero());
+}
+
+#[quickcheck]
+fn test_round_trip1(a: CowBigInt<'static>) -> TestResult {
+    let b = CowBigInt::from(BigInt::from(a.clone()));
+    if a != b {
+        return TestResult::error(format!("a != b: a = {:?}, b = {:?}", a, b));
+    }
+    if b != a {
+        return TestResult::error(format!("b != a: b = {:?}, a = {:?}", b, a));
+    }
+    TestResult::passed()
+}
+
+#[quickcheck]
+fn test_round_trip2(a: BigInt) -> TestResult {
+    let b = BigInt::from(CowBigInt::from(a.clone()));
+    if a != b {
+        return TestResult::error(format!("a != b: a = {:?}, b = {:?}", a, b));
+    }
+    if b != a {
+        return TestResult::error(format!("b != a: b = {:?}, a = {:?}", b, a));
+    }
+    TestResult::passed()
+}
+
+#[quickcheck]
+fn test_to_string(a: CowBigInt<'static>) -> bool {
+    a.to_string() == BigInt::from(a).to_string()
+}
+
+#[quickcheck]
+fn test_ord(a: CowBigInt<'static>, b: CowBigInt<'static>) -> bool {
+    a.cmp(&b) == BigInt::from(a).cmp(&BigInt::from(b))
 }

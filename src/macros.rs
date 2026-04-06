@@ -1,14 +1,14 @@
 #[macro_export]
 macro_rules! duplicate_generic_bigint_types {
     ($($body:tt)*) => {
-        // duplicate::duplicate! {
-        //     [
-        //         bigint_tag bigint_type;
-        //         [cow]      [crate::CowBigInt<'static>];
-        //         [rc]       [RcBigInt];
-        //     ]
-        //     $($body)*
-        // }
+        duplicate::duplicate! {
+            [
+                bigint_tag bigint_type;
+                [cow]      [crate::CowBigInt<'static>];
+                //[rc]       [RcBigInt];
+            ]
+            $($body)*
+        }
     };
 }
 
