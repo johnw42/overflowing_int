@@ -1,24 +1,36 @@
-use std::{
-    borrow::{Borrow, Cow},
-    hash::Hash,
-    rc::Rc,
-};
+use std::{borrow::Cow, hash::Hash, rc::Rc};
 
 use num_bigint::BigInt;
 
+use crate::small_num::SmallNumber;
 use crate::{big_number::BigNumber, duplicate_prims};
-use crate::{generic_bignum::GenericBigNum, small_num::SmallNumber};
 
-pub trait InspectEncoding<'a, S, B>: Sized + Clone
+/// A decoded big number, which may be either small or big.  Also used to
+/// represent various other decoded values, such as the pairs of numbers.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Decoded<S, B> {
+    Small(S),
+    Big(B),
+}
+
+/// A type that can be decoded into a small or big value.  This this applies to
+/// encoded big numbers, but it also applies to types that can be trivially
+/// decoded, such as integer types and bignum types.
+pub trait Decode<'a, S>: Sized + Clone
 where
-    S: SmallNumber<Big = B>,
-    B: BigNumber,
+    S: SmallNumber,
 {
-    /// Decodes the value, preferably without allocating.
-    fn decode(self) -> Decoded<S, Cow<'a, B>>;
+    /// The main method of this trait, which decodes the value into either a
+    /// small or big value without ever cloning it.
+    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T;
+
+    /// Decodes the value.  This method may be less efficient than
+    /// [`Self::with_decoded`] since it may require cloning the big value, but
+    /// it is more convenient when an owned value is needed.
+    fn decode(self) -> Decoded<S, Cow<'a, S::Big>>;
 
     /// Gets the big value as a `Cow`, creating a bignum if necessary.
-    fn into_big_cow(self) -> Cow<'a, B> {
+    fn into_big_cow(self) -> Cow<'a, S::Big> {
         match self.decode() {
             Decoded::Small(s) => Cow::Owned(s.to_big()),
             Decoded::Big(b) => b,
@@ -28,57 +40,59 @@ where
     /// Gets the small value if it the encoding is small, or `None` if it is big.
     fn small(&self) -> Option<S>;
 
-    // Gets a big value, which will always create or clone a bignum.
-    fn big(&self) -> B {
+    /// Gets the big value  This will always create or clone a bignum.
+    fn big(&self) -> S::Big {
         match self.clone().decode() {
             Decoded::Small(s) => s.to_big(),
             Decoded::Big(b) => b.into_owned(),
         }
     }
 
-    fn into_big(self) -> B {
+    /// Gets the big value as an owned value while consuming self.  Compared to
+    /// [`Self::big`], using this method may allow for more efficient code when
+    /// the encoding is big, since it can avoid an extra clone of the big value.
+    fn into_big(self) -> S::Big {
         match self.decode() {
             Decoded::Small(s) => s.to_big(),
             Decoded::Big(b) => b.into_owned(),
         }
     }
 
-    fn with_decoded_ref<T>(&self, f: impl FnOnce(Decoded<S, Cow<B>>) -> T) -> T;
-
-    fn with_big_ref<T>(&self, f: impl FnOnce(Cow<B>) -> T) -> T {
-        self.with_decoded_ref(|decoded| match decoded {
+    /// Gets the big value as a `Cow`, creating a bignum if necessary, and passes it to the provided function.
+    fn with_big_cow<T>(&self, f: impl FnOnce(Cow<S::Big>) -> T) -> T {
+        self.with_decoded(|decoded| match decoded {
             Decoded::Small(s) => f(Cow::Owned(s.to_big())),
             Decoded::Big(b) => f(b),
         })
     }
 
-    fn with_big_refs<'b, T>(
+    /// A helper method for working with two decoded values at the same time.
+    /// This calls [`Self::with_big_cow`] for both `self` and `other`, and
+    /// passes the resulting big `Cow`s to the provided function.  This is useful
+    /// for implementing binary operations on big numbers, since it allows us to
+    /// avoid cloning the big values when both encodings are big.
+    fn with_big_cows<'b, T>(
         &self,
-        other: &impl InspectEncoding<'b, S, B>,
-        f: impl FnOnce(Cow<B>, Cow<B>) -> T,
+        other: &impl Decode<'b, S>,
+        f: impl FnOnce(Cow<S::Big>, Cow<S::Big>) -> T,
     ) -> T {
-        self.with_decoded_ref(|lhs| {
-            other.with_decoded_ref(|rhs| {
-                let (lhs, rhs) = match (lhs, rhs) {
-                    (Decoded::Small(s1), Decoded::Small(s2)) => {
-                        (Cow::Owned(s1.to_big()), Cow::Owned(s2.to_big()))
-                    }
-                    (Decoded::Small(s1), Decoded::Big(b2)) => (Cow::Owned(s1.to_big()), b2),
-                    (Decoded::Big(b1), Decoded::Small(s2)) => (b1, Cow::Owned(s2.to_big())),
-                    (Decoded::Big(b1), Decoded::Big(b2)) => (b1, b2),
-                };
-                f(lhs, rhs)
-            })
-        })
+        self.with_big_cow(|lhs| other.with_big_cow(|rhs| f(lhs, rhs)))
     }
 
-    fn with_matching_refs<'b, T>(
+    /// A helper method for working with two decoded values at the same time,
+    /// where the values need to both be small or both be big.  This calls
+    /// [`Self::with_decoded`] for both `self` and `other`, and passes the
+    /// resulting decoded values to the provided function.  This is useful for
+    /// implementing binary operations on big numbers, since it allows us to
+    /// avoid cloning the big values when both encodings are big, while still
+    /// allowing us to work with the small values when both encodings are small.
+    fn with_matching_size<'b, T>(
         &self,
-        other: &impl InspectEncoding<'b, S, B>,
-        f: impl FnOnce(Decoded<(S, S), (Cow<B>, Cow<B>)>) -> T,
+        other: &impl Decode<'b, S>,
+        f: impl FnOnce(Decoded<(S, S), (Cow<S::Big>, Cow<S::Big>)>) -> T,
     ) -> T {
-        self.with_decoded_ref(|lhs| {
-            other.with_decoded_ref(|rhs| {
+        self.with_decoded(|lhs| {
+            other.with_decoded(|rhs| {
                 let enc = match (lhs, rhs) {
                     (Decoded::Small(s1), Decoded::Small(s2)) => Decoded::Small((s1, s2)),
                     (Decoded::Small(s1), Decoded::Big(b2)) => {
@@ -95,15 +109,24 @@ where
     }
 }
 
-pub trait EncodedBigNum<'a>: InspectEncoding<'a, Self::Small, Self::Big>
+/// An encoding of a big number, where small values are encoded directly in the
+/// representation, and big values are encoded as a separate big type.  The
+/// encoding must be able to be updated in place, and must be able to be
+/// compared for equality and hashed without decoding.
+pub trait Encoding<'a>: Decode<'a, Self::Small>
 where
     Self: Eq,
     Self: Hash,
     Self::Big: Into<BigInt>,
 {
+    /// The small type that can be encoded directly in the representation.
     type Small: SmallNumber<Big = Self::Big>;
+
+    /// The big type that is used when the value is too large to fit in the
+    /// small representation.  This type is completely determined by the small
+    /// type, but having it is a convenience for writing code that is generic
+    /// over the encoding.
     type Big: BigNumber;
-    //type Repr: EncodedRepr<'a, Self::Small, Self::Big>;
 
     /// Encodes a small value.
     fn from_small(s: Self::Small) -> Self;
@@ -128,12 +151,15 @@ where
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>));
 }
 
-impl<'a, S, B> InspectEncoding<'a, S, B> for Cow<'a, B>
+// =============================================================================
+// Implementations of `Decode` for various foreign and built-in types
+// =============================================================================
+
+impl<'a, S> Decode<'a, S> for Cow<'a, S::Big>
 where
-    S: SmallNumber<Big = B>,
-    B: BigNumber,
+    S: SmallNumber,
 {
-    fn decode(self) -> Decoded<S, Cow<'a, B>> {
+    fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
         Decoded::Big(self)
     }
 
@@ -141,21 +167,20 @@ where
         None
     }
 
-    fn into_big_cow(self) -> Cow<'a, B> {
+    fn into_big_cow(self) -> Cow<'a, S::Big> {
         self
     }
 
-    fn with_decoded_ref<T>(&self, f: impl FnOnce(Decoded<S, Cow<B>>) -> T) -> T {
+    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
         f(Decoded::Big(Cow::Borrowed(self.as_ref())))
     }
 }
 
-impl<'a, S, B> InspectEncoding<'a, S, B> for Rc<B>
+impl<'a, S> Decode<'a, S> for Rc<S::Big>
 where
-    S: SmallNumber<Big = B>,
-    B: BigNumber,
+    S: SmallNumber,
 {
-    fn decode(self) -> Decoded<S, Cow<'a, B>> {
+    fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
         Decoded::Big(Cow::Owned((*self).clone()))
     }
 
@@ -163,31 +188,31 @@ where
         None
     }
 
-    fn into_big_cow(self) -> Cow<'a, B> {
+    fn into_big_cow(self) -> Cow<'a, S::Big> {
         match Rc::try_unwrap(self) {
             Ok(b) => Cow::Owned(b),
             Err(rc) => Cow::Owned((*rc).clone()),
         }
     }
 
-    fn with_decoded_ref<T>(&self, f: impl FnOnce(Decoded<S, Cow<B>>) -> T) -> T {
+    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
         f(Decoded::Big(Cow::Borrowed(self.as_ref())))
     }
 }
 
 duplicate_prims! {
-    impl<'a, S, B> InspectEncoding<'a, S, B> for prim
+    impl<'a, S> Decode<'a, S> for prim
     where
-        S: SmallNumber<Big = B>,
-        B: BigNumber + From<prim>
+        S: SmallNumber,
+        S::Big: BigNumber + From<prim>
     {
-        fn decode(self) -> Decoded<S, Cow<'a, B>> {
+        fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
             #[allow(irrefutable_let_patterns)]
             #[allow(clippy::unnecessary_fallible_conversions)]
             if let Ok(small) = S::try_from(self) {
                 Decoded::Small(small)
             } else {
-                Decoded::Big(Cow::Owned(B::from(self)))
+                Decoded::Big(Cow::Owned(S::Big::from(self)))
             }
         }
 
@@ -195,26 +220,26 @@ duplicate_prims! {
             S::try_from(*self).ok()
         }
 
-        fn with_decoded_ref<T>(&self, f: impl FnOnce(Decoded<S, Cow<B>>) -> T) -> T {
+        fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
             match S::try_from(*self) {
                 Ok(small) => f(Decoded::Small(small)),
-                Err(_) => f(Decoded::Big(Cow::Owned(B::from(*self)))),
+                Err(_) => f(Decoded::Big(Cow::Owned(S::Big::from(*self)))),
             }
         }
     }
 
-    impl<'a, S: SmallNumber<Big = B>, B: BigNumber> InspectEncoding<'a, S, B> for &prim
+    impl<'a, S: SmallNumber> Decode<'a, S> for &prim
     where
-        B: From<prim>,
+        S::Big: From<prim>,
         S: TryFrom<prim>
     {
-        fn decode(self) -> Decoded<S, Cow<'a, B>> {
+        fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
             #[allow(irrefutable_let_patterns)]
             #[allow(clippy::unnecessary_fallible_conversions)]
             if let Ok(small) = S::try_from(*self) {
                 Decoded::Small(small)
             } else {
-                Decoded::Big(Cow::Owned(B::from(*self)))
+                Decoded::Big(Cow::Owned(S::Big::from(*self)))
             }
         }
 
@@ -222,26 +247,11 @@ duplicate_prims! {
             S::try_from(**self).ok()
         }
 
-        fn with_decoded_ref<T>(&self, f: impl FnOnce(Decoded<S, Cow<B>>) -> T) -> T {
+        fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
             match S::try_from(**self) {
                 Ok(small) => f(Decoded::Small(small)),
-                Err(_) => f(Decoded::Big(Cow::Owned(B::from(**self)))),
+                Err(_) => f(Decoded::Big(Cow::Owned(S::Big::from(**self)))),
             }
         }
     }
-}
-
-/// A decoded big number, which may be either small or big.  The second type parameter, `T`,
-/// maybe be an owned value, a reference, a `Cow`, depending on the context.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Decoded<S, B> {
-    Small(S),
-    Big(B),
-}
-
-pub trait EncodedRepr<'a, S, B: Clone>: Borrow<B> + Clone
-where
-    S: SmallNumber<Big = B>,
-{
-    fn into_owned(self) -> B;
 }

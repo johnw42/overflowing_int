@@ -1,26 +1,26 @@
-use std::borrow::Cow;
-use std::cmp::Ordering;
-use std::fmt::{Debug, Display, Formatter};
-use std::marker::PhantomData;
-use std::ops::Neg;
-
-use num_bigint::{BigInt, BigUint, Sign, ToBigInt};
+use crate::big_number::{BigNumber, BigNumberDigits};
+use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
+use crate::small_num::SmallNumber;
+use num_bigint::BigInt;
 use num_integer::Roots;
 use num_traits::{One, PrimInt, Zero};
-
-use crate::big_number::{BigNumber, BigNumberDigits};
-use crate::generic_bignum::encoding::{Decoded, EncodedBigNum, InspectEncoding};
-use crate::small_num::SmallNumber;
+use std::borrow::Cow;
+use std::fmt::{Debug, Display, Formatter};
+use std::marker::PhantomData;
 
 pub mod convert;
 pub mod encoding;
 pub mod num_ops;
 mod trait_impls;
 
+/// A signed big integer type that can be used with any encoding that implements
+/// `Encoding` with `Big = BigInt`.  Implements the same methods and traits as
+/// `BigInt`, and can be used as a drop-in replacement for `BigInt` in most
+/// cases.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct GenericBigNum<'a, E: EncodedBigNum<'a>>(pub(crate) E, PhantomData<&'a ()>);
+pub(crate) struct GenericBigNum<'a, E: Encoding<'a>>(pub(crate) E, PhantomData<&'a ()>);
 
-impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a>> GenericBigNum<'a, E> {
     pub fn from_encoding(enc: E) -> Self {
         Self(enc, PhantomData)
     }
@@ -42,11 +42,11 @@ impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
     }
 
     pub fn to_str_radix(&self, radix: u32) -> String {
-        self.with_big_ref(|cow| cow.to_str_radix(radix))
+        self.with_big_cow(|cow| cow.to_str_radix(radix))
     }
 
     pub fn bit(&self, bit: u64) -> bool {
-        self.with_decoded_ref(|encoded| match encoded {
+        self.with_decoded(|encoded| match encoded {
             Decoded::Small(small) => {
                 if bit < E::Small::BITS as u64 {
                     (small >> (bit as u32)) & E::Small::one() == E::Small::one()
@@ -59,7 +59,7 @@ impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
     }
 
     pub fn bits(&self) -> u64 {
-        self.with_decoded_ref(|encoded| match encoded {
+        self.with_decoded(|encoded| match encoded {
             Decoded::Small(n) => {
                 if n >= E::Small::zero() {
                     E::Small::BITS as u32 - n.leading_zeros()
@@ -73,19 +73,19 @@ impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
     }
 
     pub fn checked_add(&self, v: &Self) -> Option<Self> {
-        self.with_big_refs(v, |lhs, rhs| lhs.checked_add(&rhs).map(Self::from_big))
+        self.with_big_cows(v, |lhs, rhs| lhs.checked_add(&rhs).map(Self::from_big))
     }
 
     pub fn checked_sub(&self, v: &Self) -> Option<Self> {
-        self.with_big_refs(v, |lhs, rhs| lhs.checked_sub(&rhs).map(Self::from_big))
+        self.with_big_cows(v, |lhs, rhs| lhs.checked_sub(&rhs).map(Self::from_big))
     }
 
     pub fn checked_mul(&self, v: &Self) -> Option<Self> {
-        self.with_big_refs(v, |lhs, rhs| lhs.checked_mul(&rhs).map(Self::from_big))
+        self.with_big_cows(v, |lhs, rhs| lhs.checked_mul(&rhs).map(Self::from_big))
     }
 
     pub fn checked_div(&self, v: &Self) -> Option<Self> {
-        self.with_big_refs(v, |lhs, rhs| lhs.checked_div(&rhs).map(Self::from_big))
+        self.with_big_cows(v, |lhs, rhs| lhs.checked_div(&rhs).map(Self::from_big))
     }
 
     pub fn pow(&self, exponent: u32) -> Self {
@@ -94,50 +94,50 @@ impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
         {
             return Self::from_small(a);
         }
-        self.with_big_ref(|big| Self::from_big(big.pow(exponent)))
+        self.with_big_cow(|big| Self::from_big(big.pow(exponent)))
     }
 
     pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-        self.with_big_refs(exponent, |lhs, rhs| {
-            self.with_big_ref(|modulus| Self::from_big(lhs.modpow(&rhs, &modulus)))
+        self.with_big_cows(exponent, |lhs, rhs| {
+            modulus.with_big_cow(|modulus| Self::from_big(lhs.modpow(&rhs, &modulus)))
         })
     }
 
     pub fn sqrt(&self) -> Self {
-        self.with_decoded_ref(|encoded| match encoded {
+        self.with_decoded(|encoded| match encoded {
             Decoded::Small(n) => Self::from_small(n.sqrt()),
             Decoded::Big(n) => Self::from_big(Roots::sqrt(&n)),
         })
     }
 
     pub fn cbrt(&self) -> Self {
-        self.with_decoded_ref(|encoded| match encoded {
+        self.with_decoded(|encoded| match encoded {
             Decoded::Small(n) => Self::from_small(n.cbrt()),
             Decoded::Big(n) => Self::from_big(Roots::cbrt(&n)),
         })
     }
 
     pub fn nth_root(&self, n: u32) -> Self {
-        self.with_decoded_ref(|encoded| match encoded {
+        self.with_decoded(|encoded| match encoded {
             Decoded::Small(x) => Self::from_small(x.nth_root(n)),
             Decoded::Big(x) => Self::from_big(Roots::nth_root(&x, n)),
         })
     }
 
     pub fn trailing_zeros(&self) -> Option<u64> {
-        self.with_big_ref(|cow| cow.trailing_zeros())
+        self.with_big_cow(|cow| cow.trailing_zeros())
     }
 
     pub fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
-        self.with_big_ref(|cow| cow.iter_u32_digits().collect::<Vec<_>>().into_iter())
+        self.with_big_cow(|cow| cow.iter_u32_digits().collect::<Vec<_>>().into_iter())
     }
 
     pub fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
-        self.with_big_ref(|cow| cow.iter_u64_digits().collect::<Vec<_>>().into_iter())
+        self.with_big_cow(|cow| cow.iter_u64_digits().collect::<Vec<_>>().into_iter())
     }
 
     pub fn modinv(&self, modulus: &Self) -> Option<Self> {
-        self.with_big_refs(modulus, |lhs, rhs| lhs.modinv(&rhs).map(Self::from_big))
+        self.with_big_cows(modulus, |lhs, rhs| lhs.modinv(&rhs).map(Self::from_big))
     }
 
     pub fn set_bit(&mut self, bit: u64, value: bool) {
@@ -151,7 +151,7 @@ impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
                 }
             }
             Decoded::Small(n) => {
-                let mut big: <E as EncodedBigNum<'a>>::Big = n.to_big();
+                let mut big: <E as Encoding<'a>>::Big = n.to_big();
                 big.set_bit(bit, value);
                 *encoding = Decoded::Big(Cow::Owned(big));
             }
@@ -160,7 +160,7 @@ impl<'a, E: EncodedBigNum<'a>> GenericBigNum<'a, E> {
     }
 }
 
-impl<'a, E: EncodedBigNum<'a>> InspectEncoding<'a, E::Small, E::Big> for GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for GenericBigNum<'a, E> {
     fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
         self.0.decode()
     }
@@ -169,12 +169,12 @@ impl<'a, E: EncodedBigNum<'a>> InspectEncoding<'a, E::Small, E::Big> for Generic
         self.0.small()
     }
 
-    fn with_decoded_ref<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
-        self.0.with_decoded_ref(f)
+    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
+        self.0.with_decoded(f)
     }
 }
 
-impl<'a, E: EncodedBigNum<'a>> InspectEncoding<'a, E::Small, E::Big> for &GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &GenericBigNum<'a, E> {
     fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
         self.0.clone().decode()
     }
@@ -183,12 +183,12 @@ impl<'a, E: EncodedBigNum<'a>> InspectEncoding<'a, E::Small, E::Big> for &Generi
         self.0.small()
     }
 
-    fn with_decoded_ref<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
-        self.0.with_decoded_ref(f)
+    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
+        self.0.with_decoded(f)
     }
 }
 
-impl<'a, E: EncodedBigNum<'a>> EncodedBigNum<'a> for GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a>> Encoding<'a> for GenericBigNum<'a, E> {
     type Small = E::Small;
     type Big = E::Big;
     //type Repr = E::Repr;
@@ -206,26 +206,28 @@ impl<'a, E: EncodedBigNum<'a>> EncodedBigNum<'a> for GenericBigNum<'a, E> {
     }
 }
 
-impl<'a, E: EncodedBigNum<'a, Big = BigInt>> Default for GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Default for GenericBigNum<'a, E> {
     fn default() -> Self {
         GenericBigNum::from(0i32)
     }
 }
 
-impl<'a, E: EncodedBigNum<'a, Big = BigInt>> Display for GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Display for GenericBigNum<'a, E> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        self.with_decoded_ref(|encoded| match encoded {
+        self.with_decoded(|encoded| match encoded {
             Decoded::Small(n) => Display::fmt(&n, f),
             Decoded::Big(n) => Display::fmt(&n, f),
         })
     }
 }
 
-impl<'a, E: EncodedBigNum<'a, Big = BigInt>> Debug for GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Debug for GenericBigNum<'a, E> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        self.with_decoded_ref(|encoded| match encoded {
+        self.with_decoded(|encoded| match encoded {
             Decoded::Small(n) => Debug::fmt(&n, f),
             Decoded::Big(n) => Debug::fmt(&n, f),
         })
     }
 }
+
+// TODO: Implement numeric traits for `GenericBigNum`

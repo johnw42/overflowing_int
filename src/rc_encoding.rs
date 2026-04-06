@@ -1,30 +1,39 @@
+use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
+use crate::rc_encoding::shifted::Shifted;
+use crate::small_num::SmallNumber;
+use num_bigint::{BigInt, BigUint};
 use std::hash::Hash;
 use std::mem::ManuallyDrop;
 use std::rc::Rc;
 use std::{borrow::Cow, fmt::Debug};
 
-use num_bigint::{BigInt, BigUint};
-use serde::de;
-
-use crate::big_number::BigNumber;
-use crate::generic_bignum::encoding::{Decoded, EncodedBigNum, InspectEncoding};
-use crate::rc_encoding::shifted::Shifted;
-use crate::small_num::SmallNumber;
-
 mod shifted;
 
-#[derive(Clone)]
-pub struct RcEncoding<S, B>(RcEncodedRepr<S, B>)
-where
-    S: SmallNumber<Big = B>,
-    B: BigNumber;
+/// Numbers that can be encoded in a pointer-sized integer.
+pub trait PtrSizedNumber: SmallNumber {}
+impl PtrSizedNumber for isize {}
+impl PtrSizedNumber for usize {}
 
-impl<S, B> InspectEncoding<'static, S, B> for RcEncoding<S, B>
+const _: () = {
+    assert!(align_of::<Rc<BigInt>>() > 1);
+    assert!(align_of::<Rc<BigUint>>() > 1);
+    assert!(size_of::<Rc<BigInt>>() == size_of::<isize>());
+    assert!(size_of::<Rc<BigUint>>() == size_of::<usize>());
+};
+
+/// An encoding that uses `Rc` for big values, and a small value with the LSB
+/// set to 1 for small values.  This encoding is used for `RcBigInt` and
+/// `RcBigUint`.
+#[derive(Clone)]
+pub struct RcEncoding<S>(RcEncodedRepr<S>)
 where
-    S: SmallNumber<Big = B>,
-    B: BigNumber,
+    S: PtrSizedNumber;
+
+impl<S> Decode<'static, S> for RcEncoding<S>
+where
+    S: PtrSizedNumber,
 {
-    fn decode(mut self) -> Decoded<S, Cow<'static, B>> {
+    fn decode(mut self) -> Decoded<S, Cow<'static, S::Big>> {
         unsafe {
             if let Some(s) = self.0.small.validate() {
                 Decoded::Small(s)
@@ -41,7 +50,7 @@ where
         unsafe { self.0.small.validate() }
     }
 
-    fn with_decoded_ref<T>(&self, f: impl FnOnce(Decoded<S, Cow<B>>) -> T) -> T {
+    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
         unsafe {
             if let Some(s) = self.0.small.validate() {
                 f(Decoded::Small(s))
@@ -52,14 +61,12 @@ where
     }
 }
 
-impl<S, B> EncodedBigNum<'static> for RcEncoding<S, B>
+impl<S> Encoding<'static> for RcEncoding<S>
 where
-    S: SmallNumber<Big = B>,
-    B: BigNumber,
-    BigInt: From<B>,
+    S: PtrSizedNumber,
 {
     type Small = S;
-    type Big = B;
+    type Big = S::Big;
 
     fn from_small(s: S) -> Self {
         if let Some(shifted) = Shifted::try_new(s) {
@@ -95,21 +102,14 @@ where
     }
 }
 
-union RcEncodedRepr<S: SmallNumber, T> {
+union RcEncodedRepr<S: PtrSizedNumber> {
     small: Shifted<S>,
-    big: ManuallyDrop<Rc<T>>,
+    big: ManuallyDrop<Rc<S::Big>>,
 }
 
-const _: () = {
-    assert!(align_of::<Rc<BigInt>>() > 1);
-    assert!(align_of::<Rc<BigUint>>() > 1);
-    assert!(size_of::<Rc<BigInt>>() == size_of::<isize>());
-    assert!(size_of::<Rc<BigUint>>() == size_of::<usize>());
-};
-
-impl<S, T> Clone for RcEncodedRepr<S, T>
+impl<S> Clone for RcEncodedRepr<S>
 where
-    S: SmallNumber,
+    S: PtrSizedNumber,
 {
     fn clone(&self) -> Self {
         unsafe {
@@ -124,9 +124,9 @@ where
     }
 }
 
-impl<S, B> Drop for RcEncodedRepr<S, B>
+impl<S> Drop for RcEncodedRepr<S>
 where
-    S: SmallNumber,
+    S: PtrSizedNumber,
 {
     fn drop(&mut self) {
         unsafe {
@@ -137,40 +137,37 @@ where
     }
 }
 
-impl<S, B> Debug for RcEncoding<S, B>
+impl<S> Debug for RcEncoding<S>
 where
-    S: SmallNumber<Big = B>,
-    B: BigNumber,
+    S: PtrSizedNumber,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.with_decoded_ref(|decoded| match decoded {
+        self.with_decoded(|decoded| match decoded {
             Decoded::Small(s) => write!(f, "Small({})", s),
             Decoded::Big(b) => write!(f, "Big({})", b.as_ref()),
         })
     }
 }
 
-impl<S, B> Hash for RcEncoding<S, B>
+impl<S> Hash for RcEncoding<S>
 where
-    S: SmallNumber<Big = B>,
-    B: BigNumber,
+    S: PtrSizedNumber,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.with_decoded_ref(|decoded| match decoded {
+        self.with_decoded(|decoded| match decoded {
             Decoded::Small(s) => s.hash(state),
             Decoded::Big(b) => b.hash(state),
         });
     }
 }
 
-impl<S, B> PartialEq for RcEncoding<S, B>
+impl<S> PartialEq for RcEncoding<S>
 where
-    S: SmallNumber<Big = B>,
-    B: BigNumber,
+    S: PtrSizedNumber,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.with_decoded_ref(|lhs| {
-            other.with_decoded_ref(|rhs| match (lhs, rhs) {
+        self.with_decoded(|lhs| {
+            other.with_decoded(|rhs| match (lhs, rhs) {
                 (Decoded::Small(s1), Decoded::Small(s2)) => s1 == s2,
                 (Decoded::Big(b1), Decoded::Big(b2)) => b1 == b2,
                 _ => false,
@@ -179,9 +176,4 @@ where
     }
 }
 
-impl<S, B> Eq for RcEncoding<S, B>
-where
-    S: SmallNumber<Big = B>,
-    B: BigNumber,
-{
-}
+impl<S> Eq for RcEncoding<S> where S: PtrSizedNumber {}

@@ -129,6 +129,7 @@ where
     Self: FromStr,
     Self: Hash,
     Self: Integer,
+    Self: Into<BigInt>,
     Self: LowerHex,
     Self: Num<FromStrRadixErr = ParseBigIntError>,
     Self: Octal,
