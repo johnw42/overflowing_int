@@ -22,21 +22,22 @@ use crate::{
 pub struct GenericBigInt<'a, E: EncodedBigNum<'a>>(pub(crate) GenericBigNum<'a, E>);
 
 impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
-    /// Returns the magnitude of the `RcBigInt` as a `BigUint`.
+    /// Returns the magnitude of the as a `BigUint`.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigInt;
+    /// use compact_bigint::CowBigInt;
     /// use num_traits::Zero;
     /// use std::borrow::Borrow;
     /// use num_bigint::BigUint;
     ///
-    /// assert_eq!(*RcBigInt::from(1234).magnitude(), BigUint::from(1234u32));
-    /// assert_eq!(*RcBigInt::from(-4321).magnitude(), BigUint::from(4321u32));
-    /// assert!(RcBigInt::zero().magnitude().is_zero());
+    /// assert_eq!(CowBigInt::from(1234).magnitude(), BigUint::from(1234u32));
+    /// assert_eq!(CowBigInt::from(-4321).magnitude(), BigUint::from(4321u32));
+    /// assert!(CowBigInt::zero().magnitude().is_zero());
     /// ```
     pub fn magnitude(&self) -> BigUint {
+        // TODO change return type
         self.0.with_decoded_ref(|encoded| match encoded {
             Decoded::Small(n) => n.to_bigint().magnitude().clone(),
             Decoded::Big(n) => n.magnitude().clone(),
@@ -54,44 +55,44 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
         })
     }
 
-    /// Creates and initializes a `RcBigInt`.
+    /// Creates and initializes a bigint.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub(crate) fn from_biguint(sign: Sign, data: BigUint) -> Self {
         Self(GenericBigNum::from_big(E::Big::from_biguint(sign, data)))
     }
 
-    /// Creates and initializes a `RcBigInt`.
+    /// Creates and initializes a bigint.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn from_slice(sign: Sign, slice: &[u32]) -> Self {
         Self(GenericBigNum::from_big(E::Big::from_slice(sign, slice)))
     }
 
-    /// Reinitializes a `RcBigInt`.
+    /// Reinitializes a bigint.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     pub fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
         *self = Self::from_slice(sign, slice);
     }
 
-    /// Creates and initializes a `RcBigInt`.
+    /// Creates and initializes a bigint.
     ///
     /// The bytes are in big-endian byte order.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{RcBigInt, Sign};
+    /// use compact_bigint::{CowBigInt, Sign};
     ///
-    /// assert_eq!(RcBigInt::from_bytes_be(Sign::Plus, b"A"),
-    ///            RcBigInt::parse_bytes(b"65", 10).unwrap());
-    /// assert_eq!(RcBigInt::from_bytes_be(Sign::Plus, b"AA"),
-    ///            RcBigInt::parse_bytes(b"16705", 10).unwrap());
-    /// assert_eq!(RcBigInt::from_bytes_be(Sign::Plus, b"AB"),
-    ///            RcBigInt::parse_bytes(b"16706", 10).unwrap());
-    /// assert_eq!(RcBigInt::from_bytes_be(Sign::Plus, b"Hello world!"),
-    ///            RcBigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
+    /// assert_eq!(CowBigInt::from_bytes_be(Sign::Plus, b"A"),
+    ///            CowBigInt::parse_bytes(b"65", 10).unwrap());
+    /// assert_eq!(CowBigInt::from_bytes_be(Sign::Plus, b"AA"),
+    ///            CowBigInt::parse_bytes(b"16705", 10).unwrap());
+    /// assert_eq!(CowBigInt::from_bytes_be(Sign::Plus, b"AB"),
+    ///            CowBigInt::parse_bytes(b"16706", 10).unwrap());
+    /// assert_eq!(CowBigInt::from_bytes_be(Sign::Plus, b"Hello world!"),
+    ///            CowBigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self
     where
@@ -106,7 +107,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
         )
     }
 
-    /// Creates and initializes a `RcBigInt`.
+    /// Creates and initializes a bigint.
     ///
     /// The bytes are in little-endian byte order.
     pub fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self
@@ -122,7 +123,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
         )
     }
 
-    /// Creates and initializes a `RcBigInt` from an array of bytes in
+    /// Creates and initializes a bigint from an array of bytes in
     /// two's complement binary representation.
     ///
     /// The digits are in big-endian base 2<sup>8</sup>.
@@ -132,7 +133,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
         )))
     }
 
-    /// Creates and initializes a `RcBigInt` from an array of bytes in two's complement.
+    /// Creates and initializes a bigint from an array of bytes in two's complement.
     ///
     /// The digits are in little-endian base 2<sup>8</sup>.
     pub fn from_signed_bytes_le(digits: &[u8]) -> Self {
@@ -141,16 +142,16 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
         )))
     }
 
-    /// Creates and initializes a `RcBigInt`.
+    /// Creates and initializes a bigint.
     ///
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{RcBigInt};
+    /// use compact_bigint::{CowBigInt};
     ///
-    /// assert_eq!(RcBigInt::parse_bytes(b"1234", 10), Some(RcBigInt::from(1234)));
-    /// assert_eq!(RcBigInt::parse_bytes(b"ABCD", 16), Some(RcBigInt::from(0xABCD)));
-    /// assert_eq!(RcBigInt::parse_bytes(b"G", 16), None);
+    /// assert_eq!(CowBigInt::parse_bytes(b"1234", 10), Some(CowBigInt::from(1234)));
+    /// assert_eq!(CowBigInt::parse_bytes(b"ABCD", 16), Some(CowBigInt::from(0xABCD)));
+    /// assert_eq!(CowBigInt::parse_bytes(b"G", 16), None);
     /// ```
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
         E::Big::parse_bytes(buf, radix)
@@ -158,7 +159,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
             .map(Self)
     }
 
-    /// Creates and initializes a `RcBigInt`. Each u8 of the input slice is
+    /// Creates and initializes a bigint. Each u8 of the input slice is
     /// interpreted as one digit of the number
     /// and must therefore be less than `radix`.
     ///
@@ -180,7 +181,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
             .map(Self)
     }
 
-    /// Creates and initializes a `RcBigInt`. Each u8 of the input slice is
+    /// Creates and initializes a bigint. Each u8 of the input slice is
     /// interpreted as one digit of the number
     /// and must therefore be less than `radix`.
     ///
@@ -202,7 +203,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
             .map(Self)
     }
 
-    /// Returns the sign and the byte representation of the `RcBigInt` in big-endian byte order.
+    /// Returns the sign and the byte representation of the bigint in big-endian byte order.
     ///
     /// # Examples
     ///
@@ -216,7 +217,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
         self.0.with_big_ref(|big| big.as_ref().to_bytes_be())
     }
 
-    /// Returns the sign and the byte representation of the `RcBigInt` in little-endian byte order.
+    /// Returns the sign and the byte representation of the bigint in little-endian byte order.
     ///
     /// # Examples
     ///
@@ -230,7 +231,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
         self.0.with_big_ref(|big| big.as_ref().to_bytes_le())
     }
 
-    /// Returns the sign and the `u32` digits representation of the `RcBigInt` ordered least
+    /// Returns the sign and the `u32` digits representation of the bigint ordered least
     /// significant digit first.
     ///
     /// # Examples
@@ -248,7 +249,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
         self.0.with_big_ref(|big| big.as_ref().to_u32_digits())
     }
 
-    /// Returns the two's-complement byte representation of the `RcBigInt` in big-endian byte order.
+    /// Returns the two's-complement byte representation of the bigint in big-endian byte order.
     ///
     /// # Examples
     ///
@@ -262,7 +263,7 @@ impl<'a, E: EncodedBigNum<'a, Big = BigInt>> GenericBigInt<'a, E> {
         self.0.with_big_ref(|big| big.as_ref().to_signed_bytes_be())
     }
 
-    /// Returns the two's-complement byte representation of the `RcBigInt` in little-endian byte order.
+    /// Returns the two's-complement byte representation of the bigint in little-endian byte order.
     ///
     /// # Examples
     ///
@@ -473,7 +474,7 @@ where
         Self(GenericBigNum::from_encoding(E::from_big_cow(b)))
     }
 
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<'a, E::Big>>)) {
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
         self.0.update_encoding(f);
     }
 }

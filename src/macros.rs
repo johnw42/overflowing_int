@@ -5,7 +5,7 @@ macro_rules! duplicate_generic_bigint_types {
             [
                 bigint_tag bigint_type;
                 [cow]      [crate::CowBigInt<'static>];
-                //[rc]       [RcBigInt];
+                [rc]       [crate::RcBigInt];
             ]
             $($body)*
         }

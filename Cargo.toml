@@ -65,7 +65,6 @@ default-features = false
 [dependencies.quickcheck]
 optional = true
 version = "1"
-default-features = false
 
 [dependencies.arbitrary]
 optional = true

@@ -125,7 +125,7 @@ where
     }
 
     /// Updates the encoding in place using the provided function.
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<'a, Self::Big>>));
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>));
 }
 
 impl<'a, S, B> InspectEncoding<'a, S, B> for Cow<'a, B>

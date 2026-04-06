@@ -201,7 +201,7 @@ impl<'a, E: EncodedBigNum<'a>> EncodedBigNum<'a> for GenericBigNum<'a, E> {
         Self::from_encoding(E::from_big_cow(b))
     }
 
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<'a, E::Big>>)) {
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
         self.0.update_encoding(f);
     }
 }
