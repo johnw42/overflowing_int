@@ -46,6 +46,15 @@ pub mod mod_name {
             }
             .into()
         }
+
+        fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+            self.with_decoded(|decoded| -> Box<dyn Iterator<Item = Self>> {
+                match decoded {
+                    Decoded::Small(small) => Box::new(small.shrink().map(Self::from_small)),
+                    Decoded::Big(big) => Box::new(big.shrink().map(Self::from_big)),
+                }
+            })
+        }
     }
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> arbitrary::Arbitrary<'_>
