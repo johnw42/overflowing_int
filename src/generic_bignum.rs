@@ -10,14 +10,16 @@ use std::marker::PhantomData;
 
 pub mod encoding;
 pub mod num_ops;
+pub mod signed;
 mod trait_impls;
+pub mod unsigned;
 
 /// A signed big integer type that can be used with any encoding that implements
 /// `Encoding` with `Big = BigInt`.  Implements the same methods and traits as
 /// `BigInt`, and can be used as a drop-in replacement for `BigInt` in most
 /// cases.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(crate) struct GenericBigNum<'a, E: Encoding<'a>>(pub(crate) E, PhantomData<&'a ()>);
+pub(crate) struct GenericBigNum<'a, E: Encoding<'a>>(E, PhantomData<&'a ()>);
 
 impl<'a, E: Encoding<'a>> GenericBigNum<'a, E> {
     pub fn from_encoding(enc: E) -> Self {

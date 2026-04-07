@@ -1,6 +1,6 @@
 use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
-use crate::generic_signed_bignum::GenericSignedBigNum;
-use crate::generic_unsigned_bignum::GenericUnsignedBigNum;
+use crate::generic_bignum::signed::GenericSignedBigNum;
+use crate::generic_bignum::unsigned::GenericUnsignedBigNum;
 use crate::small_num::SmallNumber;
 use crate::{duplicate_iprims, duplicate_prims, duplicate_uprims};
 use duplicate::duplicate_item;

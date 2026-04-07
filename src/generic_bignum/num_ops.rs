@@ -619,7 +619,7 @@ mod test {
     use super::*;
     use crate::duplicate_arith_and_bit_ops;
     use crate::duplicate_generic_bigint_types;
-    use crate::generic_signed_bignum::GenericSignedBigNum;
+    use crate::generic_bignum::signed::GenericSignedBigNum;
     use num_bigint::BigInt;
     use num_traits::Zero;
     use quickcheck::TestResult;
