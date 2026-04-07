@@ -219,5 +219,3 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Debug for GenericBigNum<'a, E> {
         })
     }
 }
-
-// TODO: Implement numeric traits for `GenericBigNum`?

@@ -21,13 +21,12 @@ where
     S: SmallNumber,
 {
     /// The main method of this trait, which decodes the value into either a
-    /// small or big value without ever cloning it.
+    /// small or big value without ever cloning a big value.  This method is
+    /// preferable to [`Self::decode`] in most cases, but if `f` needs to
+    /// clone the big value, using `decode` may avoid cloning.
     fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T;
 
-    /// Decodes the value.  This method may be less efficient than
-    /// [`Self::with_decoded`] since it may require cloning the big value, but
-    /// it is more convenient when an owned value is needed.
-    // TODO: Replace uses with `with_decoded` when possible, especially in num_ops.rs, and remove this method.
+    /// Decodes the value, consuming self.
     fn decode(self) -> Decoded<S, Cow<'a, S::Big>>;
 
     /// Gets the big value as a `Cow`, creating a bignum if necessary.

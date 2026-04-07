@@ -1,4 +1,4 @@
-use crate::big_number::{BigNumber, BigNumberDigits};
+use crate::big_number::BigNumberDigits;
 use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
@@ -549,9 +549,3 @@ duplicate_bit_ops! {
         impl_binary_assign_ref_op_trait!(op_trait, op_fn);
     }
 }
-
-// impl_pow_traits!(GenericUnsignedBigNum<'a, E>, exponent, exponent.0, &exponent.0);
-// impl_pow_traits_for_ref!(GenericUnsignedBigNum<'a, E>, exponent, exponent.0, &exponent.0);
-// duplicate_uprims! { paste! {
-//     impl_pow_traits!(prim, exponent, exponent, &exponent);
-// } }

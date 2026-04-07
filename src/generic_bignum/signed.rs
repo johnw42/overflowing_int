@@ -1,4 +1,4 @@
-use crate::big_number::{BigNumber, BigNumberDigits};
+use crate::big_number::BigNumberDigits;
 use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
