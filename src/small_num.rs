@@ -145,8 +145,6 @@ pub trait SmallNumber:
         fn [<op_fn _big_ref_small>](lhs: &Self::Big, rhs: Self) -> Self::Big;
         fn [<op_fn _assign_small>](lhs: &mut Self::Big, rhs: Self);
     });
-    fn pow_big_usmall(lhs: Self::Big, rhs: Self::Unsigned) -> Self::Big;
-    fn pow_big_ref_usmall(lhs: &Self::Big, rhs: Self::Unsigned) -> Self::Big;
 }
 
 macro_rules! impl_binary_ops {
@@ -168,12 +166,6 @@ macro_rules! impl_binary_ops {
                 std::ops::[<op_trait Assign>]::[<op_fn _assign>](lhs, rhs)
             }
         });
-        fn pow_big_usmall(lhs: Self::Big, rhs: Self::Unsigned) -> Self::Big {
-            num_traits::Pow::pow(lhs, rhs)
-        }
-        fn pow_big_ref_usmall(lhs: &Self::Big, rhs: Self::Unsigned) -> Self::Big {
-            num_traits::Pow::pow(lhs, rhs)
-        }
     };
 }
 

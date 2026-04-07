@@ -6,7 +6,10 @@ use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
 };
 use core::panic;
-use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, One as _, Pow};
+use num_integer::Integer;
+use num_traits::{
+    CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, One, Pow, ToPrimitive,
+};
 use paste::paste;
 use std::borrow::Cow;
 use std::ops::{
@@ -146,6 +149,9 @@ trait ShiftOp<'e, E: Encoding<'e>> {
     }
 }
 
+// This trait has only one implementation, so it doesn't need to be generic over the operator.
+// Using a trait isn't stricly necessary, but it helps organize the code in a way that's consistent
+// with the other operations.
 trait PowOpTrait<'e, E: Encoding<'e>> {
     fn on_big_small(lhs: Cow<E::Big>, rhs: <E::Unsigned as Encoding<'e>>::Small) -> E::Big;
     fn on_small(lhs: E::Small, rhs: <E::Unsigned as Encoding<'e>>::Small) -> Result<E::Small, ()>;
@@ -285,45 +291,43 @@ duplicate_shift_ops! {
 
 struct PowOp;
 
+fn big_pow<L, R>(lhs: Cow<L>, rhs: &R) -> L
+where
+    L: BigNumber,
+    R: ToPrimitive + Integer,
+{
+    if let Some(rhs) = rhs.to_u32() {
+        lhs.pow(rhs)
+    } else if lhs.is_one() {
+        lhs.into_owned()
+    } else if lhs.is_minus_one() {
+        if rhs.is_even() {
+            L::one()
+        } else {
+            lhs.into_owned()
+        }
+    } else {
+        panic!("Exponentiation would overflow memory")
+    }
+}
+
 impl<'e, E: Encoding<'e>> PowOpTrait<'e, E> for PowOp {
     fn on_big(lhs: Cow<E::Big>, rhs: Cow<<E::Unsigned as Encoding<'e>>::Big>) -> E::Big {
-        match (lhs, rhs) {
-            (Cow::Borrowed(lhs), Cow::Borrowed(rhs)) => {
-                E::Big::pow_ref_self_and_ref_biguint(lhs, rhs.to_ref_biguint())
-            }
-            (Cow::Borrowed(lhs), Cow::Owned(rhs)) => {
-                E::Big::pow_ref_self_and_biguint(lhs, rhs.into_biguint())
-            }
-            (Cow::Owned(lhs), Cow::Borrowed(rhs)) => {
-                E::Big::pow_self_and_ref_biguint(lhs, rhs.to_ref_biguint())
-            }
-            (Cow::Owned(lhs), Cow::Owned(rhs)) => {
-                E::Big::pow_self_and_biguint(lhs, rhs.into_biguint())
-            }
-        }
+        big_pow(lhs, rhs.as_ref())
     }
 
     fn on_small(lhs: E::Small, rhs: <E::Unsigned as Encoding<'e>>::Small) -> Result<E::Small, ()> {
-        if lhs.is_one() {
-            Ok(E::Small::one())
-        } else if let Ok(rhs) = rhs.try_into()
+        if let Some(rhs) = rhs.to_u32()
             && let (result, false) = lhs.overflowing_pow(rhs)
         {
             Ok(result)
         } else {
-            panic!("Exponentiation would overflow memory")
+            Err(())
         }
     }
 
     fn on_big_small(lhs: Cow<E::Big>, rhs: <E::Unsigned as Encoding<'e>>::Small) -> E::Big {
-        if lhs.is_one() {
-            E::Big::one()
-        } else {
-            match lhs {
-                Cow::Borrowed(lhs) => E::Small::pow_big_ref_usmall(lhs, rhs),
-                Cow::Owned(lhs) => E::Small::pow_big_usmall(lhs, rhs),
-            }
-        }
+        big_pow(lhs, &rhs)
     }
 }
 
@@ -543,7 +547,7 @@ impl<'a, E: Encoding<'a>> Pow<GenericBigNum<'a, E::Unsigned>> for GenericBigNum<
     type Output = GenericBigNum<'a, E>;
 
     fn pow(self, rhs: GenericBigNum<'a, E::Unsigned>) -> Self::Output {
-        GenericBigNum::from_big(E::Big::pow_self_and_biguint(self.big(), rhs.big()))
+        PowOp::call(self, rhs)
     }
 }
 
@@ -551,35 +555,23 @@ impl<'a, E: Encoding<'a>> Pow<&GenericBigNum<'a, E::Unsigned>> for GenericBigNum
     type Output = GenericBigNum<'a, E>;
 
     fn pow(self, rhs: &GenericBigNum<'a, E::Unsigned>) -> Self::Output {
-        rhs.with_big_cow(|rhs| {
-            GenericBigNum::from_big(E::Big::pow_self_and_ref_biguint(self.big(), rhs.as_ref()))
-        })
+        PowOp::call(self, rhs)
     }
 }
 
-impl<'a, E: Encoding<'a>> Pow<GenericBigNum<'a, E>> for &GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a>> Pow<GenericBigNum<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
     type Output = GenericBigNum<'a, E>;
 
-    fn pow(self, rhs: GenericBigNum<'a, E>) -> Self::Output {
-        self.with_big_cow(|lhs| {
-            GenericBigNum::from_big(E::Big::pow_self_and_biguint(
-                lhs.into_owned(),
-                rhs.big().into_biguint(),
-            ))
-        })
+    fn pow(self, rhs: GenericBigNum<'a, E::Unsigned>) -> Self::Output {
+        PowOp::call(self, rhs)
     }
 }
 
-impl<'a, E: Encoding<'a>> Pow<&GenericBigNum<'a, E>> for &GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a>> Pow<&GenericBigNum<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
     type Output = GenericBigNum<'a, E>;
 
-    fn pow(self, rhs: &GenericBigNum<'a, E>) -> Self::Output {
-        self.with_big_cows(rhs, |lhs, rhs| {
-            GenericBigNum::from_big(E::Big::pow_self_and_ref_biguint(
-                lhs.into_owned(),
-                rhs.as_ref().to_ref_biguint(),
-            ))
-        })
+    fn pow(self, rhs: &GenericBigNum<'a, E::Unsigned>) -> Self::Output {
+        PowOp::call(self, rhs)
     }
 }
 
@@ -589,7 +581,7 @@ duplicate_uprims! {
             type Output = GenericBigNum<'a, E>;
 
             fn pow(self, rhs: prim) -> Self::Output {
-                self.with_big_cow(|lhs| GenericBigNum::from_big(E::Big::[<pow_self_and_ref_ prim>](lhs.into_owned(), &rhs)))
+                PowOp::call(self, rhs)
             }
         }
 
@@ -597,7 +589,23 @@ duplicate_uprims! {
             type Output = GenericBigNum<'a, E>;
 
             fn pow(self, rhs: &prim) -> Self::Output {
-                self.with_big_cow(|lhs| GenericBigNum::from_big(E::Big::[<pow_self_and_ref_ prim>](lhs.into_owned(), rhs)))
+                PowOp::call(self, rhs)
+            }
+        }
+
+        impl<'a, E: Encoding<'a>> Pow<prim> for &GenericBigNum<'a, E> {
+            type Output = GenericBigNum<'a, E>;
+
+            fn pow(self, rhs: prim) -> Self::Output {
+                PowOp::call(self, rhs)
+            }
+        }
+
+        impl<'a, E: Encoding<'a>> Pow<&prim> for &GenericBigNum<'a, E> {
+            type Output = GenericBigNum<'a, E>;
+
+            fn pow(self, rhs: &prim) -> Self::Output {
+                PowOp::call(self, rhs)
             }
         }
     }
@@ -818,26 +826,30 @@ mod test {
             }
         }
 
-        // duplicate_uprims! {
-        //     paste! {
-        //         #[quickcheck]
-        //         fn [<test_pow_ prim _ bigint_tag>](lhs: bigint_type, rhs: u8) -> TestResult {
-        //             let rhs = rhs % 64; // limit the exponent to avoid long test times and potential OOM errors
-        //             #[allow(irrefutable_let_patterns)]
-        //             if let Ok(rhs) = prim::try_from(rhs) {
-        //                 let big_lhs = &BigInt::from(lhs.clone());
-        //                 let expected = Pow::pow(big_lhs, rhs);
-        //                 let actual1 = BigInt::from(lhs.clone().pow(rhs));
-        //                 let actual2 = BigInt::from(lhs.pow(rhs));
-        //                 let label = format!("failed with inputs {}, {}", big_lhs, rhs);
-        //                 assert_eq!(expected, actual1, "{}", label);
-        //                 assert_eq!(expected, actual2, "{}", label);
-        //                 TestResult::passed()
-        //             } else {
-        //                 TestResult::discard()
-        //             }
-        //         }
-        //     }
-        // }
+        duplicate! {
+            [
+                prim;
+                [usize];
+            ]
+            paste! {
+                #[quickcheck]
+                fn [<test_pow_ prim _ bigint_tag>](lhs: bigint_type, rhs: u8) -> TestResult {
+                    let rhs = rhs % 64; // limit the exponent to avoid long test times and potential OOM errors
+                    #[allow(irrefutable_let_patterns)]
+                    if let Ok(rhs) = prim::try_from(rhs) {
+                        let big_lhs = &BigInt::from(lhs.clone());
+                        let expected = Pow::pow(big_lhs, rhs);
+                        let actual1 = BigInt::from(Pow::pow(lhs.clone(), rhs));
+                        let actual2 = BigInt::from(Pow::pow(lhs, rhs));
+                        let label = format!("failed with inputs {}, {}", big_lhs, rhs);
+                        assert_eq!(expected, actual1, "{}", label);
+                        assert_eq!(expected, actual2, "{}", label);
+                        TestResult::passed()
+                    } else {
+                        TestResult::discard()
+                    }
+                }
+            }
+        }
     }
 }

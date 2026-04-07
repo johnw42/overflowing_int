@@ -122,32 +122,34 @@ macro_rules! impl_binary_assign_ref_op {
         }
     };
 }
-macro_rules! impl_pow_ops {
-    ($rhs:ty) => {
-        paste! {
-            fn [<pow _self_and_ $rhs:lower>](lhs: Self, rhs: $rhs) -> Self {
-                Pow::pow(lhs, rhs)
-            }
 
-            fn [<pow _self_and_ref_ $rhs:lower>](lhs: Self, rhs: &$rhs) -> Self {
-                Pow::pow(lhs, rhs)
-            }
-        }
-    };
-}
-macro_rules! impl_pow_ops_for_ref {
-    ($rhs:ty) => {
-        paste! {
-            fn [<pow _ref_self_and_ $rhs:lower>](lhs: &Self, rhs: $rhs) -> Self {
-                Pow::pow(lhs, rhs)
-            }
+// TODO delete
+// macro_rules! impl_pow_ops {
+//     ($rhs:ty) => {
+//         paste! {
+//             fn [<pow _self_and_ $rhs:lower>](lhs: Self, rhs: $rhs) -> Self {
+//                 Pow::pow(lhs, rhs)
+//             }
 
-            fn [<pow _ref_self_and_ref_ $rhs:lower>](lhs: &Self, rhs: &$rhs) -> Self {
-                Pow::pow(lhs, rhs)
-            }
-        }
-    };
-}
+//             fn [<pow _self_and_ref_ $rhs:lower>](lhs: Self, rhs: &$rhs) -> Self {
+//                 Pow::pow(lhs, rhs)
+//             }
+//         }
+//     };
+// }
+// macro_rules! impl_pow_ops_for_ref {
+//     ($rhs:ty) => {
+//         paste! {
+//             fn [<pow _ref_self_and_ $rhs:lower>](lhs: &Self, rhs: $rhs) -> Self {
+//                 Pow::pow(lhs, rhs)
+//             }
+
+//             fn [<pow _ref_self_and_ref_ $rhs:lower>](lhs: &Self, rhs: &$rhs) -> Self {
+//                 Pow::pow(lhs, rhs)
+//             }
+//         }
+//     };
+// }
 
 // TODO: Handle config settings
 identity! {
@@ -238,14 +240,21 @@ where
             declare_binary_assign_ref_op!(op_fn);
         }
     }
-    declare_pow_ops!(BigUint);
-    declare_pow_ops_for_ref!(BigUint);
-    duplicate_uprims! { paste! {
-        declare_pow_ops!(prim);
-    } }
+    // TODO delete
+    // declare_pow_ops!(BigUint);
+    // declare_pow_ops_for_ref!(BigUint);
+    // duplicate_uprims! { paste! {
+    //     declare_pow_ops!(prim);
+    // } }
 
+    /// Casts self to a BigUint.  This is only implemented for BigUint, and will panic if called on a BigInt.
     fn into_biguint(self) -> BigUint;
+
+    /// Casts self to a reference to a BigUint.  This is only implemented for BigUint, and will panic if called on a BigInt.
     fn to_ref_biguint(&self) -> &BigUint;
+
+    /// Returns true if the value is -1.  This is used to optimize exponentiation by small unsigned integers.
+    fn is_minus_one(&self) -> bool;
 
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self>;
     fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32>;
@@ -352,11 +361,12 @@ macro_rules! impl_big_number_body {
                 impl_binary_assign_ref_op!(op_fn);
             }
         }
-        impl_pow_ops!(BigUint);
-        impl_pow_ops_for_ref!(BigUint);
-        duplicate_uprims! { paste! {
-            impl_pow_ops!(prim);
-        } }
+        // TODO delete
+        // impl_pow_ops!(BigUint);
+        // impl_pow_ops_for_ref!(BigUint);
+        // duplicate_uprims! { paste! {
+        //     impl_pow_ops!(prim);
+        // } }
 
         fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
             Self::parse_bytes(buf, radix)
@@ -430,6 +440,10 @@ impl BigNumber for BigInt {
     fn to_ref_biguint(&self) -> &BigUint {
         unreachable!()
     }
+
+    fn is_minus_one(&self) -> bool {
+        self.sign() == Sign::Minus && self.magnitude().is_one()
+    }
 }
 
 impl BigNumber for BigUint {
@@ -441,6 +455,10 @@ impl BigNumber for BigUint {
 
     fn to_ref_biguint(&self) -> &BigUint {
         self
+    }
+
+    fn is_minus_one(&self) -> bool {
+        false
     }
 }
 

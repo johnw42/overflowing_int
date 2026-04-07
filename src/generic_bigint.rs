@@ -588,16 +588,15 @@ macro_rules! impl_binary_assign_ref_op_trait {
 macro_rules! impl_pow_traits {
     ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
         paste! {
-            impl<'a, E: Encoding<'a, Big = BigInt>> Pow<$rhs_type> for GenericBigInt<'a, E> {
+            impl<'a, E: Encoding<'a>> Pow<$rhs_type> for GenericBigInt<'a, E> {
                 type Output = GenericBigInt<'a, E>;
 
                 fn pow(self, $rhs_param: $rhs_type) -> GenericBigInt<'a, E> {
-                    GenericBigInt(self.0.pow($rhs_expr))
+                    GenericBigInt(Pow::pow(&self.0, $rhs_ref_expr))
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigInt>> Pow<&$rhs_type> for GenericBigInt<'a, E>
-            where for<'b> &'b GenericBigNum<'b, E>: Pow<&'b GenericBigNum<'b, <E as Encoding<'a>>::Unsigned>, Output = GenericBigNum<'b, E>>, {
+            impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for GenericBigInt<'a, E> {
                 type Output = GenericBigInt<'a, E>;
 
                 fn pow(self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
@@ -610,16 +609,15 @@ macro_rules! impl_pow_traits {
 macro_rules! impl_pow_traits_for_ref {
     ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
         paste! {
-            impl<'a, E: Encoding<'a, Big = BigInt>> Pow<$rhs_type> for &GenericBigInt<'a, E> {
+            impl<'a, E: Encoding<'a>> Pow<$rhs_type> for &GenericBigInt<'a, E> {
                 type Output = GenericBigInt<'a, E>;
 
-                fn pow(self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
-                    GenericBigInt(self.0.pow($rhs_expr))
+                fn pow(self, $rhs_param: $rhs_type) -> GenericBigInt<'a, E> {
+                    GenericBigInt(Pow::pow(&self.0, $rhs_ref_expr))
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigInt>> Pow<&$rhs_type> for &GenericBigInt<'a, E>
-            where for<'b> &'b GenericBigNum<'b, E>: Pow<&'b GenericBigNum<'b, <E as Encoding<'a>>::Unsigned>, Output = GenericBigNum<'b, E>>, {
+            impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for &GenericBigInt<'a, E> {
                 type Output = GenericBigInt<'a, E>;
 
                 fn pow(self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
@@ -670,18 +668,18 @@ duplicate_bit_ops! {
     }
 }
 
-// impl_pow_traits!(
-//     GenericBigInt<'a, E::Unsigned>,
-//     exponent,
-//     exponent.0,
-//     &exponent.0
-// );
-// impl_pow_traits_for_ref!(
-//     GenericBigInt<'a, E::Unsigned>,
-//     exponent,
-//     exponent.0,
-//     &exponent.0
-// );
-// duplicate_uprims! { paste! {
-//     impl_pow_traits!(prim, exponent, exponent, exponent);
-// } }
+impl_pow_traits!(
+    GenericBigInt<'a, E::Unsigned>,
+    exponent,
+    exponent.0,
+    &exponent.0
+);
+impl_pow_traits_for_ref!(
+    GenericBigInt<'a, E::Unsigned>,
+    exponent,
+    exponent.0,
+    &exponent.0
+);
+duplicate_uprims! { paste! {
+    impl_pow_traits!(prim, exponent, exponent, exponent);
+} }
