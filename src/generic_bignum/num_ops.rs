@@ -1,6 +1,6 @@
 use crate::big_number::{BigNumber, BigSigned};
 use crate::generic_bignum::GenericBigNum;
-use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
+use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber as _;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
@@ -619,7 +619,7 @@ mod test {
     use super::*;
     use crate::duplicate_arith_and_bit_ops;
     use crate::duplicate_generic_bigint_types;
-    use crate::generic_bigint::GenericBigInt;
+    use crate::generic_signed_bignum::GenericSignedBigNum;
     use num_bigint::BigInt;
     use num_traits::Zero;
     use quickcheck::TestResult;
@@ -634,28 +634,28 @@ mod test {
     }
 
     struct ShiftOpsForType<R, E: Encoding<'static>> {
-        cbigint_op1: fn(GenericBigInt<'static, E>, R) -> GenericBigInt<'static, E>,
-        cbigint_op2: fn(GenericBigInt<'static, E>, &R) -> GenericBigInt<'static, E>,
-        cbigint_op3: fn(&GenericBigInt<'static, E>, R) -> GenericBigInt<'static, E>,
-        cbigint_op4: fn(&GenericBigInt<'static, E>, &R) -> GenericBigInt<'static, E>,
-        op_assign1: fn(&mut GenericBigInt<'static, E>, R),
+        cbigint_op1: fn(GenericSignedBigNum<'static, E>, R) -> GenericSignedBigNum<'static, E>,
+        cbigint_op2: fn(GenericSignedBigNum<'static, E>, &R) -> GenericSignedBigNum<'static, E>,
+        cbigint_op3: fn(&GenericSignedBigNum<'static, E>, R) -> GenericSignedBigNum<'static, E>,
+        cbigint_op4: fn(&GenericSignedBigNum<'static, E>, &R) -> GenericSignedBigNum<'static, E>,
+        op_assign1: fn(&mut GenericSignedBigNum<'static, E>, R),
         bigint_op: fn(&E::Big, R) -> E::Big,
     }
 
     struct BinOpsForTypes<L, R, E: Encoding<'static>> {
         predicate: fn(&E::Big, &E::Big) -> bool,
-        cbigint_op1: fn(L, R) -> GenericBigInt<'static, E>,
-        cbigint_op2: fn(L, &R) -> GenericBigInt<'static, E>,
-        cbigint_op3: fn(&L, R) -> GenericBigInt<'static, E>,
-        cbigint_op4: fn(&L, &R) -> GenericBigInt<'static, E>,
-        op_assign1: fn(&mut GenericBigInt<'static, E>, R),
-        op_assign2: Option<fn(&mut GenericBigInt<'static, E>, &R)>,
+        cbigint_op1: fn(L, R) -> GenericSignedBigNum<'static, E>,
+        cbigint_op2: fn(L, &R) -> GenericSignedBigNum<'static, E>,
+        cbigint_op3: fn(&L, R) -> GenericSignedBigNum<'static, E>,
+        cbigint_op4: fn(&L, &R) -> GenericSignedBigNum<'static, E>,
+        op_assign1: fn(&mut GenericSignedBigNum<'static, E>, R),
+        op_assign2: Option<fn(&mut GenericSignedBigNum<'static, E>, &R)>,
         bigint_op: fn(&E::Big, &E::Big) -> E::Big,
     }
 
     fn test_shift_op<R, E: Encoding<'static, Big = BigInt>>(
         ops: ShiftOpsForType<R, E>,
-        lhs: GenericBigInt<'static, E>,
+        lhs: GenericSignedBigNum<'static, E>,
         rhs: R,
     ) -> TestResult
     where

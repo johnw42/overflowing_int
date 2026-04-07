@@ -1,4 +1,4 @@
-use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
+use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::rc_encoding::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
@@ -41,10 +41,6 @@ where
         }
     }
 
-    fn small(&self) -> Option<S> {
-        unsafe { self.0.small.validate() }
-    }
-
     fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
         unsafe {
             if let Some(s) = self.0.small.validate() {
@@ -56,14 +52,10 @@ where
     }
 }
 
-impl<S> Encoding<'static> for RcEncoding<S>
+impl<S> Encode<'static, S> for RcEncoding<S>
 where
-    S: SmallNumber<Unsigned = usize>,
+    S: SmallNumber,
 {
-    type Small = S;
-    type Big = S::Big;
-    type Unsigned = RcEncoding<S::Unsigned>;
-
     fn from_small(s: S) -> Self {
         if let Some(shifted) = Shifted::try_new(s) {
             Self(RcEncodedRepr { small: shifted })
@@ -76,7 +68,7 @@ where
         }
     }
 
-    fn from_big_cow(b: Cow<'static, Self::Big>) -> Self {
+    fn from_big_cow(b: Cow<'static, S::Big>) -> Self {
         Self(
             if let Some(small) = S::try_from(b.as_ref()).ok()
                 && let Some(shifted) = Shifted::try_new(small)
@@ -89,6 +81,16 @@ where
             },
         )
     }
+}
+
+impl<S> Encoding<'static> for RcEncoding<S>
+where
+    S: SmallNumber<Unsigned = usize>,
+{
+    type Small = S;
+    type Big = S::Big;
+    type Unsigned = RcEncoding<S::Unsigned>;
+    type Static = Self;
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
         let mut decoded = unsafe {
@@ -103,6 +105,10 @@ where
             Decoded::Small(s) => Self::from_small(s),
             Decoded::Big(b) => Self::from_big(b.into_owned()),
         };
+    }
+
+    fn into_static(self) -> Self::Static {
+        self
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::big_number::{BigNumber, BigNumberDigits};
-use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
+use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
 use num_bigint::BigInt;
 use num_integer::Roots;
@@ -160,10 +160,6 @@ impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for GenericBigNum<'a, E> {
         self.0.decode()
     }
 
-    fn small(&self) -> Option<E::Small> {
-        self.0.small()
-    }
-
     fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
         self.0.with_decoded(f)
     }
@@ -174,20 +170,12 @@ impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &GenericBigNum<'a, E> {
         self.0.clone().decode()
     }
 
-    fn small(&self) -> Option<E::Small> {
-        self.0.small()
-    }
-
     fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
         self.0.with_decoded(f)
     }
 }
 
-impl<'a, E: Encoding<'a>> Encoding<'a> for GenericBigNum<'a, E> {
-    type Small = E::Small;
-    type Big = E::Big;
-    type Unsigned = E::Unsigned;
-
+impl<'a, E: Encoding<'a>> Encode<'a, E::Small> for GenericBigNum<'a, E> {
     fn from_small(s: E::Small) -> Self {
         Self::from_encoding(E::from_small(s))
     }
@@ -195,9 +183,20 @@ impl<'a, E: Encoding<'a>> Encoding<'a> for GenericBigNum<'a, E> {
     fn from_big_cow(b: Cow<'a, E::Big>) -> Self {
         Self::from_encoding(E::from_big_cow(b))
     }
+}
+
+impl<'a, E: Encoding<'a>> Encoding<'a> for GenericBigNum<'a, E> {
+    type Small = E::Small;
+    type Big = E::Big;
+    type Unsigned = E::Unsigned;
+    type Static = GenericBigNum<'static, E::Static>;
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
         self.0.update_encoding(f);
+    }
+
+    fn into_static(self) -> GenericBigNum<'static, E::Static> {
+        GenericBigNum(self.0.into_static(), PhantomData)
     }
 }
 

@@ -1,5 +1,6 @@
 use crate::generic_bignum::encoding::Decode;
 use crate::generic_bignum::encoding::Decoded;
+use crate::generic_bignum::encoding::Encode;
 use crate::generic_bignum::encoding::Encoding;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
@@ -32,13 +33,6 @@ where
         self.0
     }
 
-    fn small(&self) -> Option<S> {
-        match self.0 {
-            Decoded::Small(s) => Some(s),
-            Decoded::Big(_) => None,
-        }
-    }
-
     fn into_big_cow(self) -> Cow<'a, S::Big> {
         match self.0 {
             Decoded::Small(s) => Cow::Owned(s.to_big()),
@@ -54,24 +48,37 @@ where
     }
 }
 
-impl<'a, S: SmallNumber> Encoding<'a> for CowEncoding<'a, S> {
-    type Small = S;
-    type Big = S::Big;
-    type Unsigned = CowEncoding<'a, S::Unsigned>;
-
-    fn from_small(s: Self::Small) -> Self {
+impl<'a, S> Encode<'a, S> for CowEncoding<'a, S>
+where
+    S: SmallNumber,
+{
+    fn from_small(s: S) -> Self {
         Self(Decoded::Small(s))
     }
 
-    fn from_big_cow(b: Cow<'a, Self::Big>) -> Self {
+    fn from_big_cow(b: Cow<'a, S::Big>) -> Self {
         let mut r = Self(Decoded::Big(b));
         r.normalize();
         r
     }
+}
+
+impl<'a, S: SmallNumber> Encoding<'a> for CowEncoding<'a, S> {
+    type Small = S;
+    type Big = S::Big;
+    type Unsigned = CowEncoding<'a, S::Unsigned>;
+    type Static = CowEncoding<'static, S>;
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<'a, Self::Big>>)) {
         f(&mut self.0);
         self.normalize();
+    }
+
+    fn into_static(self) -> Self::Static {
+        match self.0 {
+            Decoded::Small(s) => CowEncoding(Decoded::Small(s)),
+            Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Owned(b.into_owned()))),
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::big_number::{BigNumber, BigNumberDigits};
 use crate::generic_bignum::GenericBigNum;
-use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
+use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
@@ -17,9 +17,14 @@ use std::ops::{
 
 /// A signed big integer type that can be used with any encoding that implements `Encoding` with `Big = BigInt`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct GenericBigInt<'a, E: Encoding<'a>>(pub(crate) GenericBigNum<'a, E>);
+pub struct GenericSignedBigNum<'a, E: Encoding<'a>>(pub(crate) GenericBigNum<'a, E>);
 
-impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> GenericSignedBigNum<'a, E> {
+    /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
+    pub fn into_static(self) -> GenericSignedBigNum<'static, E::Static> {
+        GenericSignedBigNum(self.0.into_static())
+    }
+
     /// Returns the magnitude of the as a `BigUint`.
     ///
     /// # Examples
@@ -451,59 +456,38 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> From<GenericBigNum<'a, E>> for GenericBigInt<'a, E> {
+impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for GenericSignedBigNum<'a, E> {
+    fn decode(self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
+        self.0.decode()
+    }
+
+    fn with_decoded<T>(
+        &self,
+        f: impl FnOnce(Decoded<E::Small, Cow<<E::Small as SmallNumber>::Big>>) -> T,
+    ) -> T {
+        self.0.with_decoded(f)
+    }
+}
+
+impl<'a, E: Encoding<'a>> Encode<'a, E::Small> for GenericSignedBigNum<'a, E> {
+    fn from_small(s: E::Small) -> Self {
+        Self(GenericBigNum::from_small(s))
+    }
+
+    fn from_big_cow(b: Cow<'a, E::Big>) -> Self {
+        Self(GenericBigNum::from_big_cow(b))
+    }
+}
+
+impl<'a, E: Encoding<'a, Big = BigInt>> From<GenericBigNum<'a, E>> for GenericSignedBigNum<'a, E> {
     fn from(value: GenericBigNum<'a, E>) -> Self {
         Self(value)
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> From<GenericBigInt<'a, E>> for GenericBigNum<'a, E> {
-    fn from(value: GenericBigInt<'a, E>) -> Self {
+impl<'a, E: Encoding<'a, Big = BigInt>> From<GenericSignedBigNum<'a, E>> for GenericBigNum<'a, E> {
+    fn from(value: GenericSignedBigNum<'a, E>) -> Self {
         value.0
-    }
-}
-
-impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for GenericBigInt<'a, E>
-where
-    E::Small: SmallNumber<Big = E::Big>,
-    E::Big: BigNumber,
-{
-    fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
-        self.0.decode()
-    }
-
-    fn small(&self) -> Option<E::Small> {
-        self.0.small()
-    }
-
-    fn into_big_cow(self) -> Cow<'a, E::Big> {
-        self.0.into_big_cow()
-    }
-
-    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
-        self.0.with_decoded(f)
-    }
-}
-
-impl<'a, E: Encoding<'a>> Encoding<'a> for GenericBigInt<'a, E>
-where
-    E::Small: SmallNumber<Big = E::Big>,
-    E::Big: BigNumber,
-{
-    type Small = E::Small;
-    type Big = E::Big;
-    type Unsigned = E::Unsigned;
-
-    fn from_small(s: E::Small) -> Self {
-        Self(GenericBigNum::from_encoding(E::from_small(s)))
-    }
-
-    fn from_big_cow(b: Cow<'a, E::Big>) -> Self {
-        Self(GenericBigNum::from_encoding(E::from_big_cow(b)))
-    }
-
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
-        self.0.update_encoding(f);
     }
 }
 
@@ -520,34 +504,34 @@ macro_rules! impl_binary_op_traits {
         $rhs_ref_expr:expr
     ) => {
         impl<'a, E: Encoding<'a, Big = BigInt>> $trait<$rhs_type> for $lhs_type {
-            type Output = GenericBigInt<'a, E>;
+            type Output = GenericSignedBigNum<'a, E>;
 
-            fn $op_fn($lhs_param: Self, $rhs_param: $rhs_type) -> GenericBigInt<'a, E> {
-                GenericBigInt($lhs_expr.$op_fn($rhs_expr))
+            fn $op_fn($lhs_param: Self, $rhs_param: $rhs_type) -> GenericSignedBigNum<'a, E> {
+                GenericSignedBigNum($lhs_expr.$op_fn($rhs_expr))
             }
         }
 
         impl<'a, E: Encoding<'a, Big = BigInt>> $trait<&$rhs_type> for $lhs_type {
-            type Output = GenericBigInt<'a, E>;
+            type Output = GenericSignedBigNum<'a, E>;
 
-            fn $op_fn($lhs_param: Self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
-                GenericBigInt($lhs_expr.$op_fn($rhs_ref_expr))
+            fn $op_fn($lhs_param: Self, $rhs_param: &$rhs_type) -> GenericSignedBigNum<'a, E> {
+                GenericSignedBigNum($lhs_expr.$op_fn($rhs_ref_expr))
             }
         }
 
         impl<'a, E: Encoding<'a, Big = BigInt>> $trait<$rhs_type> for &$lhs_type {
-            type Output = GenericBigInt<'a, E>;
+            type Output = GenericSignedBigNum<'a, E>;
 
-            fn $op_fn($lhs_param: Self, $rhs_param: $rhs_type) -> GenericBigInt<'a, E> {
-                GenericBigInt($lhs_ref_expr.$op_fn($rhs_expr))
+            fn $op_fn($lhs_param: Self, $rhs_param: $rhs_type) -> GenericSignedBigNum<'a, E> {
+                GenericSignedBigNum($lhs_ref_expr.$op_fn($rhs_expr))
             }
         }
 
         impl<'a, E: Encoding<'a, Big = BigInt>> $trait<&$rhs_type> for &$lhs_type {
-            type Output = GenericBigInt<'a, E>;
+            type Output = GenericSignedBigNum<'a, E>;
 
-            fn $op_fn($lhs_param: Self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
-                GenericBigInt($lhs_ref_expr.$op_fn($rhs_ref_expr))
+            fn $op_fn($lhs_param: Self, $rhs_param: &$rhs_type) -> GenericSignedBigNum<'a, E> {
+                GenericSignedBigNum($lhs_ref_expr.$op_fn($rhs_ref_expr))
             }
         }
     };
@@ -556,7 +540,7 @@ macro_rules! impl_binary_op_traits {
 macro_rules! impl_binary_assign_op_trait {
     ($trait:ident, $op_fn:ident, $rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
         paste! {
-            impl<'a, E: Encoding<'a, Big = BigInt>> [<$trait Assign>]<$rhs_type> for GenericBigInt<'a, E> {
+            impl<'a, E: Encoding<'a, Big = BigInt>> [<$trait Assign>]<$rhs_type> for GenericSignedBigNum<'a, E> {
                 fn [<$op_fn _assign>](&mut self, $rhs_param: $rhs_type) {
                     self.0.[<$op_fn _assign>]($rhs_expr)
                 }
@@ -568,8 +552,8 @@ macro_rules! impl_binary_assign_op_trait {
 macro_rules! impl_binary_assign_ref_op_trait {
     ($trait:ident, $op_fn:ident) => {
         paste! {
-            impl<'a, E: Encoding<'a, Big = BigInt>> [<$trait Assign>]<&GenericBigInt<'a, E>> for GenericBigInt<'a, E> {
-                fn [<$op_fn _assign>](&mut self, rhs: &GenericBigInt<'a, E>) {
+            impl<'a, E: Encoding<'a, Big = BigInt>> [<$trait Assign>]<&GenericSignedBigNum<'a, E>> for GenericSignedBigNum<'a, E> {
+                fn [<$op_fn _assign>](&mut self, rhs: &GenericSignedBigNum<'a, E>) {
                     self.0.[<$op_fn _assign>](&rhs.0)
                 }
             }
@@ -580,19 +564,19 @@ macro_rules! impl_binary_assign_ref_op_trait {
 macro_rules! impl_pow_traits {
     ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
         paste! {
-            impl<'a, E: Encoding<'a>> Pow<$rhs_type> for GenericBigInt<'a, E> {
-                type Output = GenericBigInt<'a, E>;
+            impl<'a, E: Encoding<'a>> Pow<$rhs_type> for GenericSignedBigNum<'a, E> {
+                type Output = GenericSignedBigNum<'a, E>;
 
-                fn pow(self, $rhs_param: $rhs_type) -> GenericBigInt<'a, E> {
-                    GenericBigInt(Pow::pow(&self.0, $rhs_ref_expr))
+                fn pow(self, $rhs_param: $rhs_type) -> GenericSignedBigNum<'a, E> {
+                    GenericSignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
                 }
             }
 
-            impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for GenericBigInt<'a, E> {
-                type Output = GenericBigInt<'a, E>;
+            impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for GenericSignedBigNum<'a, E> {
+                type Output = GenericSignedBigNum<'a, E>;
 
-                fn pow(self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
-                    GenericBigInt(Pow::pow(&self.0, $rhs_ref_expr))
+                fn pow(self, $rhs_param: &$rhs_type) -> GenericSignedBigNum<'a, E> {
+                    GenericSignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
                 }
             }
         }
@@ -601,51 +585,51 @@ macro_rules! impl_pow_traits {
 macro_rules! impl_pow_traits_for_ref {
     ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
         paste! {
-            impl<'a, E: Encoding<'a>> Pow<$rhs_type> for &GenericBigInt<'a, E> {
-                type Output = GenericBigInt<'a, E>;
+            impl<'a, E: Encoding<'a>> Pow<$rhs_type> for &GenericSignedBigNum<'a, E> {
+                type Output = GenericSignedBigNum<'a, E>;
 
-                fn pow(self, $rhs_param: $rhs_type) -> GenericBigInt<'a, E> {
-                    GenericBigInt(Pow::pow(&self.0, $rhs_ref_expr))
+                fn pow(self, $rhs_param: $rhs_type) -> GenericSignedBigNum<'a, E> {
+                    GenericSignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
                 }
             }
 
-            impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for &GenericBigInt<'a, E> {
-                type Output = GenericBigInt<'a, E>;
+            impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for &GenericSignedBigNum<'a, E> {
+                type Output = GenericSignedBigNum<'a, E>;
 
-                fn pow(self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
-                    GenericBigInt(Pow::pow(&self.0, $rhs_ref_expr))
+                fn pow(self, $rhs_param: &$rhs_type) -> GenericSignedBigNum<'a, E> {
+                    GenericSignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
                 }
             }
         }
     };
 }
 
-// Implementations of numeric traits for `GenericBigInt`.  The number of
+// Implementations of numeric traits for `GenericSignedBigNum`.  The number of
 // implementations is quite large, so we use macros to generate them.  The
-// reason for implementing so many variants is to allow `GenericBigInt` to serve
+// reason for implementing so many variants is to allow `GenericSignedBigNum` to serve
 // as a drop-in replacement for `BigInt`, which implements the same traits.
 duplicate_arith_ops! {
     paste! {
         impl_binary_op_traits!(op_trait, op_fn,
-             GenericBigInt<'a, E>, self, self.0, &self.0,
-             GenericBigInt<'a, E>, rhs,  rhs.0,  &rhs.0);
-        impl_binary_assign_op_trait!(op_trait, op_fn, GenericBigInt<'a, E>, rhs, rhs.0, &rhs.0);
+             GenericSignedBigNum<'a, E>, self, self.0, &self.0,
+             GenericSignedBigNum<'a, E>, rhs,  rhs.0,  &rhs.0);
+        impl_binary_assign_op_trait!(op_trait, op_fn, GenericSignedBigNum<'a, E>, rhs, rhs.0, &rhs.0);
         impl_binary_assign_ref_op_trait!(op_trait, op_fn);
     }
     duplicate_prims! { paste! {
         impl_binary_op_traits!(op_trait, op_fn,
-             GenericBigInt<'a, E>, self, self.0, &self.0,
+             GenericSignedBigNum<'a, E>, self, self.0, &self.0,
              prim, rhs, rhs, rhs);
         impl_binary_op_traits!(op_trait, op_fn,
              prim, self, self, self,
-             GenericBigInt<'a, E>, rhs, rhs.0, &rhs.0);
+             GenericSignedBigNum<'a, E>, rhs, rhs.0, &rhs.0);
         impl_binary_assign_op_trait!(op_trait, op_fn, prim, rhs, rhs, rhs);
     } }
 }
 duplicate_shift_ops! {
     duplicate_prims! { paste! {
         impl_binary_op_traits!(op_trait, op_fn,
-             GenericBigInt<'a, E>, self, self.0, &self.0,
+             GenericSignedBigNum<'a, E>, self, self.0, &self.0,
              prim, rhs, rhs, rhs);
         impl_binary_assign_op_trait!(op_trait, op_fn, prim, rhs, rhs, rhs);
     } }
@@ -653,21 +637,21 @@ duplicate_shift_ops! {
 duplicate_bit_ops! {
     paste! {
         impl_binary_op_traits!(op_trait, op_fn,
-             GenericBigInt<'a, E>, self, self.0, &self.0,
-             GenericBigInt<'a, E>, rhs,  rhs.0,  &rhs.0);
-        impl_binary_assign_op_trait!(op_trait, op_fn, GenericBigInt<'a, E>, rhs, rhs.0, &rhs.0);
+             GenericSignedBigNum<'a, E>, self, self.0, &self.0,
+             GenericSignedBigNum<'a, E>, rhs,  rhs.0,  &rhs.0);
+        impl_binary_assign_op_trait!(op_trait, op_fn, GenericSignedBigNum<'a, E>, rhs, rhs.0, &rhs.0);
         impl_binary_assign_ref_op_trait!(op_trait, op_fn);
     }
 }
 
 impl_pow_traits!(
-    GenericBigInt<'a, E::Unsigned>,
+    GenericSignedBigNum<'a, E::Unsigned>,
     exponent,
     exponent.0,
     &exponent.0
 );
 impl_pow_traits_for_ref!(
-    GenericBigInt<'a, E::Unsigned>,
+    GenericSignedBigNum<'a, E::Unsigned>,
     exponent,
     exponent.0,
     &exponent.0

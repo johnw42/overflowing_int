@@ -1,6 +1,6 @@
-use crate::generic_bigint::GenericBigInt;
-use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
-use crate::generic_biguint::GenericBigUint;
+use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::generic_signed_bignum::GenericSignedBigNum;
+use crate::generic_unsigned_bignum::GenericUnsignedBigNum;
 use crate::small_num::SmallNumber;
 use duplicate::duplicate_item;
 use num_bigint::{BigInt, BigUint, Sign, ToBigInt, ToBigUint};
@@ -11,8 +11,8 @@ use std::convert::TryFrom;
 
 #[duplicate_item(
     mod_name  BigNumType GenericBigNumWrapper signedness;
-    [bigint]  [BigInt]   [GenericBigInt]      [signed];
-    [biguint] [BigUint]  [GenericBigUint]     [unsigned];
+    [bigint]  [BigInt]   [GenericSignedBigNum]      [signed];
+    [biguint] [BigUint]  [GenericUnsignedBigNum]     [unsigned];
 )]
 pub mod mod_name {
 
@@ -52,7 +52,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> ToBigInt for GenericBigNumWrapper<'a, E> {
         fn to_bigint(&self) -> Option<BigInt> {
-            self.with_decoded(|decoded| match decoded {
+            self.0.with_decoded(|decoded| match decoded {
                 Decoded::Small(small) => Some(small.to_bigint()),
                 Decoded::Big(big) => big.to_bigint(),
             })
@@ -61,7 +61,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> ToBigUint for GenericBigNumWrapper<'a, E> {
         fn to_biguint(&self) -> Option<BigUint> {
-            self.with_decoded(|decoded| match decoded {
+            self.0.with_decoded(|decoded| match decoded {
                 Decoded::Small(small) => small.to_biguint(),
                 Decoded::Big(big) => big.to_biguint(),
             })
@@ -103,16 +103,16 @@ pub mod mod_name {
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> From<BigUint> for GenericBigInt<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> From<BigUint> for GenericSignedBigNum<'a, E> {
     fn from(value: BigUint) -> Self {
         Self::from_big(BigInt::from_biguint(Sign::Plus, value))
     }
 }
 
-// impl<'a, E: Encoding<'a, Big = BigInt>> TryFrom<GenericBigInt<'a, E>> for BigUint {
+// impl<'a, E: Encoding<'a, Big = BigInt>> TryFrom<GenericSignedBigNum<'a, E>> for BigUint {
 //     type Error = ();
 
-//     fn try_from(value: GenericBigInt<'a, E>) -> Result<Self, Self::Error> {
+//     fn try_from(value: GenericSignedBigNum<'a, E>) -> Result<Self, Self::Error> {
 //         match value.0.0.decode() {
 //             Decoded::Small(n) => n.try_into().map_err(|_| ()),
 //             Decoded::Big(n) => n.into_owned().try_into().map_err(|_| ()),
@@ -120,10 +120,10 @@ impl<'a, E: Encoding<'a, Big = BigInt>> From<BigUint> for GenericBigInt<'a, E> {
 //     }
 // }
 
-// impl<'a, E: Encoding<'a, Big = BigInt>> TryFrom<&GenericBigInt<'a, E>> for BigUint {
+// impl<'a, E: Encoding<'a, Big = BigInt>> TryFrom<&GenericSignedBigNum<'a, E>> for BigUint {
 //     type Error = ();
 
-//     fn try_from(value: &GenericBigInt<'a, E>) -> Result<Self, Self::Error> {
+//     fn try_from(value: &GenericSignedBigNum<'a, E>) -> Result<Self, Self::Error> {
 //         value.clone().try_into()
 //     }
 // }
