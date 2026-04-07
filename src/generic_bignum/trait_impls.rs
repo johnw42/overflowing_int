@@ -1,13 +1,13 @@
+use crate::generic_bigint::GenericBigInt;
+use crate::generic_bignum::GenericBigNum;
+use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
+use crate::generic_biguint::GenericBigUint;
+use crate::small_num::SmallNumber;
+use crate::{duplicate_iprims, duplicate_prims, duplicate_uprims};
 use duplicate::duplicate_item;
-
-use std::borrow::Borrow;
-use std::cmp::Ordering;
-use std::fmt::{Binary, Formatter, LowerHex, Octal, UpperHex};
-use std::ops::{Neg, Not};
-use std::panic::RefUnwindSafe;
-use std::str::FromStr;
-
-use num_bigint::{BigInt, ParseBigIntError, RandomBits, Sign, UniformBigInt};
+use num_bigint::{
+    BigInt, BigUint, ParseBigIntError, RandomBits, Sign, UniformBigInt, UniformBigUint,
+};
 use num_integer::{Integer, Roots};
 use num_traits::{
     CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, Euclid, FromBytes,
@@ -17,16 +17,17 @@ use paste::paste;
 use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformSampler};
 use rand::prelude::Distribution;
 use serde::{Deserialize, Serialize};
-
-use crate::duplicate_prims;
-use crate::generic_bigint::GenericBigInt;
-use crate::generic_bignum::GenericBigNum;
-use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
-use crate::small_num::SmallNumber;
+use std::borrow::Borrow;
+use std::cmp::Ordering;
+use std::fmt::{Binary, Formatter, LowerHex, Octal, UpperHex};
+use std::ops::{Neg, Not};
+use std::panic::RefUnwindSafe;
+use std::str::FromStr;
 
 #[duplicate_item(
-    mod_name BigNumType GenericBigNumWrapper;
-    [bigint] [BigInt]   [GenericBigInt];
+    mod_name  BigNumType GenericBigNumWrapper;
+    [bigint]  [BigInt]   [GenericBigInt];
+    [biguint] [BigUint]  [GenericBigUint];
 )]
 pub mod mod_name {
     use std::{
@@ -90,20 +91,6 @@ pub mod mod_name {
         }
     }
 
-    impl<'a, E: Encoding<'a, Big = BigNumType>> CheckedEuclid for GenericBigNumWrapper<'a, E> {
-        fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
-            self.with_big_cows(v, |lhs, rhs| {
-                lhs.checked_rem_euclid(rhs.as_ref()).map(Into::into)
-            })
-        }
-
-        fn checked_div_euclid(&self, v: &Self) -> Option<Self> {
-            self.with_big_cows(v, |lhs, rhs| {
-                lhs.checked_div_euclid(rhs.as_ref()).map(Into::into)
-            })
-        }
-    }
-
     impl<'a, E: Encoding<'a, Big = BigNumType>> CheckedMul for GenericBigNumWrapper<'a, E> {
         fn checked_mul(&self, v: &Self) -> Option<Self> {
             self.0.checked_mul(&v.0).map(Into::into)
@@ -146,45 +133,6 @@ pub mod mod_name {
         fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> GenericBigNumWrapper<'a, E> {
             <RandomBits as Distribution<BigNumType>>::sample(self, rng).into()
         }
-    }
-
-    impl<'a, E: Encoding<'a, Big = BigNumType>> Euclid for GenericBigNumWrapper<'a, E> {
-        fn rem_euclid(&self, v: &Self) -> Self {
-            self.with_big_cows(v, |lhs, rhs| lhs.rem_euclid(rhs.as_ref()).into())
-        }
-
-        fn div_euclid(&self, v: &Self) -> Self {
-            self.with_big_cows(v, |lhs, rhs| lhs.div_euclid(rhs.as_ref()).into())
-        }
-    }
-
-    impl<'a, E: Encoding<'a, Big = BigInt>> From<GenericBigNumWrapper<'a, E>> for BigInt {
-        fn from(value: GenericBigNumWrapper<'a, E>) -> Self {
-            value.0.with_decoded(|encoded| match encoded {
-                Decoded::Small(n) => n.to_big(),
-                Decoded::Big(n) => n.as_ref().clone(),
-            })
-        }
-    }
-
-    impl<'a, E: Encoding<'a, Big = BigInt>> FromBytes for GenericBigNumWrapper<'a, E> {
-        type Bytes = [u8];
-
-        fn from_be_bytes(bytes: &[u8]) -> Self {
-            E::Big::from_signed_bytes_be(bytes).into()
-        }
-
-        fn from_le_bytes(bytes: &[u8]) -> Self {
-            E::Big::from_signed_bytes_le(bytes).into()
-        }
-    }
-
-    impl<'a, E: Encoding<'a, Big = BigNumType>> FromPrimitive for GenericBigNumWrapper<'a, E> {
-        duplicate_prims! { paste! {
-            fn [<from_ prim>](n: prim) -> Option<Self> {
-                Some(GenericBigNumWrapper::from(n))
-            }
-        } }
     }
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> FromStr for GenericBigNumWrapper<'a, E> {
@@ -287,35 +235,6 @@ pub mod mod_name {
         }
     }
 
-    impl<'a, E: Encoding<'a, Big = BigNumType>> Ord for GenericBigNumWrapper<'a, E> {
-        fn cmp(&self, other: &Self) -> Ordering {
-            use Decoded::*;
-            use Ordering::*;
-            use Sign::*;
-
-            self.with_decoded(|lhs| {
-                other.with_decoded(|rhs| match (lhs, rhs) {
-                    (Small(a), Small(b)) => a.cmp(&b),
-                    (Small(a), Big(b)) => match (a.cmp(&E::Small::zero()), b.sign()) {
-                        (_, Minus) => Greater,
-                        (_, Plus) => Less,
-                        (Equal, NoSign) => Equal,
-                        (Less, NoSign) => Less,
-                        (Greater, NoSign) => Greater,
-                    },
-                    (Big(a), Small(b)) => match (a.sign(), b.cmp(&E::Small::zero())) {
-                        (Plus, _) => Greater,
-                        (Minus, _) => Less,
-                        (NoSign, Less) => Greater,
-                        (NoSign, Equal) => Equal,
-                        (NoSign, Greater) => Less,
-                    },
-                    (Big(a), Big(b)) => a.as_ref().cmp(b.as_ref()),
-                })
-            })
-        }
-    }
-
     impl<'a, E: Encoding<'a, Big = BigNumType>> One for GenericBigNumWrapper<'a, E> {
         fn one() -> Self {
             Self::from_small(E::Small::one())
@@ -414,31 +333,12 @@ pub mod mod_name {
         }
     }
 
-    impl<'a, E: Encoding<'a>> LowerHex for GenericBigNum<'a, E> {
+    impl<'a, E: Encoding<'a>> LowerHex for GenericBigNumWrapper<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
             self.with_decoded(|encoded| match encoded {
                 Decoded::Small(n) => LowerHex::fmt(&n, f),
                 Decoded::Big(n) => LowerHex::fmt(n.as_ref(), f),
             })
-        }
-    }
-
-    impl<'a, E: Encoding<'a, Big = BigNumType>> UpperHex for GenericBigNumWrapper<'a, E> {
-        fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_decoded(|encoded| match encoded {
-                Decoded::Small(n) => UpperHex::fmt(&n, f),
-                Decoded::Big(n) => UpperHex::fmt(n.as_ref(), f),
-            })
-        }
-    }
-
-    impl<'a, E: Encoding<'a, Big = BigNumType>> Zero for GenericBigNumWrapper<'a, E> {
-        fn zero() -> Self {
-            Self::from_small(E::Small::zero())
-        }
-
-        fn is_zero(&self) -> bool {
-            self.small() == Some(E::Small::zero())
         }
     }
 
@@ -461,6 +361,94 @@ pub mod mod_name {
             self.with_big_cow(|big| big.serialize(serializer))
         }
     }
+
+    impl<'a, E: Encoding<'a, Big = BigNumType>> UpperHex for GenericBigNumWrapper<'a, E> {
+        fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+            self.with_decoded(|encoded| match encoded {
+                Decoded::Small(n) => UpperHex::fmt(&n, f),
+                Decoded::Big(n) => UpperHex::fmt(n.as_ref(), f),
+            })
+        }
+    }
+
+    impl<'a, E: Encoding<'a, Big = BigNumType>> Zero for GenericBigNumWrapper<'a, E> {
+        fn zero() -> Self {
+            Self::from_small(E::Small::zero())
+        }
+
+        fn is_zero(&self) -> bool {
+            self.small() == Some(E::Small::zero())
+        }
+    }
+}
+
+impl<'a, E: Encoding<'a, Big = BigInt>> CheckedEuclid for GenericBigInt<'a, E> {
+    fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
+        self.with_big_cows(v, |lhs, rhs| {
+            lhs.checked_rem_euclid(rhs.as_ref()).map(Into::into)
+        })
+    }
+
+    fn checked_div_euclid(&self, v: &Self) -> Option<Self> {
+        self.with_big_cows(v, |lhs, rhs| {
+            lhs.checked_div_euclid(rhs.as_ref()).map(Into::into)
+        })
+    }
+}
+
+impl<'a, E: Encoding<'a, Big = BigInt>> Euclid for GenericBigInt<'a, E> {
+    fn rem_euclid(&self, v: &Self) -> Self {
+        self.with_big_cows(v, |lhs, rhs| lhs.rem_euclid(rhs.as_ref()).into())
+    }
+
+    fn div_euclid(&self, v: &Self) -> Self {
+        self.with_big_cows(v, |lhs, rhs| lhs.div_euclid(rhs.as_ref()).into())
+    }
+}
+
+impl<'a, E: Encoding<'a, Big = BigInt>> FromBytes for GenericBigInt<'a, E> {
+    type Bytes = [u8];
+
+    fn from_be_bytes(bytes: &[u8]) -> Self {
+        E::Big::from_signed_bytes_be(bytes).into()
+    }
+
+    fn from_le_bytes(bytes: &[u8]) -> Self {
+        E::Big::from_signed_bytes_le(bytes).into()
+    }
+}
+
+impl<'a, E: Encoding<'a, Big = BigUint>> FromBytes for GenericBigUint<'a, E> {
+    type Bytes = [u8];
+
+    fn from_be_bytes(bytes: &[u8]) -> Self {
+        E::Big::from_bytes_be(bytes).into()
+    }
+
+    fn from_le_bytes(bytes: &[u8]) -> Self {
+        E::Big::from_bytes_le(bytes).into()
+    }
+}
+
+impl<'a, E: Encoding<'a, Big = BigInt>> FromPrimitive for GenericBigInt<'a, E> {
+    duplicate_prims! { paste! {
+        fn [<from_ prim>](n: prim) -> Option<Self> {
+            Some(GenericBigInt::from(n))
+        }
+    } }
+}
+
+impl<'a, E: Encoding<'a, Big = BigUint>> FromPrimitive for GenericBigUint<'a, E> {
+    duplicate_iprims! { paste! {
+        fn [<from_ prim>](_: prim) -> Option<Self> {
+            None
+        }
+    } }
+    duplicate_uprims! { paste! {
+        fn [<from_ prim>](n: prim) -> Option<Self> {
+            Some(GenericBigUint::from(n))
+        }
+    } }
 }
 
 impl<'a, E: Encoding<'a, Big = BigInt>> Neg for GenericBigInt<'a, E> {
@@ -515,6 +503,50 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Not for &GenericBigInt<'a, E> {
                 Decoded::Big(n) => GenericBigInt::from_big(n.as_ref().not()),
             }
             .into()
+        })
+    }
+}
+impl<'a, E: Encoding<'a, Big = BigInt>> Ord for GenericBigInt<'a, E> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        use Decoded::*;
+        use Ordering::*;
+        use Sign::*;
+
+        self.with_decoded(|lhs| {
+            other.with_decoded(|rhs| match (lhs, rhs) {
+                (Small(a), Small(b)) => a.cmp(&b),
+                (Small(a), Big(b)) => match (a.cmp(&E::Small::zero()), b.sign()) {
+                    (_, Minus) => Greater,
+                    (_, Plus) => Less,
+                    (Equal, NoSign) => Equal,
+                    (Less, NoSign) => Less,
+                    (Greater, NoSign) => Greater,
+                },
+                (Big(a), Small(b)) => match (a.sign(), b.cmp(&E::Small::zero())) {
+                    (Plus, _) => Greater,
+                    (Minus, _) => Less,
+                    (NoSign, Less) => Greater,
+                    (NoSign, Equal) => Equal,
+                    (NoSign, Greater) => Less,
+                },
+                (Big(a), Big(b)) => a.as_ref().cmp(b.as_ref()),
+            })
+        })
+    }
+}
+
+impl<'a, E: Encoding<'a, Big = BigUint>> Ord for GenericBigUint<'a, E> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        use Decoded::*;
+        use Ordering::*;
+
+        self.with_decoded(|lhs| {
+            other.with_decoded(|rhs| match (lhs, rhs) {
+                (Small(a), Small(b)) => a.cmp(&b),
+                (Small(_), Big(_)) => Less,
+                (Big(_), Small(_)) => Greater,
+                (Big(a), Big(b)) => a.as_ref().cmp(b.as_ref()),
+            })
         })
     }
 }

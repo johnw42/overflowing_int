@@ -9,11 +9,6 @@ use std::{borrow::Cow, fmt::Debug};
 
 mod shifted;
 
-/// Numbers that can be encoded in a pointer-sized integer.
-pub trait PtrSizedNumber: SmallNumber {}
-impl PtrSizedNumber for isize {}
-impl PtrSizedNumber for usize {}
-
 const _: () = {
     assert!(align_of::<Rc<BigInt>>() > 1);
     assert!(align_of::<Rc<BigUint>>() > 1);
@@ -27,11 +22,11 @@ const _: () = {
 #[derive(Clone)]
 pub struct RcEncoding<S>(RcEncodedRepr<S>)
 where
-    S: PtrSizedNumber;
+    S: SmallNumber;
 
 impl<S> Decode<'static, S> for RcEncoding<S>
 where
-    S: PtrSizedNumber,
+    S: SmallNumber,
 {
     fn decode(mut self) -> Decoded<S, Cow<'static, S::Big>> {
         unsafe {
@@ -63,10 +58,11 @@ where
 
 impl<S> Encoding<'static> for RcEncoding<S>
 where
-    S: PtrSizedNumber,
+    S: SmallNumber,
 {
     type Small = S;
     type Big = S::Big;
+    type Unsigned = RcEncoding<S::Unsigned>;
 
     fn from_small(s: S) -> Self {
         if let Some(shifted) = Shifted::try_new(s) {
@@ -81,9 +77,17 @@ where
     }
 
     fn from_big_cow(b: Cow<'static, Self::Big>) -> Self {
-        Self(RcEncodedRepr {
-            big: ManuallyDrop::new(Rc::new(b.into_owned())),
-        })
+        Self(
+            if let Some(small) = S::try_from(b.as_ref()).ok()
+                && let Some(shifted) = Shifted::try_new(small)
+            {
+                RcEncodedRepr { small: shifted }
+            } else {
+                RcEncodedRepr {
+                    big: ManuallyDrop::new(Rc::new(b.into_owned())),
+                }
+            },
+        )
     }
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
@@ -102,14 +106,14 @@ where
     }
 }
 
-union RcEncodedRepr<S: PtrSizedNumber> {
+union RcEncodedRepr<S: SmallNumber> {
     small: Shifted<S>,
     big: ManuallyDrop<Rc<S::Big>>,
 }
 
 impl<S> Clone for RcEncodedRepr<S>
 where
-    S: PtrSizedNumber,
+    S: SmallNumber,
 {
     fn clone(&self) -> Self {
         unsafe {
@@ -126,7 +130,7 @@ where
 
 impl<S> Drop for RcEncodedRepr<S>
 where
-    S: PtrSizedNumber,
+    S: SmallNumber,
 {
     fn drop(&mut self) {
         unsafe {
@@ -139,7 +143,7 @@ where
 
 impl<S> Debug for RcEncoding<S>
 where
-    S: PtrSizedNumber,
+    S: SmallNumber,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.with_decoded(|decoded| match decoded {
@@ -151,7 +155,7 @@ where
 
 impl<S> Hash for RcEncoding<S>
 where
-    S: PtrSizedNumber,
+    S: SmallNumber,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.with_decoded(|decoded| match decoded {
@@ -163,7 +167,7 @@ where
 
 impl<S> PartialEq for RcEncoding<S>
 where
-    S: PtrSizedNumber,
+    S: SmallNumber,
 {
     fn eq(&self, other: &Self) -> bool {
         self.with_decoded(|lhs| {
@@ -176,4 +180,4 @@ where
     }
 }
 
-impl<S> Eq for RcEncoding<S> where S: PtrSizedNumber {}
+impl<S> Eq for RcEncoding<S> where S: SmallNumber {}

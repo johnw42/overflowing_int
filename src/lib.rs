@@ -2,17 +2,17 @@ pub use num_bigint::{
     BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint, TryFromBigIntError,
 };
 
-use crate::{cow_encoding::CowEncoding, generic_bigint::GenericBigInt, rc_encoding::RcEncoding};
-
 pub mod big_number;
+mod convert;
 pub mod cow_encoding;
 pub mod generic_bigint;
 mod generic_bignum;
+pub mod generic_biguint;
 mod macros;
 pub mod rc_encoding;
 mod small_num;
 
-pub type CowBigInt<'a> = GenericBigInt<'a, CowEncoding<'a, i128>>;
-pub type CowBigUint<'a> = GenericBigInt<'a, CowEncoding<'a, u128>>;
-pub type RcBigInt = GenericBigInt<'static, RcEncoding<isize>>;
-pub type RcBigUint = GenericBigInt<'static, RcEncoding<usize>>;
+pub type CowBigInt<'a> = generic_bigint::GenericBigInt<'a, cow_encoding::CowEncoding<'a, i128>>;
+pub type CowBigUint<'a> = generic_biguint::GenericBigUint<'a, cow_encoding::CowEncoding<'a, u128>>;
+pub type RcBigInt = generic_bigint::GenericBigInt<'static, rc_encoding::RcEncoding<isize>>;
+pub type RcBigUint = generic_biguint::GenericBigUint<'static, rc_encoding::RcEncoding<usize>>;

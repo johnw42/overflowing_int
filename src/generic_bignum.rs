@@ -8,7 +8,6 @@ use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
 
-pub mod convert;
 pub mod encoding;
 pub mod num_ops;
 mod trait_impls;
@@ -191,7 +190,7 @@ impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &GenericBigNum<'a, E> {
 impl<'a, E: Encoding<'a>> Encoding<'a> for GenericBigNum<'a, E> {
     type Small = E::Small;
     type Big = E::Big;
-    //type Repr = E::Repr;
+    type Unsigned = E::Unsigned;
 
     fn from_small(s: E::Small) -> Self {
         Self::from_encoding(E::from_small(s))
@@ -203,12 +202,6 @@ impl<'a, E: Encoding<'a>> Encoding<'a> for GenericBigNum<'a, E> {
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
         self.0.update_encoding(f);
-    }
-}
-
-impl<'a, E: Encoding<'a, Big = BigInt>> Default for GenericBigNum<'a, E> {
-    fn default() -> Self {
-        GenericBigNum::from(0i32)
     }
 }
 
@@ -230,4 +223,4 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Debug for GenericBigNum<'a, E> {
     }
 }
 
-// TODO: Implement numeric traits for `GenericBigNum`
+// TODO: Implement numeric traits for `GenericBigNum`?

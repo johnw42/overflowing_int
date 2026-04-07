@@ -5,7 +5,8 @@ use crate::small_num::SmallNumber as _;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
 };
-use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, Pow};
+use core::panic;
+use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, One as _, Pow};
 use paste::paste;
 use std::borrow::Cow;
 use std::ops::{
@@ -145,6 +146,45 @@ trait ShiftOp<'e, E: Encoding<'e>> {
     }
 }
 
+trait PowOpTrait<'e, E: Encoding<'e>> {
+    fn on_big_small(lhs: Cow<E::Big>, rhs: <E::Unsigned as Encoding<'e>>::Small) -> E::Big;
+    fn on_small(lhs: E::Small, rhs: <E::Unsigned as Encoding<'e>>::Small) -> Result<E::Small, ()>;
+    fn on_big(lhs: Cow<E::Big>, rhs: Cow<<E::Unsigned as Encoding<'e>>::Big>) -> E::Big;
+
+    /// Calls a version of the binary operator that returns a new number.
+    #[inline]
+    fn call<'a, 'b, L, R>(lhs: L, rhs: R) -> GenericBigNum<'e, E>
+    where
+        L: Decode<'a, E::Small>,
+        R: Decode<'b, <E::Unsigned as Encoding<'e>>::Small>,
+    {
+        lhs.with_decoded(|lhs| {
+            rhs.with_decoded(|rhs| match (lhs, rhs) {
+                (Decoded::Small(lhs), Decoded::Small(rhs)) => {
+                    if let Ok(out) = Self::on_small(lhs, rhs) {
+                        GenericBigNum::from_small(out)
+                    } else {
+                        GenericBigNum::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
+                    }
+                }
+                (Decoded::Small(small_lhs), Decoded::Big(_)) => {
+                    if small_lhs.is_one() {
+                        GenericBigNum::from_small(E::Small::one())
+                    } else {
+                        panic!("Exponentiation would overflow memory")
+                    }
+                }
+                (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
+                    GenericBigNum::from_big(Self::on_big_small(big_lhs, small_rhs))
+                }
+                (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
+                    GenericBigNum::from_big(Self::on_big(big_lhs, big_rhs))
+                }
+            })
+        })
+    }
+}
+
 // MARK: Meta-Operator Trait Implementations
 // -----------------------------------------------------------------------------
 duplicate_arith_ops! {
@@ -238,6 +278,50 @@ duplicate_shift_ops! {
                 fn [<update_big_ prim>](lhs: &mut E::Big, rhs: prim) {
                     E::Big::[<op_fn _assign_ prim>](lhs, rhs);
                 }
+            }
+        }
+    }
+}
+
+struct PowOp;
+
+impl<'e, E: Encoding<'e>> PowOpTrait<'e, E> for PowOp {
+    fn on_big(lhs: Cow<E::Big>, rhs: Cow<<E::Unsigned as Encoding<'e>>::Big>) -> E::Big {
+        match (lhs, rhs) {
+            (Cow::Borrowed(lhs), Cow::Borrowed(rhs)) => {
+                E::Big::pow_ref_self_and_ref_biguint(lhs, rhs.to_ref_biguint())
+            }
+            (Cow::Borrowed(lhs), Cow::Owned(rhs)) => {
+                E::Big::pow_ref_self_and_biguint(lhs, rhs.into_biguint())
+            }
+            (Cow::Owned(lhs), Cow::Borrowed(rhs)) => {
+                E::Big::pow_self_and_ref_biguint(lhs, rhs.to_ref_biguint())
+            }
+            (Cow::Owned(lhs), Cow::Owned(rhs)) => {
+                E::Big::pow_self_and_biguint(lhs, rhs.into_biguint())
+            }
+        }
+    }
+
+    fn on_small(lhs: E::Small, rhs: <E::Unsigned as Encoding<'e>>::Small) -> Result<E::Small, ()> {
+        if lhs.is_one() {
+            Ok(E::Small::one())
+        } else if let Ok(rhs) = rhs.try_into()
+            && let (result, false) = lhs.overflowing_pow(rhs)
+        {
+            Ok(result)
+        } else {
+            panic!("Exponentiation would overflow memory")
+        }
+    }
+
+    fn on_big_small(lhs: Cow<E::Big>, rhs: <E::Unsigned as Encoding<'e>>::Small) -> E::Big {
+        if lhs.is_one() {
+            E::Big::one()
+        } else {
+            match lhs {
+                Cow::Borrowed(lhs) => E::Small::pow_big_ref_usmall(lhs, rhs),
+                Cow::Owned(lhs) => E::Small::pow_big_usmall(lhs, rhs),
             }
         }
     }
@@ -455,6 +539,50 @@ duplicate_shift_ops! {
 
 // MARK: Pow Operator Implementations
 // -----------------------------------------------------------------------------
+impl<'a, E: Encoding<'a>> Pow<GenericBigNum<'a, E::Unsigned>> for GenericBigNum<'a, E> {
+    type Output = GenericBigNum<'a, E>;
+
+    fn pow(self, rhs: GenericBigNum<'a, E::Unsigned>) -> Self::Output {
+        GenericBigNum::from_big(E::Big::pow_self_and_biguint(self.big(), rhs.big()))
+    }
+}
+
+impl<'a, E: Encoding<'a>> Pow<&GenericBigNum<'a, E::Unsigned>> for GenericBigNum<'a, E> {
+    type Output = GenericBigNum<'a, E>;
+
+    fn pow(self, rhs: &GenericBigNum<'a, E::Unsigned>) -> Self::Output {
+        rhs.with_big_cow(|rhs| {
+            GenericBigNum::from_big(E::Big::pow_self_and_ref_biguint(self.big(), rhs.as_ref()))
+        })
+    }
+}
+
+impl<'a, E: Encoding<'a>> Pow<GenericBigNum<'a, E>> for &GenericBigNum<'a, E> {
+    type Output = GenericBigNum<'a, E>;
+
+    fn pow(self, rhs: GenericBigNum<'a, E>) -> Self::Output {
+        self.with_big_cow(|lhs| {
+            GenericBigNum::from_big(E::Big::pow_self_and_biguint(
+                lhs.into_owned(),
+                rhs.big().into_biguint(),
+            ))
+        })
+    }
+}
+
+impl<'a, E: Encoding<'a>> Pow<&GenericBigNum<'a, E>> for &GenericBigNum<'a, E> {
+    type Output = GenericBigNum<'a, E>;
+
+    fn pow(self, rhs: &GenericBigNum<'a, E>) -> Self::Output {
+        self.with_big_cows(rhs, |lhs, rhs| {
+            GenericBigNum::from_big(E::Big::pow_self_and_ref_biguint(
+                lhs.into_owned(),
+                rhs.as_ref().to_ref_biguint(),
+            ))
+        })
+    }
+}
+
 duplicate_uprims! {
     paste! {
         impl<'a, E: Encoding<'a>> Pow<prim> for GenericBigNum<'a, E> {
@@ -690,27 +818,26 @@ mod test {
             }
         }
 
-        duplicate_uprims! {
-            paste! {
-                #[quickcheck]
-                fn [<test_pow_ prim _ bigint_tag>](lhs: bigint_type, rhs: u8) -> TestResult {
-                    let rhs = rhs % 64; // limit the exponent to avoid long test times
-                    #[allow(irrefutable_let_patterns)]
-                    if let Ok(lhs) = prim::try_from(rhs) {
-                        // TODO
-                        // let big_lhs = &BigInt::from(lhs.clone());
-                        // let expected = big_lhs.pow(rhs);
-                        // let actual1 = BigInt::from(lhs.clone().pow(rhs));
-                        // let actual2 = BigInt::from(lhs.pow(rhs));
-                        // let label = format!("failed with inputs {}, {}", big_lhs, rhs);
-                        // assert_eq!(expected, actual1, "{}", label);
-                        // assert_eq!(expected, actual2, "{}", label);
-                        TestResult::passed()
-                    } else {
-                        TestResult::discard()
-                    }
-                }
-            }
-        }
+        // duplicate_uprims! {
+        //     paste! {
+        //         #[quickcheck]
+        //         fn [<test_pow_ prim _ bigint_tag>](lhs: bigint_type, rhs: u8) -> TestResult {
+        //             let rhs = rhs % 64; // limit the exponent to avoid long test times and potential OOM errors
+        //             #[allow(irrefutable_let_patterns)]
+        //             if let Ok(rhs) = prim::try_from(rhs) {
+        //                 let big_lhs = &BigInt::from(lhs.clone());
+        //                 let expected = Pow::pow(big_lhs, rhs);
+        //                 let actual1 = BigInt::from(lhs.clone().pow(rhs));
+        //                 let actual2 = BigInt::from(lhs.pow(rhs));
+        //                 let label = format!("failed with inputs {}, {}", big_lhs, rhs);
+        //                 assert_eq!(expected, actual1, "{}", label);
+        //                 assert_eq!(expected, actual2, "{}", label);
+        //                 TestResult::passed()
+        //             } else {
+        //                 TestResult::discard()
+        //             }
+        //         }
+        //     }
+        // }
     }
 }

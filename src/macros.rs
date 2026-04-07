@@ -109,3 +109,13 @@ macro_rules! duplicate_prims {
         crate::duplicate_iprims! { $($body)* }
     }
 }
+
+#[macro_export]
+macro_rules! duplicate_prims_with_signedness {
+    (signed; $($body:tt)*) => {
+        crate::duplicate_prims! { $($body)* }
+    };
+    (unsigned; $($body:tt)*) => {
+        crate::duplicate_uprims! { $($body)* }
+    };
+}

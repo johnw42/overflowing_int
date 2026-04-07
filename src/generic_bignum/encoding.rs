@@ -1,6 +1,6 @@
 use std::{borrow::Cow, hash::Hash, rc::Rc};
 
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
 
 use crate::small_num::SmallNumber;
 use crate::{big_number::BigNumber, duplicate_prims};
@@ -27,6 +27,7 @@ where
     /// Decodes the value.  This method may be less efficient than
     /// [`Self::with_decoded`] since it may require cloning the big value, but
     /// it is more convenient when an owned value is needed.
+    // TODO: Replace uses with `with_decoded` when possible, especially in num_ops.rs, and remove this method.
     fn decode(self) -> Decoded<S, Cow<'a, S::Big>>;
 
     /// Gets the big value as a `Cow`, creating a bignum if necessary.
@@ -127,6 +128,8 @@ where
     /// type, but having it is a convenience for writing code that is generic
     /// over the encoding.
     type Big: BigNumber;
+
+    type Unsigned: Encoding<'a, Small = <Self::Small as SmallNumber>::Unsigned, Big = BigUint>;
 
     /// Encodes a small value.
     fn from_small(s: Self::Small) -> Self;

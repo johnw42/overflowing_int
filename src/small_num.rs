@@ -4,7 +4,7 @@ use std::{
     ops::{BitAnd, BitOr, Shl, Shr},
 };
 
-use num_bigint::{BigInt, BigUint};
+use num_bigint::{BigInt, BigUint, ToBigUint};
 use num_integer::Roots;
 use num_traits::{
     CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, Num, One, PrimInt, ToBytes,
@@ -48,6 +48,7 @@ pub trait SmallNumber:
     + Ord
     + PrimInt
     + Roots
+    + ToBigUint
     + ToBytes
     + ToPrimitive
     + TryFrom<i8>
@@ -65,12 +66,13 @@ pub trait SmallNumber:
     + TryFrom<Self::Unsigned>
     + for<'a> TryFrom<&'a Self::Big>
     + TryInto<BigUint>
+    + TryInto<u32>
     + quickcheck::Arbitrary
     + UpperHex
     + Zero
 {
     type Big: BigNumber;
-    type Unsigned: SmallNumber + Unsigned;
+    type Unsigned: SmallNumber<Big = BigUint> + Unsigned;
 
     const BITS: u32;
     const MIN: Self;
@@ -80,7 +82,7 @@ pub trait SmallNumber:
         Self::try_from(u).ok()
     }
 
-    fn try_from_big(b: Self::Big) -> Option<Self>;
+    fn try_from_big(b: &Self::Big) -> Option<Self>;
 
     fn to_big(self) -> Self::Big {
         self.into()
@@ -204,8 +206,10 @@ macro_rules! impl_small_num {
                 self.signum()
             }
 
-            fn try_from_big(b: Self::Big) -> Option<Self> {
-                Self::try_from(b).ok()
+            fn try_from_big(b: &Self::Big) -> Option<Self> {
+                paste! {
+                    b.[<to_ $signed>]()
+                }
             }
 
             impl_binary_ops!();
@@ -238,8 +242,10 @@ macro_rules! impl_small_num {
                 if self == 0 { 0 } else { 1 }
             }
 
-            fn try_from_big(b: Self::Big) -> Option<Self> {
-                Self::try_from(b).ok()
+            fn try_from_big(b: &Self::Big) -> Option<Self> {
+                paste! {
+                    b.[<to_ $unsigned>]()
+                }
             }
 
             impl_binary_ops!();

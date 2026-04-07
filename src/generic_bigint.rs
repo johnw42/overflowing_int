@@ -2,9 +2,11 @@ use crate::big_number::{BigNumber, BigNumberDigits};
 use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
 use crate::small_num::SmallNumber;
-use crate::{duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops};
+use crate::{
+    duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
+};
 use num_bigint::{BigInt, BigUint, Sign};
-use num_traits::Zero;
+use num_traits::{Pow, Zero};
 use paste::paste;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -32,6 +34,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// assert_eq!(CowBigInt::from(-4321).magnitude(), BigUint::from(4321u32));
     /// assert!(CowBigInt::zero().magnitude().is_zero());
     /// ```
+    #[inline]
     pub fn magnitude(&self) -> BigUint {
         // TODO change return type
         self.0.with_decoded(|encoded| match encoded {
@@ -43,6 +46,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// Creates and initializes a E::Big.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
+    #[inline]
     pub fn new(sign: Sign, digits: Vec<u32>) -> Self {
         Self(if sign == Sign::NoSign {
             GenericBigNum::from_small(E::Small::zero())
@@ -61,6 +65,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// Creates and initializes a bigint.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
+    #[inline]
     pub fn from_slice(sign: Sign, slice: &[u32]) -> Self {
         Self(GenericBigNum::from_big(E::Big::from_slice(sign, slice)))
     }
@@ -68,6 +73,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// Reinitializes a bigint.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
+    #[inline]
     pub fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
         *self = Self::from_slice(sign, slice);
     }
@@ -90,39 +96,48 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// assert_eq!(CowBigInt::from_bytes_be(Sign::Plus, b"Hello world!"),
     ///            CowBigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
+    #[inline]
     pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self
     where
         E::Small: Neg<Output = E::Small>,
     {
-        Self(
-            if let Some(from_bytes) = SmallNumber::from_bytes_be(bytes) {
-                GenericBigNum::from_small(from_bytes)
-            } else {
-                GenericBigNum::from_big(E::Big::from_bytes_be(sign, bytes))
-            },
-        )
+        if let Some(from_bytes) = SmallNumber::from_bytes_be(bytes) {
+            let unsigned = Self(GenericBigNum::from_small(from_bytes));
+            match sign {
+                Sign::Plus => unsigned,
+                Sign::Minus => -unsigned,
+                Sign::NoSign => Self::zero(),
+            }
+        } else {
+            Self(GenericBigNum::from_big(E::Big::from_bytes_be(sign, bytes)))
+        }
     }
 
     /// Creates and initializes a bigint.
     ///
     /// The bytes are in little-endian byte order.
+    #[inline]
     pub fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self
     where
         E::Small: Neg<Output = E::Small>,
     {
-        Self(
-            if let Some(from_bytes) = SmallNumber::from_bytes_le(bytes) {
-                GenericBigNum::from_small(from_bytes)
-            } else {
-                GenericBigNum::from_big(E::Big::from_bytes_le(sign, bytes))
-            },
-        )
+        if let Some(from_bytes) = SmallNumber::from_bytes_be(bytes) {
+            let unsigned = Self(GenericBigNum::from_small(from_bytes));
+            match sign {
+                Sign::Plus => unsigned,
+                Sign::Minus => -unsigned,
+                Sign::NoSign => Self::zero(),
+            }
+        } else {
+            Self(GenericBigNum::from_big(E::Big::from_bytes_le(sign, bytes)))
+        }
     }
 
     /// Creates and initializes a bigint from an array of bytes in
     /// two's complement binary representation.
     ///
     /// The digits are in big-endian base 2<sup>8</sup>.
+    #[inline]
     pub fn from_signed_bytes_be(digits: &[u8]) -> Self {
         Self(GenericBigNum::from_big(E::Big::from_signed_bytes_be(
             digits,
@@ -132,6 +147,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// Creates and initializes a bigint from an array of bytes in two's complement.
     ///
     /// The digits are in little-endian base 2<sup>8</sup>.
+    #[inline]
     pub fn from_signed_bytes_le(digits: &[u8]) -> Self {
         Self(GenericBigNum::from_big(E::Big::from_signed_bytes_le(
             digits,
@@ -149,6 +165,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// assert_eq!(CowBigInt::parse_bytes(b"ABCD", 16), Some(CowBigInt::from(0xABCD)));
     /// assert_eq!(CowBigInt::parse_bytes(b"G", 16), None);
     /// ```
+    #[inline]
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
         E::Big::parse_bytes(buf, radix)
             .map(GenericBigNum::from_big)
@@ -171,6 +188,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// let a = RcBigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
+    #[inline]
     pub fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
         E::Big::from_radix_be(sign, buf, radix)
             .map(GenericBigNum::from_big)
@@ -193,6 +211,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// let a = RcBigInt::from_radix_le(Sign::Minus, &inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_le(190), (Sign::Minus, inbase190));
     /// ```
+    #[inline]
     pub fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
         E::Big::from_radix_le(sign, buf, radix)
             .map(GenericBigNum::from_big)
@@ -209,6 +228,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// let i = RcBigInt::from(-1125);
     /// assert_eq!(i.to_bytes_be(), (Sign::Minus, vec![4, 101]));
     /// ```
+    #[inline]
     pub fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
         self.0.with_big_cow(|big| big.as_ref().to_bytes_be())
     }
@@ -223,6 +243,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// let i = RcBigInt::from(-1125);
     /// assert_eq!(i.to_bytes_le(), (Sign::Minus, vec![101, 4]));
     /// ```
+    #[inline]
     pub fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
         self.0.with_big_cow(|big| big.as_ref().to_bytes_le())
     }
@@ -241,8 +262,14 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// assert_eq!(RcBigInt::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
     /// assert_eq!(RcBigInt::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
     /// ```
+    #[inline]
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
         self.0.with_big_cow(|big| big.as_ref().to_u32_digits())
+    }
+
+    #[inline]
+    pub fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
+        self.0.with_big_cow(|big| big.as_ref().to_u64_digits())
     }
 
     /// Returns the two's-complement byte representation of the bigint in big-endian byte order.
@@ -255,6 +282,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// let i = RcBigInt::from(-1125);
     /// assert_eq!(i.to_signed_bytes_be(), vec![251, 155]);
     /// ```
+    #[inline]
     pub fn to_signed_bytes_be(&self) -> Vec<u8> {
         self.0.with_big_cow(|big| big.as_ref().to_signed_bytes_be())
     }
@@ -269,6 +297,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// let i = RcBigInt::from(-1125);
     /// assert_eq!(i.to_signed_bytes_le(), vec![155, 251]);
     /// ```
+    #[inline]
     pub fn to_signed_bytes_le(&self) -> Vec<u8> {
         self.0.with_big_cow(|big| big.as_ref().to_signed_bytes_le())
     }
@@ -284,8 +313,9 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// let i = RcBigInt::parse_bytes(b"ff", 16).unwrap();
     /// assert_eq!(i.to_str_radix(16), "ff");
     /// ```
+    #[inline]
     pub fn to_str_radix(&self, radix: u32) -> String {
-        self.0.with_big_cow(|big| big.as_ref().to_str_radix(radix))
+        self.0.to_str_radix(radix)
     }
 
     /// Returns the integer in the requested base in big-endian digit order.
@@ -302,6 +332,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     ///            (Sign::Minus, vec![2, 94, 27]));
     /// // 0xFFFF = 65535 = 2*(159^2) + 94*159 + 27
     /// ```
+    #[inline]
     pub fn to_radix_be(&self, radix: u32) -> (Sign, Vec<u8>) {
         self.0.with_big_cow(|big| big.as_ref().to_radix_be(radix))
     }
@@ -320,10 +351,12 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     ///            (Sign::Minus, vec![27, 94, 2]));
     /// // 0xFFFF = 65535 = 27 + 94*159 + 2*(159^2)
     /// ```
+    #[inline]
     pub fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>) {
         self.0.with_big_cow(|big| big.as_ref().to_radix_le(radix))
     }
 
+    #[inline]
     pub fn sign(&self) -> Sign {
         self.0.with_decoded(|encoded| match encoded {
             Decoded::Small(n) => match n.cmp(&E::Small::zero()) {
@@ -335,78 +368,92 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
         })
     }
 
+    #[inline]
     pub fn into_parts(self) -> (Sign, BigUint) {
         self.0.into_bigint().into_parts()
     }
 
+    #[inline]
     pub fn bit(&self, bit: u64) -> bool {
         self.0.bit(bit)
     }
 
+    #[inline]
     pub fn bits(&self) -> u64 {
         self.0.bits()
     }
 
+    #[inline]
     pub fn to_biguint(&self) -> Option<BigUint> {
         self.0.with_big_cow(|big| big.as_ref().to_biguint())
     }
 
+    #[inline]
     pub fn checked_add(&self, v: &'a Self) -> Option<Self> {
         self.0.checked_add(&v.0).map(Self)
     }
 
+    #[inline]
     pub fn checked_sub(&self, v: &'a Self) -> Option<Self> {
         self.0.checked_sub(&v.0).map(Self)
     }
 
+    #[inline]
     pub fn checked_mul(&self, v: &'a Self) -> Option<Self> {
         self.0.checked_mul(&v.0).map(Self)
     }
 
+    #[inline]
     pub fn checked_div(&self, v: &'a Self) -> Option<Self> {
         self.0.checked_div(&v.0).map(Self)
     }
 
+    #[inline]
     pub fn pow(&self, exponent: u32) -> Self {
-        Self(self.0.pow(exponent))
+        Self((&self.0).pow(exponent))
     }
 
+    #[inline]
     pub fn modpow(&self, exponent: &'a Self, modulus: &'a Self) -> Self {
         Self(self.0.modpow(&exponent.0, &modulus.0))
     }
 
+    #[inline]
     pub fn sqrt(&self) -> Self {
         Self(self.0.sqrt())
     }
 
+    #[inline]
     pub fn cbrt(&self) -> Self {
         Self(self.0.cbrt())
     }
 
+    #[inline]
     pub fn nth_root(&self, n: u32) -> Self {
         Self(self.0.nth_root(n))
     }
 
+    #[inline]
     pub fn trailing_zeros(&self) -> Option<u64> {
         self.0.trailing_zeros()
     }
 
-    pub fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
-        self.0.with_big_cow(|big| big.as_ref().to_u64_digits())
-    }
-
+    #[inline]
     pub fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
         self.0.iter_u32_digits()
     }
 
+    #[inline]
     pub fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
         self.0.iter_u64_digits()
     }
 
+    #[inline]
     pub fn modinv(&self, modulus: &'a Self) -> Option<Self> {
         self.0.modinv(&modulus.0).map(Self)
     }
 
+    #[inline]
     pub fn set_bit(&'a mut self, bit: u64, value: bool) {
         self.0.set_bit(bit, value);
     }
@@ -418,19 +465,13 @@ impl<'a, E: Encoding<'a, Big = BigInt>> From<GenericBigNum<'a, E>> for GenericBi
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> From<BigInt> for GenericBigInt<'a, E> {
-    fn from(value: BigInt) -> Self {
-        Self(GenericBigNum::from_big(value))
-    }
-}
-
 impl<'a, E: Encoding<'a, Big = BigInt>> From<GenericBigInt<'a, E>> for GenericBigNum<'a, E> {
     fn from(value: GenericBigInt<'a, E>) -> Self {
         value.0
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for GenericBigInt<'a, E>
+impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for GenericBigInt<'a, E>
 where
     E::Small: SmallNumber<Big = E::Big>,
     E::Big: BigNumber,
@@ -452,14 +493,14 @@ where
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Encoding<'a> for GenericBigInt<'a, E>
+impl<'a, E: Encoding<'a>> Encoding<'a> for GenericBigInt<'a, E>
 where
     E::Small: SmallNumber<Big = E::Big>,
     E::Big: BigNumber,
 {
     type Small = E::Small;
     type Big = E::Big;
-    //type Repr = E::Repr;
+    type Unsigned = E::Unsigned;
 
     fn from_small(s: E::Small) -> Self {
         Self(GenericBigNum::from_encoding(E::from_small(s)))
@@ -544,12 +585,49 @@ macro_rules! impl_binary_assign_ref_op_trait {
     };
 }
 
-duplicate_prims! {
-    impl<'a, E: Encoding<'a, Big = BigInt>> From<prim> for GenericBigInt<'a, E> {
-        fn from(value: prim) -> Self {
-            Self(GenericBigNum::from(value))
+macro_rules! impl_pow_traits {
+    ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
+        paste! {
+            impl<'a, E: Encoding<'a, Big = BigInt>> Pow<$rhs_type> for GenericBigInt<'a, E> {
+                type Output = GenericBigInt<'a, E>;
+
+                fn pow(self, $rhs_param: $rhs_type) -> GenericBigInt<'a, E> {
+                    GenericBigInt(self.0.pow($rhs_expr))
+                }
+            }
+
+            impl<'a, E: Encoding<'a, Big = BigInt>> Pow<&$rhs_type> for GenericBigInt<'a, E>
+            where for<'b> &'b GenericBigNum<'b, E>: Pow<&'b GenericBigNum<'b, <E as Encoding<'a>>::Unsigned>, Output = GenericBigNum<'b, E>>, {
+                type Output = GenericBigInt<'a, E>;
+
+                fn pow(self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
+                    GenericBigInt(Pow::pow(&self.0, $rhs_ref_expr))
+                }
+            }
         }
-    }
+    };
+}
+macro_rules! impl_pow_traits_for_ref {
+    ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
+        paste! {
+            impl<'a, E: Encoding<'a, Big = BigInt>> Pow<$rhs_type> for &GenericBigInt<'a, E> {
+                type Output = GenericBigInt<'a, E>;
+
+                fn pow(self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
+                    GenericBigInt(self.0.pow($rhs_expr))
+                }
+            }
+
+            impl<'a, E: Encoding<'a, Big = BigInt>> Pow<&$rhs_type> for &GenericBigInt<'a, E>
+            where for<'b> &'b GenericBigNum<'b, E>: Pow<&'b GenericBigNum<'b, <E as Encoding<'a>>::Unsigned>, Output = GenericBigNum<'b, E>>, {
+                type Output = GenericBigInt<'a, E>;
+
+                fn pow(self, $rhs_param: &$rhs_type) -> GenericBigInt<'a, E> {
+                    GenericBigInt(Pow::pow(&self.0, $rhs_ref_expr))
+                }
+            }
+        }
+    };
 }
 
 // Implementations of numeric traits for `GenericBigInt`.  The number of
@@ -592,9 +670,18 @@ duplicate_bit_ops! {
     }
 }
 
-// TODO
-
-// fn pow_self_and_ref_biguint(lhs: Self, rhs: &BigUint) -> Self;
+// impl_pow_traits!(
+//     GenericBigInt<'a, E::Unsigned>,
+//     exponent,
+//     exponent.0,
+//     &exponent.0
+// );
+// impl_pow_traits_for_ref!(
+//     GenericBigInt<'a, E::Unsigned>,
+//     exponent,
+//     exponent.0,
+//     &exponent.0
+// );
 // duplicate_uprims! { paste! {
-//     fn [<pow_self_and_ref_ prim>](lhs: Self, rhs: &prim) -> Self;
+//     impl_pow_traits!(prim, exponent, exponent, exponent);
 // } }

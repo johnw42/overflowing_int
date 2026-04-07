@@ -69,6 +69,22 @@ macro_rules! declare_binary_assign_ref_op {
         }
     };
 }
+macro_rules! declare_pow_ops {
+    ($rhs:ty) => {
+        paste! {
+            fn [<pow _self_and_ $rhs:lower>](lhs: Self, rhs: $rhs) -> Self;
+            fn [<pow _self_and_ref_ $rhs:lower>](lhs: Self, rhs: &$rhs) -> Self;
+        }
+    };
+}
+macro_rules! declare_pow_ops_for_ref {
+    ($rhs:ty) => {
+        paste! {
+            fn [<pow _ref_self_and_ $rhs:lower>](lhs: &Self, rhs: $rhs) -> Self;
+            fn [<pow _ref_self_and_ref_ $rhs:lower>](lhs: &Self, rhs: &$rhs) -> Self;
+        }
+    };
+}
 
 macro_rules! impl_binary_ops {
     ($op_fn:ident, $lhs:ty, $rhs:ty) => {
@@ -102,6 +118,32 @@ macro_rules! impl_binary_assign_ref_op {
         paste! {
             fn [<$op_fn _assign_ref_self>](&mut self, rhs: &Self) {
                 self.[<$op_fn _assign>](rhs);
+            }
+        }
+    };
+}
+macro_rules! impl_pow_ops {
+    ($rhs:ty) => {
+        paste! {
+            fn [<pow _self_and_ $rhs:lower>](lhs: Self, rhs: $rhs) -> Self {
+                Pow::pow(lhs, rhs)
+            }
+
+            fn [<pow _self_and_ref_ $rhs:lower>](lhs: Self, rhs: &$rhs) -> Self {
+                Pow::pow(lhs, rhs)
+            }
+        }
+    };
+}
+macro_rules! impl_pow_ops_for_ref {
+    ($rhs:ty) => {
+        paste! {
+            fn [<pow _ref_self_and_ $rhs:lower>](lhs: &Self, rhs: $rhs) -> Self {
+                Pow::pow(lhs, rhs)
+            }
+
+            fn [<pow _ref_self_and_ref_ $rhs:lower>](lhs: &Self, rhs: &$rhs) -> Self {
+                Pow::pow(lhs, rhs)
             }
         }
     };
@@ -196,10 +238,14 @@ where
             declare_binary_assign_ref_op!(op_fn);
         }
     }
-    fn pow_self_and_ref_biguint(lhs: Self, rhs: &BigUint) -> Self;
+    declare_pow_ops!(BigUint);
+    declare_pow_ops_for_ref!(BigUint);
     duplicate_uprims! { paste! {
-        fn [<pow_self_and_ref_ prim>](lhs: Self, rhs: &prim) -> Self;
+        declare_pow_ops!(prim);
     } }
+
+    fn into_biguint(self) -> BigUint;
+    fn to_ref_biguint(&self) -> &BigUint;
 
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self>;
     fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32>;
@@ -279,106 +325,124 @@ pub trait BigUnsigned: BigNumber + Unsigned {
 }
 
 #[macro_export]
-macro_rules! impl_big_number {
-    ($t:ty) => {
-        impl BigNumber for $t {
-            duplicate_arith_ops! {
-                paste! {
-                    impl_binary_ops!(op_fn, Self, Self);
-                    impl_binary_assign_op!(op_fn, Self);
-                    impl_binary_assign_ref_op!(op_fn);
-                }
-                duplicate_uprims! { paste! {
-                    impl_binary_ops!(op_fn, Self, prim);
-                    impl_binary_ops!(op_fn, prim, Self);
-                    impl_binary_assign_op!(op_fn, prim);
-                }}
-            }
-            duplicate_shift_ops! {
-                duplicate_prims! { paste! {
-                    impl_binary_ops!(op_fn, Self, prim);
-                    impl_binary_assign_op!(op_fn, prim);
-                }}
-            }
-            duplicate_bit_ops! {
-                paste! {
-                    impl_binary_ops!(op_fn, Self, Self);
-                    impl_binary_assign_op!(op_fn, Self);
-                    impl_binary_assign_ref_op!(op_fn);
-                }
-            }
-            fn pow_self_and_ref_biguint(lhs: Self, rhs: &BigUint) -> Self {
-                lhs.pow(rhs)
+macro_rules! impl_big_number_body {
+    () => {
+        duplicate_arith_ops! {
+            paste! {
+                impl_binary_ops!(op_fn, Self, Self);
+                impl_binary_assign_op!(op_fn, Self);
+                impl_binary_assign_ref_op!(op_fn);
             }
             duplicate_uprims! { paste! {
-                fn [<pow_self_and_ref_ prim>](lhs: Self, rhs: &prim) -> Self { lhs.pow(rhs) }
-            } }
-
-            fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
-                Self::parse_bytes(buf, radix)
+                impl_binary_ops!(op_fn, Self, prim);
+                impl_binary_ops!(op_fn, prim, Self);
+                impl_binary_assign_op!(op_fn, prim);
+            }}
+        }
+        duplicate_shift_ops! {
+            duplicate_prims! { paste! {
+                impl_binary_ops!(op_fn, Self, prim);
+                impl_binary_assign_op!(op_fn, prim);
+            }}
+        }
+        duplicate_bit_ops! {
+            paste! {
+                impl_binary_ops!(op_fn, Self, Self);
+                impl_binary_assign_op!(op_fn, Self);
+                impl_binary_assign_ref_op!(op_fn);
             }
+        }
+        impl_pow_ops!(BigUint);
+        impl_pow_ops_for_ref!(BigUint);
+        duplicate_uprims! { paste! {
+            impl_pow_ops!(prim);
+        } }
 
-            fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
-                self.iter_u32_digits()
-            }
+        fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
+            Self::parse_bytes(buf, radix)
+        }
 
-            fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
-                self.iter_u64_digits()
-            }
+        fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
+            self.iter_u32_digits()
+        }
 
-            fn to_str_radix(&self, radix: u32) -> String {
-                self.to_str_radix(radix)
-            }
+        fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
+            self.iter_u64_digits()
+        }
 
-            fn bits(&self) -> u64 {
-                self.bits()
-            }
+        fn to_str_radix(&self, radix: u32) -> String {
+            self.to_str_radix(radix)
+        }
 
-            fn checked_add(&self, v: &Self) -> Option<Self> {
-                CheckedAdd::checked_add(self, v)
-            }
+        fn bits(&self) -> u64 {
+            self.bits()
+        }
 
-            fn checked_sub(&self, v: &Self) -> Option<Self> {
-                CheckedSub::checked_sub(self, v)
-            }
+        fn checked_add(&self, v: &Self) -> Option<Self> {
+            CheckedAdd::checked_add(self, v)
+        }
 
-            fn checked_mul(&self, v: &Self) -> Option<Self> {
-                CheckedMul::checked_mul(self, v)
-            }
+        fn checked_sub(&self, v: &Self) -> Option<Self> {
+            CheckedSub::checked_sub(self, v)
+        }
 
-            fn checked_div(&self, v: &Self) -> Option<Self> {
-                CheckedDiv::checked_div(self, v)
-            }
+        fn checked_mul(&self, v: &Self) -> Option<Self> {
+            CheckedMul::checked_mul(self, v)
+        }
 
-            fn pow(&self, exponent: u32) -> Self {
-                self.pow(exponent)
-            }
+        fn checked_div(&self, v: &Self) -> Option<Self> {
+            CheckedDiv::checked_div(self, v)
+        }
 
-            fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-                self.modpow(exponent, modulus)
-            }
+        fn pow(&self, exponent: u32) -> Self {
+            self.pow(exponent)
+        }
 
-            fn modinv(&self, modulus: &Self) -> Option<Self> {
-                self.modinv(modulus)
-            }
+        fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
+            self.modpow(exponent, modulus)
+        }
 
-            fn trailing_zeros(&self) -> Option<u64> {
-                self.trailing_zeros()
-            }
+        fn modinv(&self, modulus: &Self) -> Option<Self> {
+            self.modinv(modulus)
+        }
 
-            fn bit(&self, bit: u64) -> bool {
-                self.bit(bit)
-            }
+        fn trailing_zeros(&self) -> Option<u64> {
+            self.trailing_zeros()
+        }
 
-            fn set_bit(&mut self, bit: u64, value: bool) {
-                self.set_bit(bit, value)
-            }
+        fn bit(&self, bit: u64) -> bool {
+            self.bit(bit)
+        }
+
+        fn set_bit(&mut self, bit: u64, value: bool) {
+            self.set_bit(bit, value)
         }
     };
 }
 
-impl_big_number!(BigInt);
-impl_big_number!(BigUint);
+impl BigNumber for BigInt {
+    impl_big_number_body!();
+
+    fn into_biguint(self) -> BigUint {
+        unreachable!()
+    }
+
+    fn to_ref_biguint(&self) -> &BigUint {
+        unreachable!()
+    }
+}
+
+impl BigNumber for BigUint {
+    impl_big_number_body!();
+
+    fn into_biguint(self) -> BigUint {
+        self
+    }
+
+    fn to_ref_biguint(&self) -> &BigUint {
+        self
+    }
+}
 
 impl BigSigned for BigInt {
     duplicate_arith_ops! { duplicate_iprims! { paste! {

@@ -57,6 +57,7 @@ where
 impl<'a, S: SmallNumber> Encoding<'a> for CowEncoding<'a, S> {
     type Small = S;
     type Big = S::Big;
+    type Unsigned = CowEncoding<'a, S::Unsigned>;
 
     fn from_small(s: Self::Small) -> Self {
         Self(Decoded::Small(s))
