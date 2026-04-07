@@ -25,29 +25,6 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericSignedBigNum<'a, E> {
         GenericSignedBigNum(self.0.into_static())
     }
 
-    /// Returns the magnitude of the as a `BigUint`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use compact_bigint::CowBigInt;
-    /// use num_traits::Zero;
-    /// use std::borrow::Borrow;
-    /// use num_bigint::BigUint;
-    ///
-    /// assert_eq!(CowBigInt::from(1234).magnitude(), BigUint::from(1234u32));
-    /// assert_eq!(CowBigInt::from(-4321).magnitude(), BigUint::from(4321u32));
-    /// assert!(CowBigInt::zero().magnitude().is_zero());
-    /// ```
-    #[inline]
-    pub fn magnitude(&self) -> BigUint {
-        // TODO change return type
-        self.0.with_decoded(|encoded| match encoded {
-            Decoded::Small(n) => n.to_bigint().magnitude().clone(),
-            Decoded::Big(n) => n.magnitude().clone(),
-        })
-    }
-
     /// Creates and initializes a E::Big.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
