@@ -58,13 +58,6 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// Creates and initializes a bigint.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
-    pub(crate) fn from_biguint(sign: Sign, data: BigUint) -> Self {
-        Self(GenericBigNum::from_big(E::Big::from_biguint(sign, data)))
-    }
-
-    /// Creates and initializes a bigint.
-    ///
-    /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
     pub fn from_slice(sign: Sign, slice: &[u32]) -> Self {
         Self(GenericBigNum::from_big(E::Big::from_slice(sign, slice)))
@@ -167,9 +160,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
     /// ```
     #[inline]
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
-        E::Big::parse_bytes(buf, radix)
-            .map(GenericBigNum::from_big)
-            .map(Self)
+        GenericBigNum::parse_bytes(buf, radix).map(Self)
     }
 
     /// Creates and initializes a bigint. Each u8 of the input slice is
@@ -410,6 +401,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericBigInt<'a, E> {
 
     #[inline]
     pub fn pow(&self, exponent: u32) -> Self {
+        #[allow(clippy::needless_borrow)]
         Self((&self.0).pow(exponent))
     }
 

@@ -220,10 +220,12 @@ duplicate_prims! {
         }
 
         fn small(&self) -> Option<S> {
+            #[allow(clippy::unnecessary_fallible_conversions)]
             S::try_from(*self).ok()
         }
 
         fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
+            #[allow(clippy::unnecessary_fallible_conversions)]
             match S::try_from(*self) {
                 Ok(small) => f(Decoded::Small(small)),
                 Err(_) => f(Decoded::Big(Cow::Owned(S::Big::from(*self)))),
@@ -247,10 +249,12 @@ duplicate_prims! {
         }
 
         fn small(&self) -> Option<S> {
+            #[allow(clippy::unnecessary_fallible_conversions)]
             S::try_from(**self).ok()
         }
 
         fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
+            #[allow(clippy::unnecessary_fallible_conversions)]
             match S::try_from(**self) {
                 Ok(small) => f(Decoded::Small(small)),
                 Err(_) => f(Decoded::Big(Cow::Owned(S::Big::from(**self)))),

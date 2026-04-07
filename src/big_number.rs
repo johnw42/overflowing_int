@@ -123,34 +123,6 @@ macro_rules! impl_binary_assign_ref_op {
     };
 }
 
-// TODO delete
-// macro_rules! impl_pow_ops {
-//     ($rhs:ty) => {
-//         paste! {
-//             fn [<pow _self_and_ $rhs:lower>](lhs: Self, rhs: $rhs) -> Self {
-//                 Pow::pow(lhs, rhs)
-//             }
-
-//             fn [<pow _self_and_ref_ $rhs:lower>](lhs: Self, rhs: &$rhs) -> Self {
-//                 Pow::pow(lhs, rhs)
-//             }
-//         }
-//     };
-// }
-// macro_rules! impl_pow_ops_for_ref {
-//     ($rhs:ty) => {
-//         paste! {
-//             fn [<pow _ref_self_and_ $rhs:lower>](lhs: &Self, rhs: $rhs) -> Self {
-//                 Pow::pow(lhs, rhs)
-//             }
-
-//             fn [<pow _ref_self_and_ref_ $rhs:lower>](lhs: &Self, rhs: &$rhs) -> Self {
-//                 Pow::pow(lhs, rhs)
-//             }
-//         }
-//     };
-// }
-
 // TODO: Handle config settings
 identity! {
 pub trait BigNumber
@@ -240,12 +212,6 @@ where
             declare_binary_assign_ref_op!(op_fn);
         }
     }
-    // TODO delete
-    // declare_pow_ops!(BigUint);
-    // declare_pow_ops_for_ref!(BigUint);
-    // duplicate_uprims! { paste! {
-    //     declare_pow_ops!(prim);
-    // } }
 
     /// Casts self to a BigUint.  This is only implemented for BigUint, and will panic if called on a BigInt.
     fn into_biguint(self) -> BigUint;
@@ -361,12 +327,6 @@ macro_rules! impl_big_number_body {
                 impl_binary_assign_ref_op!(op_fn);
             }
         }
-        // TODO delete
-        // impl_pow_ops!(BigUint);
-        // impl_pow_ops_for_ref!(BigUint);
-        // duplicate_uprims! { paste! {
-        //     impl_pow_ops!(prim);
-        // } }
 
         fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
             Self::parse_bytes(buf, radix)

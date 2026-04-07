@@ -58,7 +58,7 @@ where
 
 impl<S> Encoding<'static> for RcEncoding<S>
 where
-    S: SmallNumber,
+    S: SmallNumber<Unsigned = usize>,
 {
     type Small = S;
     type Big = S::Big;

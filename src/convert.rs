@@ -6,7 +6,6 @@ use duplicate::duplicate_item;
 use num_bigint::{BigInt, BigUint, Sign, ToBigInt, ToBigUint};
 use num_traits::ToPrimitive;
 use paste::paste;
-use serde::de;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 

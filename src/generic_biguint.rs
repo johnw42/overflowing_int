@@ -6,13 +6,11 @@ use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
 };
 use num_bigint::BigUint;
-use num_traits::{Pow, Zero};
 use paste::paste;
 use std::borrow::Cow;
-use std::cmp::Ordering;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
-    Mul, MulAssign, Neg, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+    Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 
 /// An unsigned big integer type that can be used with any encoding that implements `Encoding` with `Big = BigUint`.
@@ -98,10 +96,8 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericBigUint<'a, E> {
     /// assert_eq!(RcBigUint::parse_bytes(b"G", 16), None);
     /// ```
     #[inline]
-    pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<GenericBigUint<'a, E>> {
-        E::Big::parse_bytes(buf, radix)
-            .map(GenericBigNum::from_big)
-            .map(Self)
+    pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
+        GenericBigNum::parse_bytes(buf, radix).map(Self)
     }
 
     /// Creates and initializes a [`GenericBigUint`]. Each `u8` of the input slice is
@@ -120,7 +116,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericBigUint<'a, E> {
     /// let a = RcBigUint::from_radix_be(inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_be(190), inbase190);
     /// ```
-    pub fn from_radix_be(buf: &[u8], radix: u32) -> Option<GenericBigUint<'a, E>> {
+    pub fn from_radix_be(buf: &[u8], radix: u32) -> Option<Self> {
         E::Big::from_radix_be(buf, radix)
             .map(GenericBigNum::from_big)
             .map(Self)
@@ -314,6 +310,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericBigUint<'a, E> {
 
     /// Returns `self ^ exponent`.
     pub fn pow(&self, exponent: u32) -> Self {
+        #[allow(clippy::needless_borrow)]
         Self((&self.0).pow(exponent))
     }
 
@@ -519,49 +516,6 @@ macro_rules! impl_binary_assign_ref_op_trait {
             impl<'a, E: Encoding<'a, Big = BigUint>> [<$trait Assign>]<&GenericBigUint<'a, E>> for GenericBigUint<'a, E> {
                 fn [<$op_fn _assign>](&mut self, rhs: &GenericBigUint<'a, E>) {
                     self.0.[<$op_fn _assign>](&rhs.0)
-                }
-            }
-        }
-    };
-}
-
-macro_rules! impl_pow_traits {
-    ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
-        paste! {
-            impl<'a, E: Encoding<'a, Big = BigUint, Unsigned = E>> Pow<$rhs_type> for GenericBigUint<'a, E> {
-                type Output = GenericBigUint<'a, E>;
-
-                fn pow(self, $rhs_param: $rhs_type) -> GenericBigUint<'a, E> {
-                    GenericBigUint(self.0.pow($rhs_expr))
-                }
-            }
-
-            impl<'a, E: Encoding<'a, Big = BigUint>> Pow<&$rhs_type> for &GenericBigUint<'a, E> {
-                type Output = GenericBigUint<'a, E>;
-
-                fn pow(self, $rhs_param: &$rhs_type) -> GenericBigUint<'a, E> {
-                    GenericBigUint(Pow::pow(&self.0, $rhs_ref_expr))
-                }
-            }
-        }
-    };
-}
-macro_rules! impl_pow_traits_for_ref {
-    ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
-        paste! {
-            impl<'a, E: Encoding<'a, Big = BigUint>> Pow<&$rhs_type> for GenericBigUint<'a, E> {
-                type Output = GenericBigUint<'a, E>;
-
-                fn pow(self, $rhs_param: &$rhs_type) -> GenericBigUint<'a, E> {
-                    GenericBigUint(self.0.pow($rhs_expr))
-                }
-            }
-
-            impl<'a, E: Encoding<'a, Big = BigUint, Unsigned = E>> Pow<&$rhs_type> for &GenericBigUint<'a, E> {
-                type Output = GenericBigUint<'a, E>;
-
-                fn pow(self, $rhs_param: &$rhs_type) -> GenericBigUint<'a, E> {
-                    GenericBigUint((&self.0).pow($rhs_ref_expr))
                 }
             }
         }

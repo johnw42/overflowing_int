@@ -14,10 +14,6 @@ use paste::paste;
 
 use crate::{big_number::BigNumber, duplicate_arith_ops};
 
-// TODO
-pub trait SameSizeInt<A, B> {}
-impl<T> SameSizeInt<T, T> for T {}
-
 /// A trait implemented by primitive integer types that can be used as the
 /// "small" part of a big integer encoding.
 pub trait SmallNumber:

@@ -4,8 +4,8 @@ macro_rules! duplicate_generic_bigint_types {
         duplicate::duplicate! {
             [
                 bigint_tag bigint_type;
-                [cow]      [crate::CowBigInt<'static>];
-                [rc]       [crate::RcBigInt];
+                [cow]      [$crate::CowBigInt<'static>];
+                [rc]       [$crate::RcBigInt];
             ]
             $($body)*
         }
@@ -61,8 +61,8 @@ macro_rules! duplicate_bit_ops {
 #[macro_export]
 macro_rules! duplicate_arith_and_bit_ops {
     ($($body:tt)*) => {
-        crate::duplicate_arith_ops! { $($body)* }
-        crate::duplicate_bit_ops! { $($body)* }
+        $crate::duplicate_arith_ops! { $($body)* }
+        $crate::duplicate_bit_ops! { $($body)* }
     }
 }
 
@@ -105,17 +105,17 @@ macro_rules! duplicate_uprims {
 #[macro_export]
 macro_rules! duplicate_prims {
     ($($body:tt)*) => {
-        crate::duplicate_uprims! { $($body)* }
-        crate::duplicate_iprims! { $($body)* }
+        $crate::duplicate_uprims! { $($body)* }
+        $crate::duplicate_iprims! { $($body)* }
     }
 }
 
 #[macro_export]
 macro_rules! duplicate_prims_with_signedness {
     (signed; $($body:tt)*) => {
-        crate::duplicate_prims! { $($body)* }
+        $crate::duplicate_prims! { $($body)* }
     };
     (unsigned; $($body:tt)*) => {
-        crate::duplicate_uprims! { $($body)* }
+        $crate::duplicate_uprims! { $($body)* }
     };
 }

@@ -1,5 +1,4 @@
 use crate::generic_bigint::GenericBigInt;
-use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
 use crate::generic_biguint::GenericBigUint;
 use crate::small_num::SmallNumber;
@@ -45,7 +44,6 @@ pub mod mod_name {
                 true => Self::from_small(E::Small::arbitrary(g)),
                 false => Self::from_big(E::Big::arbitrary(g)),
             }
-            .into()
         }
 
         fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
@@ -65,8 +63,7 @@ pub mod mod_name {
             Ok(match bool::arbitrary(g)? {
                 true => Self::from_small(E::Small::arbitrary(g)?),
                 false => Self::from_big(E::Big::arbitrary(g)?),
-            }
-            .into())
+            })
         }
     }
 
@@ -483,12 +480,9 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Not for GenericBigInt<'a, E> {
     type Output = GenericBigInt<'a, E>;
 
     fn not(self) -> Self::Output {
-        self.with_decoded(|encoded| {
-            match encoded {
-                Decoded::Small(n) => Self::from_small(n.not()),
-                Decoded::Big(n) => Self::from_big(n.as_ref().not()),
-            }
-            .into()
+        self.with_decoded(|encoded| match encoded {
+            Decoded::Small(n) => Self::from_small(n.not()),
+            Decoded::Big(n) => Self::from_big(n.as_ref().not()),
         })
     }
 }
@@ -497,12 +491,9 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Not for &GenericBigInt<'a, E> {
     type Output = GenericBigInt<'a, E>;
 
     fn not(self) -> Self::Output {
-        self.with_decoded(|encoded| {
-            match encoded {
-                Decoded::Small(n) => GenericBigInt::from_small(n.not()),
-                Decoded::Big(n) => GenericBigInt::from_big(n.as_ref().not()),
-            }
-            .into()
+        self.with_decoded(|encoded| match encoded {
+            Decoded::Small(n) => GenericBigInt::from_small(n.not()),
+            Decoded::Big(n) => GenericBigInt::from_big(n.as_ref().not()),
         })
     }
 }

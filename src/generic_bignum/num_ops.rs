@@ -836,6 +836,7 @@ mod test {
                 fn [<test_pow_ prim _ bigint_tag>](lhs: bigint_type, rhs: u8) -> TestResult {
                     let rhs = rhs % 64; // limit the exponent to avoid long test times and potential OOM errors
                     #[allow(irrefutable_let_patterns)]
+                    #[allow(clippy::unnecessary_fallible_conversions)]
                     if let Ok(rhs) = prim::try_from(rhs) {
                         let big_lhs = &BigInt::from(lhs.clone());
                         let expected = Pow::pow(big_lhs, rhs);

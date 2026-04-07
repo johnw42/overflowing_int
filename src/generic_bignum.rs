@@ -28,10 +28,6 @@ impl<'a, E: Encoding<'a>> GenericBigNum<'a, E> {
         self.into_big_cow().into_owned()
     }
 
-    fn to_bigint(&self) -> BigInt {
-        self.big().into()
-    }
-
     pub fn into_bigint(self) -> BigInt {
         self.into_big_cow().into_owned().into()
     }
@@ -61,9 +57,9 @@ impl<'a, E: Encoding<'a>> GenericBigNum<'a, E> {
         self.with_decoded(|encoded| match encoded {
             Decoded::Small(n) => {
                 if n >= E::Small::zero() {
-                    E::Small::BITS as u32 - n.leading_zeros()
+                    E::Small::BITS - n.leading_zeros()
                 } else {
-                    E::Small::BITS as u32 - n.unsigned_abs().leading_zeros()
+                    E::Small::BITS - n.unsigned_abs().leading_zeros()
                 }
             }
             .into(),
