@@ -1,5 +1,5 @@
 use crate::big_number::BigNumberDigits;
-use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,

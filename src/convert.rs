@@ -1,7 +1,7 @@
-use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
-use crate::generic_bignum::signed::GenericSignedBigNum;
-use crate::generic_bignum::unsigned::GenericUnsignedBigNum;
+use crate::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::signed::GenericSignedBigNum;
 use crate::small_num::SmallNumber;
+use crate::unsigned::GenericUnsignedBigNum;
 use duplicate::duplicate_item;
 use num_bigint::{BigInt, BigUint, Sign, ToBigInt, ToBigUint};
 use num_traits::ToPrimitive;

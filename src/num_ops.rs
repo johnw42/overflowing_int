@@ -1,8 +1,8 @@
 use crate::big_number::{BigNumber, BigSigned};
-use crate::generic_bignum::encoding::{Decode, Decoded, Encoding};
-use crate::generic_bignum::signed::GenericSignedBigNum;
-use crate::generic_bignum::unsigned::GenericUnsignedBigNum;
+use crate::encoding::{Decode, Decoded, Encoding};
+use crate::signed::GenericSignedBigNum;
 use crate::small_num::SmallNumber as _;
+use crate::unsigned::GenericUnsignedBigNum;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_generic_big_num, duplicate_iprims,
     duplicate_prims, duplicate_shift_ops, duplicate_uprims,
@@ -630,7 +630,7 @@ mod test {
     use crate::duplicate_arith_and_bit_ops;
     use crate::duplicate_generic_bignum_types;
     use crate::duplicate_prims_with_signedness;
-    use crate::generic_bignum::signed::GenericSignedBigNum;
+    use crate::signed::GenericSignedBigNum;
     use num_bigint::BigInt;
     use num_traits::Zero;
     use quickcheck::TestResult;

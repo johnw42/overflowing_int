@@ -1,7 +1,7 @@
-use crate::generic_bignum::encoding::Decode;
-use crate::generic_bignum::encoding::Decoded;
-use crate::generic_bignum::encoding::Encode;
-use crate::generic_bignum::encoding::Encoding;
+use crate::encoding::Decode;
+use crate::encoding::Decoded;
+use crate::encoding::Encode;
+use crate::encoding::Encoding;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
