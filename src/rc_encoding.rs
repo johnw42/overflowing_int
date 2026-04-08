@@ -61,6 +61,24 @@ mod shifted {
             Self(S::one())
         }
     }
+
+    impl<S> quickcheck::Arbitrary for Shifted<S>
+    where
+        S: SmallNumber,
+    {
+        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+            Shifted(<S as quickcheck::Arbitrary>::arbitrary(g) >> 1u32)
+        }
+    }
+
+    impl<S> arbitrary::Arbitrary<'_> for Shifted<S>
+    where
+        S: SmallNumber,
+    {
+        fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+            Ok(Shifted(<S as arbitrary::Arbitrary>::arbitrary(u)? >> 1u32))
+        }
+    }
 }
 
 /// An encoding that uses `Rc` for big values, and a small value with the LSB
@@ -234,3 +252,31 @@ where
 }
 
 impl<S> Eq for RcEncoding<S> where S: SmallNumber {}
+
+impl<S: SmallNumber> quickcheck::Arbitrary for RcEncoding<S> {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        if bool::arbitrary(g) {
+            Self(RcEncodedRepr {
+                small: Shifted::<S>::arbitrary(g),
+            })
+        } else {
+            Self(RcEncodedRepr {
+                big: ManuallyDrop::new(Rc::new(S::Big::arbitrary(g))),
+            })
+        }
+    }
+}
+
+impl<S: SmallNumber> arbitrary::Arbitrary<'_> for RcEncoding<S> {
+    fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
+        if bool::arbitrary(u)? {
+            Ok(Self(RcEncodedRepr {
+                small: <Shifted<S> as arbitrary::Arbitrary>::arbitrary(u)?,
+            }))
+        } else {
+            Ok(Self(RcEncodedRepr {
+                big: ManuallyDrop::new(Rc::new(S::Big::arbitrary(u)?)),
+            }))
+        }
+    }
+}

@@ -9,6 +9,7 @@ use crate::{
 };
 
 pub mod big_number;
+mod bounds;
 mod convert;
 pub mod cow_encoding;
 mod encoding;

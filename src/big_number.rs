@@ -1,5 +1,13 @@
 #![allow(unused_imports)]
 
+use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint};
+use num_integer::{Integer, Roots};
+use num_traits::{
+    CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, ConstZero, Euclid, FromBytes,
+    FromPrimitive, Num, One, Pow, Signed, ToBytes, ToPrimitive, Unsigned, Zero,
+};
+use rand::distributions::uniform::SampleUniform;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Binary, Debug, Display, LowerHex, Octal, UpperHex};
 use std::hash::Hash;
 use std::iter::FusedIterator;
@@ -10,16 +18,7 @@ use std::ops::{
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::str::FromStr;
 
-use num_bigint::{BigInt, BigUint, ParseBigIntError, RandomBits, Sign, ToBigInt, ToBigUint};
-use num_integer::{Integer, Roots};
-use num_traits::{
-    CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, ConstZero, Euclid, FromBytes,
-    FromPrimitive, Num, One, Pow, Signed, ToBytes, ToPrimitive, Unsigned, Zero,
-};
-use rand::distributions::uniform::SampleUniform;
-use rand::prelude::Distribution;
-use serde::{Deserialize, Serialize};
-
+use crate::bounds::{ArbitraryBounds, QuickcheckBounds, RandBounds, SerdeBounds};
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_iprims, duplicate_prims, duplicate_shift_ops,
     duplicate_uprims,
@@ -37,12 +36,6 @@ pub trait BigNumberDigits<'a, T>:
 impl<'a, T, I> BigNumberDigits<'a, T> for I where
     I: DoubleEndedIterator<Item = T> + ExactSizeIterator<Item = T> + FusedIterator<Item = T> + 'a
 {
-}
-
-macro_rules! identity {
-    ($($body:tt)*) => {
-        $($body)*
-    };
 }
 
 macro_rules! declare_binary_ops {
@@ -107,8 +100,6 @@ macro_rules! impl_binary_assign_ref_op {
     };
 }
 
-// TODO: Handle config settings
-identity! {
 pub trait BigNumber
 where
     Self: Binary,
@@ -224,7 +215,6 @@ where
     fn trailing_zeros(&self) -> Option<u64>;
     fn bit(&self, bit: u64) -> bool;
     fn set_bit(&mut self, bit: u64, value: bool);
-}
 }
 
 pub trait BigSigned: BigNumber + Signed

@@ -35,6 +35,9 @@ use std::str::FromStr;
 )]
 mod mod_name {
     use super::*;
+    use quickcheck::TestResult;
+    use quickcheck_macros::quickcheck;
+    use serde::{Deserialize, Serialize};
 
     #[quickcheck]
     fn test_binary(n: RawType) -> bool {
@@ -291,6 +294,8 @@ mod mod_name {
     [signed_rc_ops]  [RcBigInt];
 )]
 mod mod_name {
+    use quickcheck_macros::quickcheck;
+
     use super::*;
 
     #[quickcheck]

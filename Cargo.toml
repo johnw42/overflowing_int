@@ -54,35 +54,40 @@ features = [
 
 [dependencies.rand]
 optional = true
-version = "0.8"
+version = "^0.8"
 default-features = false
 
 [dependencies.serde]
 optional = true
-version = "1.0"
+version = "^1.0"
 default-features = false
 
 [dependencies.quickcheck]
 optional = true
-version = "1"
+version = "^1"
 
 [dependencies.arbitrary]
 optional = true
-version = "1"
+version = "^1"
 default-features = false
 
 [dependencies.test_suite_macro]
-version = "0.1.0"
+version = "^0.1.0"
 
 [dev-dependencies]
-num-bigint = { version = "^0.4.0", features = [
-  "rand",
-] }
-rand = { version = "^0.8.4" }
+arbitrary = "^1"
 criterion = { version = "^0.8.2", features = [
   "html_reports",
 ] }
-serde_json = "1.0.149"
+num-bigint = { version = "^0.4.0", features = [
+  "rand",
+  "quickcheck",
+  "serde",
+] }
+quickcheck = "^1"
+rand = "^0.8.4"
+serde = "^1.0"
+serde_json = "^1.0.149"
 
 [[bench]]
 name = "benchmark"
