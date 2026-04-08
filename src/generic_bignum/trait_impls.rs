@@ -16,7 +16,6 @@ use paste::paste;
 use rand::distributions::uniform::{SampleBorrow, SampleUniform, UniformSampler};
 use rand::prelude::Distribution;
 use serde::{Deserialize, Serialize};
-use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::fmt::{Binary, Formatter, LowerHex, Octal, UpperHex};
 use std::ops::{Neg, Not};
@@ -75,25 +74,25 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> CheckedAdd for GenericBigNumWrapper<'a, E> {
         fn checked_add(&self, v: &Self) -> Option<Self> {
-            self.0.checked_add(&v.0).map(Into::into)
+            <Self as Encoding>::checked_add(self, v).map(Into::into)
         }
     }
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> CheckedDiv for GenericBigNumWrapper<'a, E> {
         fn checked_div(&self, v: &Self) -> Option<Self> {
-            self.0.checked_div(&v.0).map(Into::into)
+            <Self as Encoding>::checked_div(self, v).map(Into::into)
         }
     }
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> CheckedMul for GenericBigNumWrapper<'a, E> {
         fn checked_mul(&self, v: &Self) -> Option<Self> {
-            self.0.checked_mul(&v.0).map(Into::into)
+            <Self as Encoding>::checked_mul(self, v).map(Into::into)
         }
     }
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> CheckedSub for GenericBigNumWrapper<'a, E> {
         fn checked_sub(&self, v: &Self) -> Option<Self> {
-            self.0.checked_sub(&v.0).map(Into::into)
+            <Self as Encoding>::checked_sub(self, v).map(Into::into)
         }
     }
 
@@ -314,7 +313,7 @@ pub mod mod_name {
         }
     }
 
-    impl<'a, E: Encoding<'a>> LowerHex for GenericBigNumWrapper<'a, E> {
+    impl<'a, E: Encoding<'a, Big = BigNumType>> LowerHex for GenericBigNumWrapper<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
             self.with_big_cow(|cow| LowerHex::fmt(cow.as_ref(), f))
         }
@@ -326,7 +325,7 @@ pub mod mod_name {
         }
     }
 
-    impl<'a, E: Encoding<'a>> RefUnwindSafe for GenericBigNumWrapper<'a, E> {}
+    impl<'a, E: Encoding<'a, Big = BigNumType>> RefUnwindSafe for GenericBigNumWrapper<'a, E> {}
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> Serialize for GenericBigNumWrapper<'a, E> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

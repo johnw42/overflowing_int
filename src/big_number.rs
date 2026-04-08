@@ -222,6 +222,9 @@ where
     /// Returns true if the value is -1.  This is used to optimize exponentiation by small unsigned integers.
     fn is_minus_one(&self) -> bool;
 
+    /// Returns true if the number type is signed.
+    fn is_signed() -> bool;
+
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self>;
     fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32>;
     fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64>;
@@ -404,6 +407,10 @@ impl BigNumber for BigInt {
     fn is_minus_one(&self) -> bool {
         self.sign() == Sign::Minus && self.magnitude().is_one()
     }
+
+    fn is_signed() -> bool {
+        true
+    }
 }
 
 impl BigNumber for BigUint {
@@ -418,6 +425,10 @@ impl BigNumber for BigUint {
     }
 
     fn is_minus_one(&self) -> bool {
+        false
+    }
+
+    fn is_signed() -> bool {
         false
     }
 }

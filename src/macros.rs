@@ -1,11 +1,26 @@
 #[macro_export]
-macro_rules! duplicate_generic_bigint_types {
+macro_rules! duplicate_generic_bignum_types {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                bigint_tag bigint_type;
-                [cow]      [$crate::CowBigInt<'static>];
-                [rc]       [$crate::RcBigInt];
+                signedness  bignum_tag     BigNumType bignum_type;
+                [signed]    [cow_signed]   [BigInt]   [$crate::CowBigInt<'static>];
+                [unsigned]  [cow_unsigned] [BigUint]  [$crate::CowBigUint<'static>];
+                [signed]    [rc_signed]    [BigInt]   [$crate::RcBigInt];
+                [unsigned]  [rc_unsigned]  [BigUint]  [$crate::RcBigUint];
+            ]
+            $($body)*
+        }
+    };
+}
+#[macro_export]
+macro_rules! duplicate_generic_big_num {
+    ($($body:tt)*) => {
+        duplicate::duplicate! {
+            [
+                signedness GenericBigNum           BigNumType;
+                [signed]   [GenericSignedBigNum]   [BigInt];
+                [unsigned] [GenericUnsignedBigNum] [BigUint];
             ]
             $($body)*
         }
@@ -19,7 +34,7 @@ macro_rules! duplicate_arith_ops {
             [
                 op_type op_trait op_fn op_test_pred;
                 [arith] [Add]    [add] [always];
-                [arith] [Sub]    [sub] [always];
+                [arith] [Sub]    [sub] [can_subtract];
                 [arith] [Mul]    [mul] [always];
                 [arith] [Div]    [div] [nonzero_rhs];
                 [arith] [Rem]    [rem] [nonzero_rhs];

@@ -1,6 +1,6 @@
 use crate::big_number::BigNumberDigits;
-use crate::generic_bignum::GenericBigNum;
 use crate::generic_bignum::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::generic_bignum::signed::GenericSignedBigNum;
 use crate::small_num::SmallNumber;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
@@ -9,6 +9,7 @@ use num_bigint::BigUint;
 use num_traits::Pow;
 use paste::paste;
 use std::borrow::Cow;
+use std::marker::PhantomData;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
     Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
@@ -16,16 +17,20 @@ use std::ops::{
 
 /// An unsigned big integer type that can be used with any encoding that implements `Encoding` with `Big = BigUint`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct GenericUnsignedBigNum<'a, E: Encoding<'a>>(pub(crate) GenericBigNum<'a, E>);
+pub struct GenericUnsignedBigNum<'a, E: Encoding<'a>>(pub(crate) E, PhantomData<&'a ()>);
 
 impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
+    fn from_encoding(encoding: E) -> Self {
+        Self(encoding, PhantomData)
+    }
+
     pub(crate) fn is_signed() -> bool {
         false
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
     pub fn into_static(self) -> GenericUnsignedBigNum<'static, E::Static> {
-        GenericUnsignedBigNum(self.0.into_static())
+        GenericUnsignedBigNum::<'static, E::Static>::from_encoding(self.0.into_static())
     }
 
     /// Creates and initializes a [`GenericUnsignedBigNum`].
@@ -33,7 +38,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
     pub fn new(digits: Vec<u32>) -> GenericUnsignedBigNum<'a, E> {
-        Self(GenericBigNum::from_big(E::Big::new(digits)))
+        Self::from_encoding(E::from_big(E::Big::new(digits)))
     }
 
     /// Creates and initializes a [`GenericUnsignedBigNum`].
@@ -41,7 +46,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
     pub fn from_slice(slice: &[u32]) -> GenericUnsignedBigNum<'a, E> {
-        Self(GenericBigNum::from_big(E::Big::from_slice(slice)))
+        Self::from_encoding(E::from_big(E::Big::from_slice(slice)))
     }
 
     /// Assign a value to a [`GenericUnsignedBigNum`].
@@ -72,11 +77,11 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     /// ```
     #[inline]
     pub fn from_bytes_be(bytes: &[u8]) -> GenericUnsignedBigNum<'a, E> {
-        Self(
+        Self::from_encoding(
             if let Some(from_bytes) = SmallNumber::from_bytes_be(bytes) {
-                GenericBigNum::from_small(from_bytes)
+                E::from_small(from_bytes)
             } else {
-                GenericBigNum::from_big(E::Big::from_bytes_be(bytes))
+                E::from_big(E::Big::from_bytes_be(bytes))
             },
         )
     }
@@ -86,7 +91,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     /// The bytes are in little-endian byte order.
     #[inline]
     pub fn from_bytes_le(bytes: &[u8]) -> GenericUnsignedBigNum<'a, E> {
-        Self(GenericBigNum::from_big(E::Big::from_bytes_le(bytes)))
+        Self::from_encoding(E::from_big(E::Big::from_bytes_le(bytes)))
     }
 
     /// Creates and initializes a [`GenericUnsignedBigNum`]. The input slice must contain
@@ -107,7 +112,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     /// ```
     #[inline]
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
-        GenericBigNum::parse_bytes(buf, radix).map(Self)
+        E::parse_bytes(buf, radix).map(Self::from_encoding)
     }
 
     /// Creates and initializes a [`GenericUnsignedBigNum`]. Each `u8` of the input slice is
@@ -128,8 +133,8 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     /// ```
     pub fn from_radix_be(buf: &[u8], radix: u32) -> Option<Self> {
         E::Big::from_radix_be(buf, radix)
-            .map(GenericBigNum::from_big)
-            .map(Self)
+            .map(E::from_big)
+            .map(Self::from_encoding)
     }
 
     /// Creates and initializes a [`GenericUnsignedBigNum`]. Each `u8` of the input slice is
@@ -150,8 +155,8 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     /// ```
     pub fn from_radix_le(buf: &[u8], radix: u32) -> Option<GenericUnsignedBigNum<'a, E>> {
         E::Big::from_radix_le(buf, radix)
-            .map(GenericBigNum::from_big)
-            .map(Self)
+            .map(E::from_big)
+            .map(Self::from_encoding)
     }
 
     /// Returns the byte representation of the [`GenericUnsignedBigNum`] in big-endian byte order.
@@ -321,14 +326,14 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     /// Returns `self ^ exponent`.
     pub fn pow(&self, exponent: u32) -> Self {
         #[allow(clippy::needless_borrow)]
-        Self((&self.0).pow(exponent))
+        Self::from_encoding((&self.0).pow(exponent))
     }
 
     /// Returns `(self ^ exponent) % modulus`.
     ///
     /// Panics if the modulus is zero.
     pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-        Self(self.0.modpow(&exponent.0, &modulus.0))
+        Self::from_encoding(self.0.modpow(&exponent.0, &modulus.0))
     }
 
     /// Returns the modular multiplicative inverse if it exists, otherwise `None`.
@@ -355,25 +360,25 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     /// assert!((a * x % m).is_one());
     /// ```
     pub fn modinv(&self, modulus: &Self) -> Option<Self> {
-        self.0.modinv(&modulus.0).map(Self)
+        self.0.modinv(&modulus.0).map(Self::from_encoding)
     }
 
     /// Returns the truncated principal square root of `self` --
     /// see [Roots::sqrt](https://docs.rs/num-integer/0.1/num_integer/trait.Roots.html#method.sqrt)
     pub fn sqrt(&self) -> Self {
-        Self(self.0.sqrt())
+        Self::from_encoding(self.0.sqrt())
     }
 
     /// Returns the truncated principal cube root of `self` --
     /// see [Roots::cbrt](https://docs.rs/num-integer/0.1/num_integer/trait.Roots.html#method.cbrt).
     pub fn cbrt(&self) -> Self {
-        Self(self.0.cbrt())
+        Self::from_encoding(self.0.cbrt())
     }
 
     /// Returns the truncated principal `n`th root of `self` --
     /// see [Roots::nth_root](https://docs.rs/num-integer/0.1/num_integer/trait.Roots.html#tymethod.nth_root).
     pub fn nth_root(&self, n: u32) -> Self {
-        Self(self.0.nth_root(n))
+        Self::from_encoding(self.0.nth_root(n))
     }
 
     /// Returns the number of least-significant bits that are zero,
@@ -419,197 +424,209 @@ impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for GenericUnsignedBigNum<'a, E> 
     }
 }
 
-impl<'a, E: Encoding<'a>> Encode<'a, E::Small> for GenericUnsignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &GenericUnsignedBigNum<'a, E> {
+    fn decode(self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
+        self.0.clone().decode()
+    }
+
+    fn with_decoded<T>(
+        &self,
+        f: impl FnOnce(Decoded<E::Small, Cow<<E::Small as SmallNumber>::Big>>) -> T,
+    ) -> T {
+        self.0.with_decoded(f)
+    }
+}
+
+impl<'a, E: Encoding<'a, Big = BigUint>> Encode<'a, E::Small> for GenericUnsignedBigNum<'a, E> {
     fn from_small(s: E::Small) -> Self {
-        Self(GenericBigNum::from_small(s))
+        Self::from_encoding(E::from_small(s))
     }
 
     fn from_big_cow(b: Cow<'a, E::Big>) -> Self {
-        Self(GenericBigNum::from_big_cow(b))
+        Self::from_encoding(E::from_big_cow(b))
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigUint>> From<GenericBigNum<'a, E>>
-    for GenericUnsignedBigNum<'a, E>
-{
-    fn from(value: GenericBigNum<'a, E>) -> Self {
-        Self(value)
+impl<'a, E: Encoding<'a, Big = BigUint>> Encoding<'a> for GenericUnsignedBigNum<'a, E> {
+    type Small = E::Small;
+    type Big = E::Big;
+    type Unsigned = E::Unsigned;
+    type Static = GenericUnsignedBigNum<'static, E::Static>;
+
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
+        self.0.update_encoding(f);
+    }
+
+    fn into_static(self) -> Self::Static {
+        GenericUnsignedBigNum::from_encoding(self.0.into_static())
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigUint>> From<GenericUnsignedBigNum<'a, E>>
-    for GenericBigNum<'a, E>
-{
-    fn from(value: GenericUnsignedBigNum<'a, E>) -> Self {
-        value.0
-    }
-}
+// macro_rules! impl_binary_op_traits {
+//     ($trait:ident,
+//         $op_fn:ident,
+//         $lhs_type:ty,
+//         $lhs_param:ident,
+//         $lhs_expr:expr,
+//         $lhs_ref_expr:expr,
+//         $rhs_type:ty,
+//         $rhs_param:ident,
+//         $rhs_expr:expr,
+//         $rhs_ref_expr:expr
+//     ) => {
+//         impl<'a, E: Encoding<'a, Big = BigUint>> $trait<$rhs_type> for $lhs_type {
+//             type Output = GenericUnsignedBigNum<'a, E>;
 
-macro_rules! impl_binary_op_traits {
-    ($trait:ident,
-        $op_fn:ident,
-        $lhs_type:ty,
-        $lhs_param:ident,
-        $lhs_expr:expr,
-        $lhs_ref_expr:expr,
-        $rhs_type:ty,
-        $rhs_param:ident,
-        $rhs_expr:expr,
-        $rhs_ref_expr:expr
-    ) => {
-        impl<'a, E: Encoding<'a, Big = BigUint>> $trait<$rhs_type> for $lhs_type {
-            type Output = GenericUnsignedBigNum<'a, E>;
+//             fn $op_fn($lhs_param: Self, $rhs_param: $rhs_type) -> GenericUnsignedBigNum<'a, E> {
+//                 GenericUnsignedBigNum($lhs_expr.$op_fn($rhs_expr))
+//             }
+//         }
 
-            fn $op_fn($lhs_param: Self, $rhs_param: $rhs_type) -> GenericUnsignedBigNum<'a, E> {
-                GenericUnsignedBigNum($lhs_expr.$op_fn($rhs_expr))
-            }
-        }
+//         impl<'a, E: Encoding<'a, Big = BigUint>> $trait<&$rhs_type> for $lhs_type {
+//             type Output = GenericUnsignedBigNum<'a, E>;
 
-        impl<'a, E: Encoding<'a, Big = BigUint>> $trait<&$rhs_type> for $lhs_type {
-            type Output = GenericUnsignedBigNum<'a, E>;
+//             fn $op_fn($lhs_param: Self, $rhs_param: &$rhs_type) -> GenericUnsignedBigNum<'a, E> {
+//                 GenericUnsignedBigNum($lhs_expr.$op_fn($rhs_ref_expr))
+//             }
+//         }
 
-            fn $op_fn($lhs_param: Self, $rhs_param: &$rhs_type) -> GenericUnsignedBigNum<'a, E> {
-                GenericUnsignedBigNum($lhs_expr.$op_fn($rhs_ref_expr))
-            }
-        }
+//         impl<'a, E: Encoding<'a, Big = BigUint>> $trait<$rhs_type> for &$lhs_type {
+//             type Output = GenericUnsignedBigNum<'a, E>;
 
-        impl<'a, E: Encoding<'a, Big = BigUint>> $trait<$rhs_type> for &$lhs_type {
-            type Output = GenericUnsignedBigNum<'a, E>;
+//             fn $op_fn($lhs_param: Self, $rhs_param: $rhs_type) -> GenericUnsignedBigNum<'a, E> {
+//                 GenericUnsignedBigNum($lhs_ref_expr.$op_fn($rhs_expr))
+//             }
+//         }
 
-            fn $op_fn($lhs_param: Self, $rhs_param: $rhs_type) -> GenericUnsignedBigNum<'a, E> {
-                GenericUnsignedBigNum($lhs_ref_expr.$op_fn($rhs_expr))
-            }
-        }
+//         impl<'a, E: Encoding<'a, Big = BigUint>> $trait<&$rhs_type> for &$lhs_type {
+//             type Output = GenericUnsignedBigNum<'a, E>;
 
-        impl<'a, E: Encoding<'a, Big = BigUint>> $trait<&$rhs_type> for &$lhs_type {
-            type Output = GenericUnsignedBigNum<'a, E>;
+//             fn $op_fn($lhs_param: Self, $rhs_param: &$rhs_type) -> GenericUnsignedBigNum<'a, E> {
+//                 GenericUnsignedBigNum($lhs_ref_expr.$op_fn($rhs_ref_expr))
+//             }
+//         }
+//     };
+// }
 
-            fn $op_fn($lhs_param: Self, $rhs_param: &$rhs_type) -> GenericUnsignedBigNum<'a, E> {
-                GenericUnsignedBigNum($lhs_ref_expr.$op_fn($rhs_ref_expr))
-            }
-        }
-    };
-}
+// macro_rules! impl_binary_assign_op_trait {
+//     ($trait:ident, $op_fn:ident, $rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
+//         paste! {
+//             impl<'a, E: Encoding<'a, Big = BigUint>> [<$trait Assign>]<$rhs_type> for GenericUnsignedBigNum<'a, E> {
+//                 fn [<$op_fn _assign>](&mut self, $rhs_param: $rhs_type) {
+//                     self.0.[<$op_fn _assign>]($rhs_expr)
+//                 }
+//             }
+//         }
+//     };
+// }
 
-macro_rules! impl_binary_assign_op_trait {
-    ($trait:ident, $op_fn:ident, $rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
-        paste! {
-            impl<'a, E: Encoding<'a, Big = BigUint>> [<$trait Assign>]<$rhs_type> for GenericUnsignedBigNum<'a, E> {
-                fn [<$op_fn _assign>](&mut self, $rhs_param: $rhs_type) {
-                    self.0.[<$op_fn _assign>]($rhs_expr)
-                }
-            }
-        }
-    };
-}
+// macro_rules! impl_binary_assign_ref_op_trait {
+//     ($trait:ident, $op_fn:ident) => {
+//         paste! {
+//             impl<'a, E: Encoding<'a, Big = BigUint>> [<$trait Assign>]<&GenericUnsignedBigNum<'a, E>> for GenericUnsignedBigNum<'a, E> {
+//                 fn [<$op_fn _assign>](&mut self, rhs: &GenericUnsignedBigNum<'a, E>) {
+//                     self.0.[<$op_fn _assign>](&rhs.0)
+//                 }
+//             }
+//         }
+//     };
+// }
 
-macro_rules! impl_binary_assign_ref_op_trait {
-    ($trait:ident, $op_fn:ident) => {
-        paste! {
-            impl<'a, E: Encoding<'a, Big = BigUint>> [<$trait Assign>]<&GenericUnsignedBigNum<'a, E>> for GenericUnsignedBigNum<'a, E> {
-                fn [<$op_fn _assign>](&mut self, rhs: &GenericUnsignedBigNum<'a, E>) {
-                    self.0.[<$op_fn _assign>](&rhs.0)
-                }
-            }
-        }
-    };
-}
+// // Implementations of numeric traits for `GenericUnsignedBigNum`.  The number of
+// // implementations is quite large, so we use macros to generate them.  The
+// // reason for implementing so many variants is to allow `GenericUnsignedBigNum` to serve
+// // as a drop-in replacement for `BigUint`, which implements the same traits.
+// duplicate_arith_ops! {
+//     paste! {
+//         impl_binary_op_traits!(op_trait, op_fn,
+//              GenericUnsignedBigNum<'a, E>, self, self.0, &self.0,
+//              GenericUnsignedBigNum<'a, E>, rhs,  rhs.0,  &rhs.0);
+//         impl_binary_assign_op_trait!(op_trait, op_fn, GenericUnsignedBigNum<'a, E>, rhs, rhs.0, &rhs.0);
+//         impl_binary_assign_ref_op_trait!(op_trait, op_fn);
+//     }
+//     duplicate_uprims! { paste! {
+//         impl_binary_op_traits!(op_trait, op_fn,
+//             GenericUnsignedBigNum<'a, E>, self, self.0, &self.0,
+//             prim, rhs, rhs, rhs);
+//         impl_binary_op_traits!(op_trait, op_fn,
+//             prim, self, self, self,
+//             GenericUnsignedBigNum<'a, E>, rhs, rhs.0, &rhs.0);
+//         impl_binary_assign_op_trait!(op_trait, op_fn, prim, rhs, rhs, rhs);
+//     } }
+// }
+// duplicate_shift_ops! {
+//     duplicate_prims! { paste! {
+//         impl_binary_op_traits!(op_trait, op_fn,
+//              GenericUnsignedBigNum<'a, E>, self, self.0, &self.0,
+//              prim, rhs, rhs, rhs);
+//         impl_binary_assign_op_trait!(op_trait, op_fn, prim, rhs, rhs, rhs);
+//     } }
+// }
+// duplicate_bit_ops! {
+//     paste! {
+//         impl_binary_op_traits!(op_trait, op_fn,
+//              GenericUnsignedBigNum<'a, E>, self, self.0, &self.0,
+//              GenericUnsignedBigNum<'a, E>, rhs,  rhs.0,  &rhs.0);
+//         impl_binary_assign_op_trait!(op_trait, op_fn, GenericUnsignedBigNum<'a, E>, rhs, rhs.0, &rhs.0);
+//         impl_binary_assign_ref_op_trait!(op_trait, op_fn);
+//     }
+// }
 
-// Implementations of numeric traits for `GenericUnsignedBigNum`.  The number of
-// implementations is quite large, so we use macros to generate them.  The
-// reason for implementing so many variants is to allow `GenericUnsignedBigNum` to serve
-// as a drop-in replacement for `BigUint`, which implements the same traits.
-duplicate_arith_ops! {
-    paste! {
-        impl_binary_op_traits!(op_trait, op_fn,
-             GenericUnsignedBigNum<'a, E>, self, self.0, &self.0,
-             GenericUnsignedBigNum<'a, E>, rhs,  rhs.0,  &rhs.0);
-        impl_binary_assign_op_trait!(op_trait, op_fn, GenericUnsignedBigNum<'a, E>, rhs, rhs.0, &rhs.0);
-        impl_binary_assign_ref_op_trait!(op_trait, op_fn);
-    }
-    duplicate_uprims! { paste! {
-        impl_binary_op_traits!(op_trait, op_fn,
-            GenericUnsignedBigNum<'a, E>, self, self.0, &self.0,
-            prim, rhs, rhs, rhs);
-        impl_binary_op_traits!(op_trait, op_fn,
-            prim, self, self, self,
-            GenericUnsignedBigNum<'a, E>, rhs, rhs.0, &rhs.0);
-        impl_binary_assign_op_trait!(op_trait, op_fn, prim, rhs, rhs, rhs);
-    } }
-}
-duplicate_shift_ops! {
-    duplicate_prims! { paste! {
-        impl_binary_op_traits!(op_trait, op_fn,
-             GenericUnsignedBigNum<'a, E>, self, self.0, &self.0,
-             prim, rhs, rhs, rhs);
-        impl_binary_assign_op_trait!(op_trait, op_fn, prim, rhs, rhs, rhs);
-    } }
-}
-duplicate_bit_ops! {
-    paste! {
-        impl_binary_op_traits!(op_trait, op_fn,
-             GenericUnsignedBigNum<'a, E>, self, self.0, &self.0,
-             GenericUnsignedBigNum<'a, E>, rhs,  rhs.0,  &rhs.0);
-        impl_binary_assign_op_trait!(op_trait, op_fn, GenericUnsignedBigNum<'a, E>, rhs, rhs.0, &rhs.0);
-        impl_binary_assign_ref_op_trait!(op_trait, op_fn);
-    }
-}
+// macro_rules! impl_pow_traits {
+//     ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
+//         paste! {
+//             impl<'a, E: Encoding<'a>> Pow<$rhs_type> for GenericUnsignedBigNum<'a, E> {
+//                 type Output = GenericUnsignedBigNum<'a, E>;
 
-macro_rules! impl_pow_traits {
-    ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
-        paste! {
-            impl<'a, E: Encoding<'a>> Pow<$rhs_type> for GenericUnsignedBigNum<'a, E> {
-                type Output = GenericUnsignedBigNum<'a, E>;
+//                 fn pow(self, $rhs_param: $rhs_type) -> GenericUnsignedBigNum<'a, E> {
+//                     GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
+//                 }
+//             }
 
-                fn pow(self, $rhs_param: $rhs_type) -> GenericUnsignedBigNum<'a, E> {
-                    GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
-                }
-            }
+//             impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for GenericUnsignedBigNum<'a, E> {
+//                 type Output = GenericUnsignedBigNum<'a, E>;
 
-            impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for GenericUnsignedBigNum<'a, E> {
-                type Output = GenericUnsignedBigNum<'a, E>;
+//                 fn pow(self, $rhs_param: &$rhs_type) -> GenericUnsignedBigNum<'a, E> {
+//                     GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
+//                 }
+//             }
+//         }
+//     };
+// }
+// macro_rules! impl_pow_traits_for_ref {
+//     ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
+//         paste! {
+//             impl<'a, E: Encoding<'a>> Pow<$rhs_type> for &GenericUnsignedBigNum<'a, E> {
+//                 type Output = GenericUnsignedBigNum<'a, E>;
 
-                fn pow(self, $rhs_param: &$rhs_type) -> GenericUnsignedBigNum<'a, E> {
-                    GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
-                }
-            }
-        }
-    };
-}
-macro_rules! impl_pow_traits_for_ref {
-    ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
-        paste! {
-            impl<'a, E: Encoding<'a>> Pow<$rhs_type> for &GenericUnsignedBigNum<'a, E> {
-                type Output = GenericUnsignedBigNum<'a, E>;
+//                 fn pow(self, $rhs_param: $rhs_type) -> GenericUnsignedBigNum<'a, E> {
+//                     GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
+//                 }
+//             }
 
-                fn pow(self, $rhs_param: $rhs_type) -> GenericUnsignedBigNum<'a, E> {
-                    GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
-                }
-            }
+//             impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for &GenericUnsignedBigNum<'a, E> {
+//                 type Output = GenericUnsignedBigNum<'a, E>;
 
-            impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for &GenericUnsignedBigNum<'a, E> {
-                type Output = GenericUnsignedBigNum<'a, E>;
+//                 fn pow(self, $rhs_param: &$rhs_type) -> GenericUnsignedBigNum<'a, E> {
+//                     GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
+//                 }
+//             }
+//         }
+//     };
+// }
 
-                fn pow(self, $rhs_param: &$rhs_type) -> GenericUnsignedBigNum<'a, E> {
-                    GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
-                }
-            }
-        }
-    };
-}
-
-impl_pow_traits!(
-    GenericUnsignedBigNum<'a, E::Unsigned>,
-    exponent,
-    exponent.0,
-    &exponent.0
-);
-impl_pow_traits_for_ref!(
-    GenericUnsignedBigNum<'a, E::Unsigned>,
-    exponent,
-    exponent.0,
-    &exponent.0
-);
-duplicate_uprims! { paste! {
-    impl_pow_traits!(prim, exponent, exponent, exponent);
-} }
+// impl_pow_traits!(
+//     GenericUnsignedBigNum<'a, E::Unsigned>,
+//     exponent,
+//     exponent.0,
+//     &exponent.0
+// );
+// impl_pow_traits_for_ref!(
+//     GenericUnsignedBigNum<'a, E::Unsigned>,
+//     exponent,
+//     exponent.0,
+//     &exponent.0
+// );
+// duplicate_uprims! { paste! {
+//     impl_pow_traits!(prim, exponent, exponent, exponent);
+// } }
