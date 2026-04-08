@@ -24,9 +24,9 @@ use std::panic::RefUnwindSafe;
 use std::str::FromStr;
 
 #[duplicate_item(
-    mod_name  BigNumType GenericBigNumWrapper;
-    [bigint]  [BigInt]   [GenericSignedBigNum];
-    [biguint] [BigUint]  [GenericUnsignedBigNum];
+    mod_name   BigNumType GenericBigNumWrapper;
+    [signed]   [BigInt]   [GenericSignedBigNum];
+    [unsigned] [BigUint]  [GenericUnsignedBigNum];
 )]
 pub mod mod_name {
     use std::{
@@ -69,10 +69,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> Binary for GenericBigNumWrapper<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_decoded(|encoded| match encoded {
-                Decoded::Small(n) => Binary::fmt(&n, f),
-                Decoded::Big(n) => Binary::fmt(n.as_ref(), f),
-            })
+            self.with_big_cow(|cow| Binary::fmt(cow.as_ref(), f))
         }
     }
 
@@ -117,10 +114,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> Display for GenericBigNumWrapper<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_decoded(|encoded| match encoded {
-                Decoded::Small(n) => Display::fmt(&n, f),
-                Decoded::Big(n) => Display::fmt(n.as_ref(), f),
-            })
+            self.with_big_cow(|cow| Display::fmt(cow.as_ref(), f))
         }
     }
 
@@ -171,11 +165,7 @@ pub mod mod_name {
         }
 
         fn lcm(&self, other: &Self) -> Self {
-            if let Some(lhs) = self.small()
-                && let Some(rhs) = other.small()
-            {
-                return Self::from_small(lhs.lcm(&rhs));
-            }
+            // We don't bother doing the LCM computation in the small case, since it can easily overflow.
             self.with_big_cows(other, |lhs, rhs| lhs.lcm(rhs.as_ref()).into())
         }
 
@@ -303,17 +293,11 @@ pub mod mod_name {
         type Bytes = Vec<u8>;
 
         fn to_be_bytes(&self) -> Self::Bytes {
-            self.with_decoded(|encoded| match encoded {
-                Decoded::Small(n) => n.to_be_bytes().borrow().to_vec(),
-                Decoded::Big(n) => n.to_be_bytes(),
-            })
+            self.with_big_cow(|cow| cow.to_be_bytes())
         }
 
         fn to_le_bytes(&self) -> Self::Bytes {
-            self.with_decoded(|encoded| match encoded {
-                Decoded::Small(n) => n.to_le_bytes().borrow().to_vec(),
-                Decoded::Big(n) => n.to_le_bytes(),
-            })
+            self.with_big_cow(|cow| cow.to_le_bytes())
         }
     }
 
@@ -332,19 +316,13 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a>> LowerHex for GenericBigNumWrapper<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_decoded(|encoded| match encoded {
-                Decoded::Small(n) => LowerHex::fmt(&n, f),
-                Decoded::Big(n) => LowerHex::fmt(n.as_ref(), f),
-            })
+            self.with_big_cow(|cow| LowerHex::fmt(cow.as_ref(), f))
         }
     }
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> Octal for GenericBigNumWrapper<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_decoded(|encoded| match encoded {
-                Decoded::Small(n) => Octal::fmt(&n, f),
-                Decoded::Big(n) => Octal::fmt(n.as_ref(), f),
-            })
+            self.with_big_cow(|cow| Octal::fmt(cow.as_ref(), f))
         }
     }
 
@@ -361,10 +339,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> UpperHex for GenericBigNumWrapper<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_decoded(|encoded| match encoded {
-                Decoded::Small(n) => UpperHex::fmt(&n, f),
-                Decoded::Big(n) => UpperHex::fmt(n.as_ref(), f),
-            })
+            self.with_big_cow(|cow| UpperHex::fmt(cow.as_ref(), f))
         }
     }
 
@@ -437,8 +412,11 @@ impl<'a, E: Encoding<'a, Big = BigInt>> FromPrimitive for GenericSignedBigNum<'a
 
 impl<'a, E: Encoding<'a, Big = BigUint>> FromPrimitive for GenericUnsignedBigNum<'a, E> {
     duplicate_iprims! { paste! {
-        fn [<from_ prim>](_: prim) -> Option<Self> {
-            None
+        fn [<from_ prim>](n: prim) -> Option<Self> {
+            match uprim::try_from(n) {
+                Ok(small) => Some(GenericUnsignedBigNum::from(small)),
+                Err(_) => None,
+            }
         }
     } }
     duplicate_uprims! { paste! {

@@ -20,6 +20,10 @@ use std::ops::{
 pub struct GenericSignedBigNum<'a, E: Encoding<'a>>(pub(crate) GenericBigNum<'a, E>);
 
 impl<'a, E: Encoding<'a, Big = BigInt>> GenericSignedBigNum<'a, E> {
+    pub(crate) fn is_signed() -> bool {
+        true
+    }
+
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
     pub fn into_static(self) -> GenericSignedBigNum<'static, E::Static> {
         GenericSignedBigNum(self.0.into_static())
@@ -362,22 +366,22 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericSignedBigNum<'a, E> {
     }
 
     #[inline]
-    pub fn checked_add(&self, v: &'a Self) -> Option<Self> {
+    pub fn checked_add(&self, v: &Self) -> Option<Self> {
         self.0.checked_add(&v.0).map(Self)
     }
 
     #[inline]
-    pub fn checked_sub(&self, v: &'a Self) -> Option<Self> {
+    pub fn checked_sub(&self, v: &Self) -> Option<Self> {
         self.0.checked_sub(&v.0).map(Self)
     }
 
     #[inline]
-    pub fn checked_mul(&self, v: &'a Self) -> Option<Self> {
+    pub fn checked_mul(&self, v: &Self) -> Option<Self> {
         self.0.checked_mul(&v.0).map(Self)
     }
 
     #[inline]
-    pub fn checked_div(&self, v: &'a Self) -> Option<Self> {
+    pub fn checked_div(&self, v: &Self) -> Option<Self> {
         self.0.checked_div(&v.0).map(Self)
     }
 
@@ -388,7 +392,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericSignedBigNum<'a, E> {
     }
 
     #[inline]
-    pub fn modpow(&self, exponent: &'a Self, modulus: &'a Self) -> Self {
+    pub fn modpow(&self, exponent: Self, modulus: Self) -> Self {
         Self(self.0.modpow(&exponent.0, &modulus.0))
     }
 
@@ -423,12 +427,12 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericSignedBigNum<'a, E> {
     }
 
     #[inline]
-    pub fn modinv(&self, modulus: &'a Self) -> Option<Self> {
+    pub fn modinv(&self, modulus: Self) -> Option<Self> {
         self.0.modinv(&modulus.0).map(Self)
     }
 
     #[inline]
-    pub fn set_bit(&'a mut self, bit: u64, value: bool) {
+    pub fn set_bit(&mut self, bit: u64, value: bool) {
         self.0.set_bit(bit, value);
     }
 }

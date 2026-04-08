@@ -71,13 +71,13 @@ macro_rules! duplicate_iprims {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                prim;
-                [i8];
-                [i16];
-                [i32];
-                [i64];
-                [i128];
-                [isize];
+                prim    uprim;
+                [i8]    [u8];
+                [i16]   [u16];
+                [i32]   [u32];
+                [i64]   [u64];
+                [i128]  [u128];
+                [isize] [usize];
             ]
             $($body)*
         }

@@ -82,6 +82,7 @@ rand = { version = "^0.8.4" }
 criterion = { version = "^0.8.2", features = [
   "html_reports",
 ] }
+serde_json = "1.0.149"
 
 [[bench]]
 name = "benchmark"

@@ -6,6 +6,7 @@ use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_prims, duplicate_shift_ops, duplicate_uprims,
 };
 use num_bigint::BigUint;
+use num_traits::Pow;
 use paste::paste;
 use std::borrow::Cow;
 use std::ops::{
@@ -18,6 +19,10 @@ use std::ops::{
 pub struct GenericUnsignedBigNum<'a, E: Encoding<'a>>(pub(crate) GenericBigNum<'a, E>);
 
 impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
+    pub(crate) fn is_signed() -> bool {
+        false
+    }
+
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
     pub fn into_static(self) -> GenericUnsignedBigNum<'static, E::Static> {
         GenericUnsignedBigNum(self.0.into_static())
@@ -549,3 +554,62 @@ duplicate_bit_ops! {
         impl_binary_assign_ref_op_trait!(op_trait, op_fn);
     }
 }
+
+macro_rules! impl_pow_traits {
+    ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
+        paste! {
+            impl<'a, E: Encoding<'a>> Pow<$rhs_type> for GenericUnsignedBigNum<'a, E> {
+                type Output = GenericUnsignedBigNum<'a, E>;
+
+                fn pow(self, $rhs_param: $rhs_type) -> GenericUnsignedBigNum<'a, E> {
+                    GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
+                }
+            }
+
+            impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for GenericUnsignedBigNum<'a, E> {
+                type Output = GenericUnsignedBigNum<'a, E>;
+
+                fn pow(self, $rhs_param: &$rhs_type) -> GenericUnsignedBigNum<'a, E> {
+                    GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
+                }
+            }
+        }
+    };
+}
+macro_rules! impl_pow_traits_for_ref {
+    ($rhs_type:ty, $rhs_param:ident, $rhs_expr:expr, $rhs_ref_expr:expr) => {
+        paste! {
+            impl<'a, E: Encoding<'a>> Pow<$rhs_type> for &GenericUnsignedBigNum<'a, E> {
+                type Output = GenericUnsignedBigNum<'a, E>;
+
+                fn pow(self, $rhs_param: $rhs_type) -> GenericUnsignedBigNum<'a, E> {
+                    GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
+                }
+            }
+
+            impl<'a, E: Encoding<'a>> Pow<&$rhs_type> for &GenericUnsignedBigNum<'a, E> {
+                type Output = GenericUnsignedBigNum<'a, E>;
+
+                fn pow(self, $rhs_param: &$rhs_type) -> GenericUnsignedBigNum<'a, E> {
+                    GenericUnsignedBigNum(Pow::pow(&self.0, $rhs_ref_expr))
+                }
+            }
+        }
+    };
+}
+
+impl_pow_traits!(
+    GenericUnsignedBigNum<'a, E::Unsigned>,
+    exponent,
+    exponent.0,
+    &exponent.0
+);
+impl_pow_traits_for_ref!(
+    GenericUnsignedBigNum<'a, E::Unsigned>,
+    exponent,
+    exponent.0,
+    &exponent.0
+);
+duplicate_uprims! { paste! {
+    impl_pow_traits!(prim, exponent, exponent, exponent);
+} }
