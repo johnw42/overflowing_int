@@ -848,28 +848,31 @@ mod test {
             }
         }
 
-        // TODO
-        // duplicate_uprims! {
-        //     paste! {
-        //         #[quickcheck]
-        //         fn [<test_pow_ prim>](lhs: bignum_type, rhs: u8) -> TestResult {
-        //             let rhs = rhs % 64; // limit the exponent to avoid long test times and potential OOM errors
-        //             #[allow(irrefutable_let_patterns)]
-        //             #[allow(clippy::unnecessary_fallible_conversions)]
-        //             if let Ok(rhs) = prim::try_from(rhs) {
-        //                 let big_lhs = &bignum_type::from(lhs.clone());
-        //                 let expected = Pow::pow(big_lhs, rhs);
-        //                 let actual1 = bignum_type::from(Pow::pow(lhs.clone(), rhs));
-        //                 let actual2 = bignum_type::from(Pow::pow(lhs, rhs));
-        //                 let label = format!("failed with inputs {}, {}", big_lhs, rhs);
-        //                 assert_eq!(expected, actual1, "{}", label);
-        //                 assert_eq!(expected, actual2, "{}", label);
-        //                 TestResult::passed()
-        //             } else {
-        //                 TestResult::discard()
-        //             }
-        //         }
-        //     }
-        // }
+        duplicate_uprims! {
+            paste! {
+                // The #[quickcheck] macro gets confused here, so we have to call the inner function manually.
+                #[test]
+                fn [<test_pow_ prim>]() {
+                    fn inner(lhs: bignum_type, rhs: u8) -> TestResult {
+                        let rhs = rhs % 64; // limit the exponent to avoid long test times and potential OOM errors
+                        #[allow(irrefutable_let_patterns)]
+                        #[allow(clippy::unnecessary_fallible_conversions)]
+                        if let Ok(rhs) = prim::try_from(rhs) {
+                            let big_lhs = &bignum_type::from(lhs.clone());
+                            let expected = Pow::pow(big_lhs, rhs);
+                            let actual1 = bignum_type::from(Pow::pow(lhs.clone(), rhs));
+                            let actual2 = bignum_type::from(Pow::pow(lhs, rhs));
+                            let label = format!("failed with inputs {}, {}", big_lhs, rhs);
+                            assert_eq!(expected, actual1, "{}", label);
+                            assert_eq!(expected, actual2, "{}", label);
+                            TestResult::passed()
+                        } else {
+                            TestResult::discard()
+                        }
+                    }
+                    quickcheck::quickcheck(inner as fn(_, _) -> _);
+                }
+            }
+        }
     } }
 }

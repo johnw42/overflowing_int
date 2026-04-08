@@ -4,8 +4,8 @@ macro_rules! duplicate_generic_bignum_types {
         duplicate::duplicate! {
             [
                 signedness  bignum_tag     BigNumType bignum_type;
-                [signed]    [cow_signed]   [BigInt]   [$crate::CowBigInt<'static>];
-                [unsigned]  [cow_unsigned] [BigUint]  [$crate::CowBigUint<'static>];
+                [signed]    [cow_signed]   [BigInt]   [$crate::CowBigInt::<'static>];
+                [unsigned]  [cow_unsigned] [BigUint]  [$crate::CowBigUint::<'static>];
                 [signed]    [rc_signed]    [BigInt]   [$crate::RcBigInt];
                 [unsigned]  [rc_unsigned]  [BigUint]  [$crate::RcBigUint];
             ]
