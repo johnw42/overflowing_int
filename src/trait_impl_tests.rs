@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::signed::GenericSignedBigNum;
 use crate::small_num::SmallNumber;
@@ -33,8 +34,6 @@ use std::str::FromStr;
     [unsigned_rc]  [BigUint]  [RcBigUint];
 )]
 mod mod_name {
-    use quickcheck::TestResult;
-
     use super::*;
 
     #[quickcheck]

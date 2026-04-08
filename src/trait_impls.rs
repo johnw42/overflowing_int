@@ -74,25 +74,25 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> CheckedAdd for GenericBigNumWrapper<'a, E> {
         fn checked_add(&self, v: &Self) -> Option<Self> {
-            <Self as Encoding>::checked_add(self, v).map(Into::into)
+            <Self as Encoding>::checked_add(self, v)
         }
     }
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> CheckedDiv for GenericBigNumWrapper<'a, E> {
         fn checked_div(&self, v: &Self) -> Option<Self> {
-            <Self as Encoding>::checked_div(self, v).map(Into::into)
+            <Self as Encoding>::checked_div(self, v)
         }
     }
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> CheckedMul for GenericBigNumWrapper<'a, E> {
         fn checked_mul(&self, v: &Self) -> Option<Self> {
-            <Self as Encoding>::checked_mul(self, v).map(Into::into)
+            <Self as Encoding>::checked_mul(self, v)
         }
     }
 
     impl<'a, E: Encoding<'a, Big = BigNumType>> CheckedSub for GenericBigNumWrapper<'a, E> {
         fn checked_sub(&self, v: &Self) -> Option<Self> {
-            <Self as Encoding>::checked_sub(self, v).map(Into::into)
+            <Self as Encoding>::checked_sub(self, v)
         }
     }
 

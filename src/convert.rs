@@ -1,4 +1,4 @@
-use crate::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::encoding::{Decoded, Encode, Encoding};
 use crate::signed::GenericSignedBigNum;
 use crate::small_num::SmallNumber;
 use crate::unsigned::GenericUnsignedBigNum;

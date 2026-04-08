@@ -1,4 +1,4 @@
-#![allow(unused)]
+#![allow(unused_imports)]
 
 use std::fmt::{Binary, Debug, Display, LowerHex, Octal, UpperHex};
 use std::hash::Hash;
@@ -66,22 +66,6 @@ macro_rules! declare_binary_assign_ref_op {
     ($op_fn:ident) => {
         paste! {
             fn [<$op_fn _assign_ref_self>](&mut self, rhs: &Self);
-        }
-    };
-}
-macro_rules! declare_pow_ops {
-    ($rhs:ty) => {
-        paste! {
-            fn [<pow _self_and_ $rhs:lower>](lhs: Self, rhs: $rhs) -> Self;
-            fn [<pow _self_and_ref_ $rhs:lower>](lhs: Self, rhs: &$rhs) -> Self;
-        }
-    };
-}
-macro_rules! declare_pow_ops_for_ref {
-    ($rhs:ty) => {
-        paste! {
-            fn [<pow _ref_self_and_ $rhs:lower>](lhs: &Self, rhs: $rhs) -> Self;
-            fn [<pow _ref_self_and_ref_ $rhs:lower>](lhs: &Self, rhs: &$rhs) -> Self;
         }
     };
 }
