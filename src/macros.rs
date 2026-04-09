@@ -126,9 +126,19 @@ macro_rules! duplicate_prims {
 }
 
 #[macro_export]
-macro_rules! duplicate_prims_with_signedness {
+macro_rules! duplicate_iprims_if_unsigned {
     (signed; $($body:tt)*) => {
-        $crate::duplicate_prims! { $($body)* }
+    };
+    (unsigned; $($body:tt)*) => {
+        $crate::duplicate_iprims! { $($body)* }
+    };
+}
+
+#[macro_export]
+macro_rules! duplicate_uprims_and_iprims_if_signed {
+    (signed; $($body:tt)*) => {
+        $crate::duplicate_iprims! { $($body)* }
+        $crate::duplicate_uprims! { $($body)* }
     };
     (unsigned; $($body:tt)*) => {
         $crate::duplicate_uprims! { $($body)* }

@@ -417,6 +417,10 @@ impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for GenericUnsignedBigNum<'a, E> 
     ) -> T {
         self.0.with_decoded(f)
     }
+
+    fn owns_bignum(&self) -> bool {
+        self.0.owns_bignum()
+    }
 }
 
 impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &GenericUnsignedBigNum<'a, E> {
@@ -429,6 +433,10 @@ impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &GenericUnsignedBigNum<'a, E>
         f: impl FnOnce(Decoded<E::Small, Cow<<E::Small as SmallNumber>::Big>>) -> T,
     ) -> T {
         self.0.with_decoded(f)
+    }
+
+    fn owns_bignum(&self) -> bool {
+        false
     }
 }
 

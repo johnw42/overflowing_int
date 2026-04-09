@@ -65,6 +65,9 @@ where
         }
     }
 
+    /// Tests whether this encoding owns its value as a bignum.
+    fn owns_bignum(&self) -> bool;
+
     /// Gets the big value as a `Cow`, creating a bignum if necessary, and passes it to the provided function.
     fn with_big_cow<T>(&self, f: impl FnOnce(Cow<S::Big>) -> T) -> T {
         self.with_decoded(|decoded| match decoded {
@@ -324,6 +327,13 @@ where
     fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
         f(Decoded::Big(Cow::Borrowed(self.as_ref())))
     }
+
+    fn owns_bignum(&self) -> bool {
+        match self {
+            Cow::Borrowed(_) => false,
+            Cow::Owned(_) => true,
+        }
+    }
 }
 
 impl<'a, S> Decode<'a, S> for Rc<S::Big>
@@ -343,6 +353,10 @@ where
 
     fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
         f(Decoded::Big(Cow::Borrowed(self.as_ref())))
+    }
+
+    fn owns_bignum(&self) -> bool {
+        true
     }
 }
 
@@ -369,6 +383,10 @@ duplicate_prims! {
                 Err(_) => f(Decoded::Big(Cow::Owned(S::Big::from(*self)))),
             }
         }
+
+        fn owns_bignum(&self) -> bool {
+            false
+        }
     }
 
     impl<'a, S: SmallNumber> Decode<'a, S> for &prim
@@ -392,6 +410,10 @@ duplicate_prims! {
                 Ok(small) => f(Decoded::Small(small)),
                 Err(_) => f(Decoded::Big(Cow::Owned(S::Big::from(**self)))),
             }
+        }
+
+        fn owns_bignum(&self) -> bool {
+            false
         }
     }
 }

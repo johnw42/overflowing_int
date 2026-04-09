@@ -1,14 +1,14 @@
 #[cfg(feature = "arbitrary")]
-pub trait ArbitraryBounds<'a>: arbitrary::Arbitrary<'a> {}
+pub trait ArbitraryBounds: for<'a> arbitrary::Arbitrary<'a> {}
 
 #[cfg(feature = "arbitrary")]
-impl<'a, T> ArbitraryBounds<'a> for T where T: arbitrary::Arbitrary<'a> {}
+impl<T> ArbitraryBounds for T where for<'a> T: arbitrary::Arbitrary<'a> {}
 
 #[cfg(not(feature = "arbitrary"))]
-pub trait ArbitraryBounds<'a> {}
+pub trait ArbitraryBounds {}
 
 #[cfg(not(feature = "arbitrary"))]
-impl<'a, T> ArbitraryBounds<'a> for T {}
+impl<T> ArbitraryBounds for T {}
 
 #[cfg(any(test, feature = "quickcheck"))]
 pub trait QuickcheckBounds: quickcheck::Arbitrary {}
@@ -17,10 +17,10 @@ pub trait QuickcheckBounds: quickcheck::Arbitrary {}
 impl<T> QuickcheckBounds for T where T: quickcheck::Arbitrary {}
 
 #[cfg(not(any(test, feature = "quickcheck")))]
-pub trait QuickcheckBounds {}
+pub trait QuickcheckBounds: 'static + Clone {}
 
 #[cfg(not(any(test, feature = "quickcheck")))]
-impl<T> QuickcheckBounds for T {}
+impl<T> QuickcheckBounds for T where T: 'static + Clone {}
 
 #[cfg(any(test, feature = "rand"))]
 pub trait RandBounds: rand::distributions::uniform::SampleUniform {}

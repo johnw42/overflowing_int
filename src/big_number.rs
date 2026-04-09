@@ -6,8 +6,7 @@ use num_traits::{
     CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, ConstZero, Euclid, FromBytes,
     FromPrimitive, Num, One, Pow, Signed, ToBytes, ToPrimitive, Unsigned, Zero,
 };
-use rand::distributions::uniform::SampleUniform;
-use serde::{Deserialize, Serialize};
+
 use std::fmt::{Binary, Debug, Display, LowerHex, Octal, UpperHex};
 use std::hash::Hash;
 use std::iter::FusedIterator;
@@ -130,9 +129,8 @@ where
     Self: PartialOrd,
     Self: RefUnwindSafe,
     Self: Roots,
-    Self: SampleUniform,
+    Self: RandBounds,
     Self: Send,
-    Self: Serialize,
     Self: Sync,
     Self: ToBigInt,
     Self: ToBigUint,
@@ -142,9 +140,9 @@ where
     Self: UnwindSafe,
     Self: UpperHex,
     Self: Zero,
-    Self: quickcheck::Arbitrary,
-    for<'a> Self: arbitrary::Arbitrary<'a>,
-    for<'de> Self: Deserialize<'de>,
+    Self: QuickcheckBounds,
+    Self: ArbitraryBounds,
+    Self: SerdeBounds,
     // From bounds
     Self: From<BigUint>,
     Self: From<bool>,

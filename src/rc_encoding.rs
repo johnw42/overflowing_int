@@ -3,6 +3,7 @@ use crate::rc_encoding::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::rc::Rc;
 use std::{borrow::Cow, fmt::Debug};
@@ -62,6 +63,7 @@ mod shifted {
         }
     }
 
+    #[cfg(any(test, feature = "quickcheck"))]
     impl<S> quickcheck::Arbitrary for Shifted<S>
     where
         S: SmallNumber,
@@ -71,6 +73,7 @@ mod shifted {
         }
     }
 
+    #[cfg(feature = "arbitrary")]
     impl<S> arbitrary::Arbitrary<'_> for Shifted<S>
     where
         S: SmallNumber,
@@ -85,7 +88,7 @@ mod shifted {
 /// set to 1 for small values.  This encoding is used for `RcBigInt` and
 /// `RcBigUint`.
 #[derive(Clone)]
-pub struct RcEncoding<S>(RcEncodedRepr<S>)
+pub struct RcEncoding<S>(RcEncodedRepr<S>, PhantomData<()>)
 where
     S: SmallNumber;
 
@@ -115,6 +118,13 @@ where
             }
         }
     }
+
+    fn owns_bignum(&self) -> bool {
+        self.with_decoded(|decoded| match decoded {
+            Decoded::Small(_) => false,
+            Decoded::Big(_) => true,
+        })
+    }
 }
 
 impl<S> Encode<'static, S> for RcEncoding<S>
@@ -123,7 +133,7 @@ where
 {
     fn from_small(s: S) -> Self {
         if let Some(shifted) = Shifted::try_new(s) {
-            Self(RcEncodedRepr { small: shifted })
+            Self(RcEncodedRepr { small: shifted }, PhantomData)
         } else {
             let r = Self::from_big(s.to_big());
             unsafe {
@@ -144,6 +154,7 @@ where
                     big: ManuallyDrop::new(Rc::new(b.into_owned())),
                 }
             },
+            PhantomData,
         )
     }
 }
@@ -155,7 +166,7 @@ where
     type Small = S;
     type Big = S::Big;
     type Unsigned = RcEncoding<S::Unsigned>;
-    type Static = Self;
+    type Static = RcEncoding<S>;
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
         let mut decoded = unsafe {
@@ -173,7 +184,7 @@ where
     }
 
     fn into_static(self) -> Self::Static {
-        self
+        RcEncoding(self.0, PhantomData)
     }
 }
 
@@ -253,30 +264,42 @@ where
 
 impl<S> Eq for RcEncoding<S> where S: SmallNumber {}
 
+#[cfg(any(test, feature = "quickcheck"))]
 impl<S: SmallNumber> quickcheck::Arbitrary for RcEncoding<S> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         if bool::arbitrary(g) {
-            Self(RcEncodedRepr {
-                small: Shifted::<S>::arbitrary(g),
-            })
+            Self(
+                RcEncodedRepr {
+                    small: Shifted::<S>::arbitrary(g),
+                },
+                PhantomData,
+            )
         } else {
-            Self(RcEncodedRepr {
-                big: ManuallyDrop::new(Rc::new(S::Big::arbitrary(g))),
-            })
+            Self(
+                RcEncodedRepr {
+                    big: ManuallyDrop::new(Rc::new(S::Big::arbitrary(g))),
+                },
+                PhantomData,
+            )
         }
     }
 }
 
+#[cfg(feature = "arbitrary")]
 impl<S: SmallNumber> arbitrary::Arbitrary<'_> for RcEncoding<S> {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
-        if bool::arbitrary(u)? {
-            Ok(Self(RcEncodedRepr {
-                small: <Shifted<S> as arbitrary::Arbitrary>::arbitrary(u)?,
-            }))
-        } else {
-            Ok(Self(RcEncodedRepr {
-                big: ManuallyDrop::new(Rc::new(S::Big::arbitrary(u)?)),
-            }))
-        }
+        Ok(
+            self,
+            if bool::arbitrary(u)? {
+                RcEncodedRepr {
+                    small: <Shifted<S> as arbitrary::Arbitrary>::arbitrary(u)?,
+                }
+            } else {
+                RcEncodedRepr {
+                    big: ManuallyDrop::new(Rc::new(S::Big::arbitrary(u)?)),
+                }
+            },
+            PhantomData,
+        )
     }
 }

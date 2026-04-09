@@ -18,9 +18,12 @@ mod num_ops;
 pub mod rc_encoding;
 mod signed;
 mod small_num;
+//mod test_assertions;
 mod trait_impl_tests;
 mod trait_impls;
 mod unsigned;
+
+pub use crate::convert::{ToCowBigInt, ToCowBigUint, ToRcBigInt, ToRcBigUint};
 
 pub type CowBigInt<'a> = GenericSignedBigNum<'a, CowEncoding<'a, i128>>;
 pub type CowBigUint<'a> = GenericUnsignedBigNum<'a, CowEncoding<'a, u128>>;

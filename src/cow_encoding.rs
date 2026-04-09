@@ -4,7 +4,6 @@ use crate::encoding::Decoded;
 use crate::encoding::Encode;
 use crate::encoding::Encoding;
 use crate::small_num::SmallNumber;
-use std::borrow::Borrow;
 use std::borrow::Cow;
 use std::fmt::Debug;
 
@@ -47,6 +46,16 @@ where
             Decoded::Small(s) => f(Decoded::Small(*s)),
             Decoded::Big(b) => f(Decoded::Big(Cow::Borrowed(b.as_ref()))),
         }
+    }
+
+    fn owns_bignum(&self) -> bool {
+        self.with_decoded(|decoded| match decoded {
+            Decoded::Small(_) => false,
+            Decoded::Big(b) => match b {
+                Cow::Borrowed(_) => false,
+                Cow::Owned(_) => true,
+            },
+        })
     }
 }
 
@@ -101,6 +110,7 @@ impl<'a, S: SmallNumber> BorrowingEncoding<'a> for CowEncoding<'a, S> {
     }
 }
 
+#[cfg(any(test, feature = "quickcheck"))]
 impl<S: SmallNumber> quickcheck::Arbitrary for CowEncoding<'static, S> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         if bool::arbitrary(g) {
@@ -113,6 +123,7 @@ impl<S: SmallNumber> quickcheck::Arbitrary for CowEncoding<'static, S> {
     }
 }
 
+#[cfg(feature = "arbitrary")]
 impl<S: SmallNumber> arbitrary::Arbitrary<'_> for CowEncoding<'static, S> {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         if bool::arbitrary(u)? {

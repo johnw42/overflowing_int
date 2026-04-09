@@ -12,7 +12,11 @@ use num_traits::{
 };
 use paste::paste;
 
-use crate::{big_number::BigNumber, duplicate_arith_ops};
+use crate::{
+    big_number::BigNumber,
+    bounds::{ArbitraryBounds, QuickcheckBounds},
+    duplicate_arith_ops,
+};
 
 /// A trait implemented by primitive integer types that can be used as the
 /// "small" part of a big integer encoding.
@@ -22,7 +26,7 @@ pub trait SmallNumber:
     + Display
     + Eq
     + Num
-    + for<'a> arbitrary::Arbitrary<'a>
+    + ArbitraryBounds
     + Binary
     + BitAnd<Output = Self>
     + BitOr<Output = Self>
@@ -63,7 +67,7 @@ pub trait SmallNumber:
     + for<'a> TryFrom<&'a Self::Big>
     + TryInto<BigUint>
     + TryInto<u32>
-    + quickcheck::Arbitrary
+    + QuickcheckBounds
     + UpperHex
     + Zero
 {

@@ -8,10 +8,10 @@ authors.workspace = true
 
 [features]
 default = [
-  "quickcheck",
-  "arbitrary",
-  "serde",
-  "rand",
+  # "quickcheck",
+  # "arbitrary",
+  # "serde",
+  # "rand",
 ]
 debug_structure = [
 ]

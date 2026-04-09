@@ -5,7 +5,7 @@ use crate::small_num::SmallNumber as _;
 use crate::unsigned::GenericUnsignedBigNum;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_generic_big_num, duplicate_iprims,
-    duplicate_prims, duplicate_shift_ops, duplicate_uprims,
+    duplicate_prims, duplicate_shift_ops, duplicate_uprims, duplicate_uprims_and_iprims_if_signed,
 };
 use num_bigint::{BigInt, BigUint};
 use num_integer::Integer;
@@ -629,7 +629,6 @@ mod test {
     use super::*;
     use crate::duplicate_arith_and_bit_ops;
     use crate::duplicate_generic_bignum_types;
-    use crate::duplicate_prims_with_signedness;
     use crate::signed::GenericSignedBigNum;
     use num_bigint::BigInt;
     use num_traits::Zero;
@@ -816,7 +815,7 @@ mod test {
         }
 
         duplicate_arith_ops! {
-            duplicate_prims_with_signedness! { signedness;
+            duplicate_uprims_and_iprims_if_signed! { signedness;
                 paste! {
                     #[quickcheck]
                     fn [<test_ op_fn _ prim _lhs>](lhs: prim, rhs: bignum_type) -> TestResult{
