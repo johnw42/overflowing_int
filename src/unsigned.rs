@@ -1,5 +1,5 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::encoding::{BorrowingEncoding, Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
 use num_bigint::BigUint;
 use std::borrow::Cow;
@@ -16,7 +16,16 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
     pub fn into_static(self) -> GenericUnsignedBigNum<'static, E::Static> {
-        GenericUnsignedBigNum::<'static, E::Static>::from_encoding(self.0.into_static())
+        GenericUnsignedBigNum::from_encoding(self.0.into_static())
+    }
+
+    /// Converts this big integer to into one that borrows from this one's data.
+    pub fn borrow<'b>(&'b self) -> GenericUnsignedBigNum<'b, E::WithLifetime<'b>>
+    where
+        E: BorrowingEncoding<'a>,
+        'a: 'b,
+    {
+        GenericUnsignedBigNum::from_encoding(self.0.borrow())
     }
 
     /// Creates and initializes a [`GenericUnsignedBigNum`].
@@ -446,4 +455,32 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Encoding<'a> for GenericUnsignedBigNum<
     fn into_static(self) -> Self::Static {
         GenericUnsignedBigNum::from_encoding(self.0.into_static())
     }
+}
+
+#[test]
+fn test_borrow_and_static() {
+    use crate::CowBigUint;
+    use num_traits::Zero;
+
+    struct CowTest<'a>(CowBigUint<'a>);
+
+    impl<'a> CowTest<'a> {
+        fn test(self) {
+            // Prove that we can change the lifetime to a shorter one.
+            Self::wants_borrowed(self.0.borrow());
+
+            // Prove we can change the lifetime to 'static.
+            Self::wants_static(self.0.clone().into_static());
+        }
+
+        fn wants_static(_x: CowBigUint<'static>) {}
+
+        fn wants_borrowed<'b>(_x: CowBigUint<'b>)
+        where
+            'a: 'b,
+        {
+        }
+    }
+
+    CowTest(CowBigUint::zero()).test();
 }

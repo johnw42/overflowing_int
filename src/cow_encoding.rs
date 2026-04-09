@@ -1,8 +1,10 @@
+use crate::encoding::BorrowingEncoding;
 use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encode;
 use crate::encoding::Encoding;
 use crate::small_num::SmallNumber;
+use std::borrow::Borrow;
 use std::borrow::Cow;
 use std::fmt::Debug;
 
@@ -78,6 +80,23 @@ impl<'a, S: SmallNumber> Encoding<'a> for CowEncoding<'a, S> {
         match self.0 {
             Decoded::Small(s) => CowEncoding(Decoded::Small(s)),
             Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Owned(b.into_owned()))),
+        }
+    }
+}
+
+impl<'a, S: SmallNumber> BorrowingEncoding<'a> for CowEncoding<'a, S> {
+    type WithLifetime<'b>
+        = CowEncoding<'b, S>
+    where
+        'a: 'b;
+
+    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    where
+        'a: 'b,
+    {
+        match &self.0 {
+            Decoded::Small(s) => CowEncoding(Decoded::Small(*s)),
+            Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Borrowed(b.as_ref()))),
         }
     }
 }

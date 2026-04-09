@@ -294,6 +294,17 @@ where
     }
 }
 
+pub trait BorrowingEncoding<'a>: Encoding<'a> + 'a {
+    type WithLifetime<'b>: Encoding<'b, Small = Self::Small, Big = Self::Big>
+    where
+        'a: 'b;
+
+    /// Converts this encoding into a version with a shorter lifetime.
+    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    where
+        'a: 'b;
+}
+
 // =============================================================================
 // Implementations of `Decode` for various foreign and built-in types
 // =============================================================================

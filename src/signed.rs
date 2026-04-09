@@ -1,5 +1,5 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::encoding::{BorrowingEncoding, Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::Zero;
@@ -21,7 +21,16 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericSignedBigNum<'a, E> {
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
     pub fn into_static(self) -> GenericSignedBigNum<'static, E::Static> {
-        GenericSignedBigNum::<'static, E::Static>::from_encoding(self.0.into_static())
+        GenericSignedBigNum::from_encoding(self.0.into_static())
+    }
+
+    /// Converts this big integer to into one that borrows from this one's data.
+    pub fn borrow<'b>(&'b self) -> GenericSignedBigNum<'b, E::WithLifetime<'b>>
+    where
+        E: BorrowingEncoding<'a>,
+        'a: 'b,
+    {
+        GenericSignedBigNum::from_encoding(self.0.borrow())
     }
 
     /// Creates and initializes a E::Big.
