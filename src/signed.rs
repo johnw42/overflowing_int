@@ -10,9 +10,9 @@ use std::ops::Neg;
 
 /// A signed big integer type that can be used with any encoding that implements `Encoding` with `Big = BigInt`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct GenericSignedBigNum<'a, E>(pub(crate) E, PhantomData<&'a ()>)
-where
-    E: Encoding<'a, Big = BigInt>;
+pub struct Int<'a, E>(pub(crate) E, PhantomData<&'a ()>);
+
+pub type GenericSignedBigNum<'a, E> = Int<'a, E>;
 
 impl<'a, E: Encoding<'a, Big = BigInt>> GenericSignedBigNum<'a, E> {
     fn from_encoding(encoding: E) -> Self {

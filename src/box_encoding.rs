@@ -4,35 +4,34 @@ use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
 use std::hash::Hash;
 use std::mem::ManuallyDrop;
-use std::rc::Rc;
 use std::{borrow::Cow, fmt::Debug};
 
 const _: () = {
-    assert!(align_of::<Rc<BigInt>>() > 1);
-    assert!(align_of::<Rc<BigUint>>() > 1);
-    assert!(size_of::<Rc<BigInt>>() == size_of::<isize>());
-    assert!(size_of::<Rc<BigUint>>() == size_of::<usize>());
+    assert!(align_of::<Box<BigInt>>() > 1);
+    assert!(align_of::<Box<BigUint>>() > 1);
+    assert!(size_of::<Box<BigInt>>() == size_of::<isize>());
+    assert!(size_of::<Box<BigUint>>() == size_of::<usize>());
 };
 
-/// An encoding that uses `Rc` for big values, and a small value with the LSB
-/// set to 1 for small values.  This encoding is used for `RcBigInt` and
-/// `RcBigUint`.
+/// An encoding that uses `Box` for big values, and a small value with the LSB
+/// set to 1 for small values.  This encoding is used for `BoxBigInt` and
+/// `BoxBigUint`.
 #[derive(Clone)]
-pub struct RcEncoding<S>(RcEncodedRepr<S>)
+pub struct BoxEncoding<S>(BoxEncodedRepr<S>)
 where
     S: SmallNumber;
 
-impl<S> RcEncoding<S>
+impl<S> BoxEncoding<S>
 where
     S: SmallNumber,
 {
     #[allow(unused)]
     fn from_shifted(shifted: Shifted<S>) -> Self {
-        Self(RcEncodedRepr { small: shifted })
+        Self(BoxEncodedRepr { small: shifted })
     }
 }
 
-impl<S> Decode<'static, S> for RcEncoding<S>
+impl<S> Decode<'static, S> for BoxEncoding<S>
 where
     S: SmallNumber,
 {
@@ -44,7 +43,7 @@ where
                 let taken = ManuallyDrop::take(&mut self.0.big);
                 // Reset the encoding to a valid small so the Drop implementation doesn't try to drop the big value again.
                 self.0.small = Shifted::default();
-                Decoded::Big(Cow::Owned(Rc::unwrap_or_clone(taken)))
+                Decoded::Big(Cow::Owned(*taken))
             }
         }
     }
@@ -67,13 +66,13 @@ where
     }
 }
 
-impl<S> Encode<'static, S> for RcEncoding<S>
+impl<S> Encode<'static, S> for BoxEncoding<S>
 where
     S: SmallNumber,
 {
     fn from_small(s: S) -> Self {
         if let Some(shifted) = Shifted::try_new(s) {
-            Self(RcEncodedRepr { small: shifted })
+            Self(BoxEncodedRepr { small: shifted })
         } else {
             let r = Self::from_big(s.to_big());
             unsafe {
@@ -88,31 +87,31 @@ where
             if let Some(small) = S::try_from(b.as_ref()).ok()
                 && let Some(shifted) = Shifted::try_new(small)
             {
-                RcEncodedRepr { small: shifted }
+                BoxEncodedRepr { small: shifted }
             } else {
-                RcEncodedRepr {
-                    big: ManuallyDrop::new(Rc::new(b.into_owned())),
+                BoxEncodedRepr {
+                    big: ManuallyDrop::new(Box::new(b.into_owned())),
                 }
             },
         )
     }
 }
 
-impl<S> Encoding<'static> for RcEncoding<S>
+impl<S> Encoding<'static> for BoxEncoding<S>
 where
     S: SmallNumber,
 {
     type Small = S;
     type Big = S::Big;
-    type Unsigned = RcEncoding<S::Unsigned>;
-    type Static = RcEncoding<S>;
+    type Unsigned = BoxEncoding<S::Unsigned>;
+    type Static = BoxEncoding<S>;
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
         let mut decoded = unsafe {
             if let Some(s) = self.0.small.validate() {
                 Decoded::Small(s)
             } else {
-                Decoded::Big(Cow::Borrowed(Rc::as_ref(&self.0.big)))
+                Decoded::Big(Cow::Borrowed(Box::as_ref(&self.0.big)))
             }
         };
         f(&mut decoded);
@@ -123,33 +122,33 @@ where
     }
 
     fn into_static(self) -> Self::Static {
-        RcEncoding(self.0)
+        BoxEncoding(self.0)
     }
 }
 
-union RcEncodedRepr<S: SmallNumber> {
+union BoxEncodedRepr<S: SmallNumber> {
     small: Shifted<S>,
-    big: ManuallyDrop<Rc<S::Big>>,
+    big: ManuallyDrop<Box<S::Big>>,
 }
 
-impl<S> Clone for RcEncodedRepr<S>
+impl<S> Clone for BoxEncodedRepr<S>
 where
     S: SmallNumber,
 {
     fn clone(&self) -> Self {
         unsafe {
             if self.small.validate().is_some() {
-                RcEncodedRepr { small: self.small }
+                BoxEncodedRepr { small: self.small }
             } else {
-                RcEncodedRepr {
-                    big: ManuallyDrop::new(Rc::clone(&self.big)),
+                BoxEncodedRepr {
+                    big: ManuallyDrop::new(Box::clone(&self.big)),
                 }
             }
         }
     }
 }
 
-impl<S> Drop for RcEncodedRepr<S>
+impl<S> Drop for BoxEncodedRepr<S>
 where
     S: SmallNumber,
 {
@@ -162,7 +161,7 @@ where
     }
 }
 
-impl<S> Debug for RcEncoding<S>
+impl<S> Debug for BoxEncoding<S>
 where
     S: SmallNumber,
 {
@@ -174,7 +173,7 @@ where
     }
 }
 
-impl<S> Hash for RcEncoding<S>
+impl<S> Hash for BoxEncoding<S>
 where
     S: SmallNumber,
 {
@@ -186,7 +185,7 @@ where
     }
 }
 
-impl<S> PartialEq for RcEncoding<S>
+impl<S> PartialEq for BoxEncoding<S>
 where
     S: SmallNumber,
 {
@@ -201,10 +200,10 @@ where
     }
 }
 
-impl<S> Eq for RcEncoding<S> where S: SmallNumber {}
+impl<S> Eq for BoxEncoding<S> where S: SmallNumber {}
 
 #[cfg(any(test, feature = "quickcheck"))]
-impl<S: SmallNumber> quickcheck::Arbitrary for RcEncoding<S> {
+impl<S: SmallNumber> quickcheck::Arbitrary for BoxEncoding<S> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         if bool::arbitrary(g) {
             Self::from_shifted(Shifted::<S>::arbitrary(g))
@@ -215,7 +214,7 @@ impl<S: SmallNumber> quickcheck::Arbitrary for RcEncoding<S> {
 }
 
 #[cfg(feature = "arbitrary")]
-impl<S: SmallNumber> arbitrary::Arbitrary<'_> for RcEncoding<S> {
+impl<S: SmallNumber> arbitrary::Arbitrary<'_> for BoxEncoding<S> {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         Ok(if bool::arbitrary(u)? {
             Self::from_shifted(Shifted::<S>::arbitrary(u)?)

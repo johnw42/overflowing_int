@@ -4,7 +4,7 @@ use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::signed::GenericSignedBigNum;
 use crate::small_num::SmallNumber;
 use crate::unsigned::GenericUnsignedBigNum;
-use crate::{CowBigInt, CowBigUint, RcBigInt, RcBigUint};
+use crate::{CowBigInt, CowBigUint, RcBigInt, RcBigUint, duplicate_generic_bignum_types};
 use crate::{duplicate_iprims, duplicate_prims, duplicate_uprims};
 use duplicate::duplicate_item;
 use num_bigint::{
@@ -27,14 +27,7 @@ use std::fmt::{Binary, Formatter, LowerHex, Octal, UpperHex};
 use std::ops::{Neg, Not};
 use std::str::FromStr;
 
-#[duplicate_item(
-    mod_name   RawType    EncodedType;
-    [signed_cow]   [BigInt]   [CowBigInt];
-    [unsigned_cow] [BigUint]  [CowBigUint];
-    [signed_rc]    [BigInt]   [RcBigInt];
-    [unsigned_rc]  [BigUint]  [RcBigUint];
-)]
-mod mod_name {
+duplicate_generic_bignum_types! { mod bignum_tag {
     use super::*;
     use quickcheck::TestResult;
     use quickcheck_macros::quickcheck;
@@ -259,12 +252,10 @@ mod mod_name {
     }
 
     #[quickcheck]
-    fn test_is_one(n: RawType) -> TestResult {
-        let r = TestResult::eq(&n.is_one(), &EncodedType::from(n.clone()).is_one());
-        if r.is_failure() {
-            return r;
-        }
-        TestResult::eq(&n.is_one(), &EncodedType::from(n).is_one())
+    fn test_is_one(n: RawType) {
+        assert!(EncodedType::one().is_one());
+        assert_eq!(&n.is_one(), &EncodedType::from(n.clone()).is_one());
+        assert_eq!(&n.is_one(), &EncodedType::from(n).is_one());
     }
 
     #[test]
@@ -273,12 +264,10 @@ mod mod_name {
     }
 
     #[quickcheck]
-    fn test_is_zero(n: RawType) -> TestResult {
-        let r = TestResult::eq(&n.is_zero(), &EncodedType::from(n.clone()).is_zero());
-        if r.is_failure() {
-            return r;
-        }
-        TestResult::eq(&n.is_zero(), &EncodedType::from(n).is_zero())
+    fn test_is_zero(n: RawType) {
+        assert!(EncodedType::zero().is_zero());
+        assert_eq!(n.is_zero(), EncodedType::from(n.clone()).is_zero());
+        assert_eq!(n.is_zero(), EncodedType::from(n).is_zero());
     }
 
     //
@@ -369,7 +358,7 @@ mod mod_name {
             )
         }
     } }
-}
+} }
 
 #[duplicate_item(
     mod_name         EncodedType;

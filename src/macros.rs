@@ -3,11 +3,15 @@ macro_rules! duplicate_generic_bignum_types {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                signedness  bignum_tag     BigNumType bignum_type;
-                [signed]    [cow_signed]   [BigInt]   [$crate::CowBigInt::<'static>];
-                [unsigned]  [cow_unsigned] [BigUint]  [$crate::CowBigUint::<'static>];
-                [signed]    [rc_signed]    [BigInt]   [$crate::RcBigInt];
-                [unsigned]  [rc_unsigned]  [BigUint]  [$crate::RcBigUint];
+                signedness  RawType  bignum_tag          EncodedType;
+                [signed]    [BigInt]    [cow_signed]        [$crate::CowBigInt::<'static>];
+                [unsigned]  [BigUint]   [cow_unsigned]      [$crate::CowBigUint::<'static>];
+                [signed]    [BigInt]    [rc_signed]         [$crate::RcBigInt];
+                [unsigned]  [BigUint]   [rc_unsigned]       [$crate::RcBigUint];
+                [signed]    [BigInt]    [trivial_signed]    [$crate::TrivialBigInt];
+                [unsigned]  [BigUint]   [trivial_unsigned]  [$crate::TrivialBigUint];
+                [signed]    [BigInt]    [box_signed]        [$crate::BoxBigInt];
+                [unsigned]  [BigUint]   [box_unsigned]      [$crate::BoxBigUint];
             ]
             $($body)*
         }
@@ -18,7 +22,7 @@ macro_rules! duplicate_generic_big_num {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                signedness GenericBigNum           BigNumType;
+                signedness GenericBigNum           RawType;
                 [signed]   [GenericSignedBigNum]   [BigInt];
                 [unsigned] [GenericUnsignedBigNum] [BigUint];
             ]

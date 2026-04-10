@@ -340,7 +340,7 @@ duplicate_generic_big_num! {
 
 duplicate_arith_ops! {
     paste! {
-        impl<'a, T, E: Encoding<'a, Big = BigNumType>> op_trait<T> for GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for GenericBigNum<'a, E>
         where
             T: Decode<'a, E::Small>,
         {
@@ -351,7 +351,7 @@ duplicate_arith_ops! {
             }
         }
 
-        impl<'a, T, E: Encoding<'a, Big = BigNumType>> op_trait<T> for &GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for &GenericBigNum<'a, E>
         where
             T: Decode<'a, E::Small>,
         {
@@ -362,7 +362,7 @@ duplicate_arith_ops! {
             }
         }
 
-        impl<'a, T, E: Encoding<'a, Big = BigNumType>> [<op_trait Assign>]<T> for GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<T> for GenericBigNum<'a, E>
         where
             T: Decode<'a, E::Small>
         {
@@ -374,7 +374,7 @@ duplicate_arith_ops! {
 
     duplicate_iprims! {
         paste! {
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<GenericBigNum<'a, E>> for prim
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<GenericBigNum<'a, E>> for prim
             where
                 E::Big: BigSigned,
             {
@@ -386,7 +386,7 @@ duplicate_arith_ops! {
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<GenericBigNum<'a, E>> for &prim
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<GenericBigNum<'a, E>> for &prim
             where
                 E::Big: BigSigned,
             {
@@ -397,7 +397,7 @@ duplicate_arith_ops! {
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<&GenericBigNum<'a, E>> for prim
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&GenericBigNum<'a, E>> for prim
             where
                 E::Big: BigSigned,
             {
@@ -409,7 +409,7 @@ duplicate_arith_ops! {
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<&GenericBigNum<'a, E>> for &prim
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&GenericBigNum<'a, E>> for &prim
             where
                 E::Big: BigSigned,
             {
@@ -424,7 +424,7 @@ duplicate_arith_ops! {
 
     duplicate_uprims! {
         paste! {
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<GenericBigNum<'a, E>> for prim {
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<GenericBigNum<'a, E>> for prim {
                 type Output = GenericBigNum<'a, E>;
 
                 #[inline(never)]
@@ -433,7 +433,7 @@ duplicate_arith_ops! {
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<GenericBigNum<'a, E>> for &prim {
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<GenericBigNum<'a, E>> for &prim {
                 type Output = GenericBigNum<'a, E>;
 
                 fn op_fn(self, rhs: GenericBigNum<'a, E>) -> Self::Output {
@@ -441,7 +441,7 @@ duplicate_arith_ops! {
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<&GenericBigNum<'a, E>> for prim {
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&GenericBigNum<'a, E>> for prim {
                 type Output = GenericBigNum<'a, E>;
 
                 #[inline(never)]
@@ -450,7 +450,7 @@ duplicate_arith_ops! {
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<&GenericBigNum<'a, E>> for &prim {
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&GenericBigNum<'a, E>> for &prim {
                 type Output = GenericBigNum<'a, E>;
 
                 fn op_fn(self, rhs: &GenericBigNum<'a, E>) -> Self::Output {
@@ -463,7 +463,7 @@ duplicate_arith_ops! {
 
 duplicate_bit_ops! {
     paste! {
-        impl<'a, 'b, T, E: Encoding<'a, Big = BigNumType>> op_trait<T> for GenericBigNum<'a, E>
+        impl<'a, 'b, T, E: Encoding<'a, Big = RawType>> op_trait<T> for GenericBigNum<'a, E>
         where
             T: Decode<'b, E::Small>,
         {
@@ -474,7 +474,7 @@ duplicate_bit_ops! {
             }
         }
 
-        impl<'a, 'b, T, E: Encoding<'a, Big = BigNumType>> op_trait<T> for &GenericBigNum<'a, E>
+        impl<'a, 'b, T, E: Encoding<'a, Big = RawType>> op_trait<T> for &GenericBigNum<'a, E>
         where
             T: Decode<'b, E::Small>,
         {
@@ -485,7 +485,7 @@ duplicate_bit_ops! {
             }
         }
 
-        impl<'a, 'b, T, E: Encoding<'a, Big = BigNumType>> [<op_trait Assign>]<T> for GenericBigNum<'a, E>
+        impl<'a, 'b, T, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<T> for GenericBigNum<'a, E>
         where
             T: Decode<'b, E::Small>
         {
@@ -499,7 +499,7 @@ duplicate_bit_ops! {
 duplicate_shift_ops! {
     duplicate_prims! {
         paste! {
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<prim> for GenericBigNum<'a, E> {
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<prim> for GenericBigNum<'a, E> {
                 type Output = GenericBigNum<'a, E>;
 
                 fn op_fn(self, rhs: prim) -> Self::Output {
@@ -507,7 +507,7 @@ duplicate_shift_ops! {
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<&prim> for GenericBigNum<'a, E> {
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&prim> for GenericBigNum<'a, E> {
                 type Output = GenericBigNum<'a, E>;
 
                 fn op_fn(self, rhs: &prim) -> Self::Output {
@@ -515,7 +515,7 @@ duplicate_shift_ops! {
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<prim> for &GenericBigNum<'a, E> {
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<prim> for &GenericBigNum<'a, E> {
                 type Output = GenericBigNum<'a, E>;
 
                 fn op_fn(self, rhs: prim) -> Self::Output {
@@ -523,7 +523,7 @@ duplicate_shift_ops! {
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> op_trait<&prim> for &GenericBigNum<'a, E> {
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&prim> for &GenericBigNum<'a, E> {
                 type Output = GenericBigNum<'a, E>;
 
                 fn op_fn(self, rhs: &prim) -> Self::Output {
@@ -531,13 +531,13 @@ duplicate_shift_ops! {
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> [<op_trait Assign>]<prim> for GenericBigNum<'a, E> {
+            impl<'a, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<prim> for GenericBigNum<'a, E> {
                 fn [<op_fn _assign>](&mut self, rhs: prim) {
                     [<op_trait Op>]::[<call_update_big_ prim>](self, rhs);
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = BigNumType>> [<op_trait Assign>]<&prim> for GenericBigNum<'a, E> {
+            impl<'a, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<&prim> for GenericBigNum<'a, E> {
                 fn [<op_fn _assign>](&mut self, rhs: &prim) {
                     self.[<op_fn _assign>](*rhs);
                 }
@@ -552,7 +552,7 @@ duplicate_shift_ops! {
 // -----------------------------------------------------------------------------
 duplicate_generic_big_num! {
 
-impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<GenericUnsignedBigNum<'a, E::Unsigned>> for GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<GenericUnsignedBigNum<'a, E::Unsigned>> for GenericBigNum<'a, E> {
     type Output = GenericBigNum<'a, E>;
 
     fn pow(self, rhs: GenericUnsignedBigNum<'a, E::Unsigned>) -> Self::Output {
@@ -560,7 +560,7 @@ impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<GenericUnsignedBigNum<'a, E::Uns
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<&GenericUnsignedBigNum<'a, E::Unsigned>> for GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<&GenericUnsignedBigNum<'a, E::Unsigned>> for GenericBigNum<'a, E> {
     type Output = GenericBigNum<'a, E>;
 
     fn pow(self, rhs: &GenericUnsignedBigNum<'a, E::Unsigned>) -> Self::Output {
@@ -568,7 +568,7 @@ impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<&GenericUnsignedBigNum<'a, E::Un
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<GenericUnsignedBigNum<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<GenericUnsignedBigNum<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
     type Output = GenericBigNum<'a, E>;
 
     fn pow(self, rhs: GenericUnsignedBigNum<'a, E::Unsigned>) -> Self::Output {
@@ -576,7 +576,7 @@ impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<GenericUnsignedBigNum<'a, E::Uns
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<&GenericUnsignedBigNum<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<&GenericUnsignedBigNum<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
     type Output = GenericBigNum<'a, E>;
 
     fn pow(self, rhs: &GenericUnsignedBigNum<'a, E::Unsigned>) -> Self::Output {
@@ -586,7 +586,7 @@ impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<&GenericUnsignedBigNum<'a, E::Un
 
 duplicate_uprims! {
     paste! {
-        impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<prim> for GenericBigNum<'a, E> {
+        impl<'a, E: Encoding<'a, Big = RawType>> Pow<prim> for GenericBigNum<'a, E> {
             type Output = GenericBigNum<'a, E>;
 
             fn pow(self, rhs: prim) -> Self::Output {
@@ -594,7 +594,7 @@ duplicate_uprims! {
             }
         }
 
-        impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<&prim> for GenericBigNum<'a, E> {
+        impl<'a, E: Encoding<'a, Big = RawType>> Pow<&prim> for GenericBigNum<'a, E> {
             type Output = GenericBigNum<'a, E>;
 
             fn pow(self, rhs: &prim) -> Self::Output {
@@ -602,7 +602,7 @@ duplicate_uprims! {
             }
         }
 
-        impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<prim> for &GenericBigNum<'a, E> {
+        impl<'a, E: Encoding<'a, Big = RawType>> Pow<prim> for &GenericBigNum<'a, E> {
             type Output = GenericBigNum<'a, E>;
 
             fn pow(self, rhs: prim) -> Self::Output {
@@ -610,7 +610,7 @@ duplicate_uprims! {
             }
         }
 
-        impl<'a, E: Encoding<'a, Big = BigNumType>> Pow<&prim> for &GenericBigNum<'a, E> {
+        impl<'a, E: Encoding<'a, Big = RawType>> Pow<&prim> for &GenericBigNum<'a, E> {
             type Output = GenericBigNum<'a, E>;
 
             fn pow(self, rhs: &prim) -> Self::Output {
@@ -651,7 +651,7 @@ mod test {
     duplicate_generic_big_num! { mod signedness {
         use super::*;
 
-        pub struct ShiftOpsForType<R, E: Encoding<'static, Big = BigNumType>> {
+        pub struct ShiftOpsForType<R, E: Encoding<'static, Big = RawType>> {
             pub cbigint_op1: fn(GenericBigNum<'static, E>, R) -> GenericBigNum<'static, E>,
             pub cbigint_op2: fn(GenericBigNum<'static, E>, &R) -> GenericBigNum<'static, E>,
             pub cbigint_op3: fn(&GenericBigNum<'static, E>, R) -> GenericBigNum<'static, E>,
@@ -660,7 +660,7 @@ mod test {
             pub bigint_op: fn(&E::Big, R) -> E::Big,
         }
 
-        pub struct BinOpsForTypes<L, R, E: Encoding<'static, Big = BigNumType>> {
+        pub struct BinOpsForTypes<L, R, E: Encoding<'static, Big = RawType>> {
             pub predicate: fn(&E::Big, &E::Big) -> bool,
             pub cbigint_op1: fn(L, R) -> GenericBigNum<'static, E>,
             pub cbigint_op2: fn(L, &R) -> GenericBigNum<'static, E>,
@@ -671,7 +671,7 @@ mod test {
             pub bigint_op: fn(&E::Big, &E::Big) -> E::Big,
         }
 
-        pub fn test_shift_op<R, E: Encoding<'static, Big = BigNumType>>(
+        pub fn test_shift_op<R, E: Encoding<'static, Big = RawType>>(
             ops: ShiftOpsForType<R, E>,
             lhs: GenericBigNum<'static, E>,
             rhs: R,
@@ -703,7 +703,7 @@ mod test {
             TestResult::passed()
         }
 
-        pub fn test_bin_op<L, R, E: Encoding<'static, Big = BigNumType>>(
+        pub fn test_bin_op<L, R, E: Encoding<'static, Big = RawType>>(
             ops: BinOpsForTypes<L, R, E>,
             lhs: L,
             rhs: R,
@@ -777,7 +777,7 @@ mod test {
         duplicate_arith_and_bit_ops! {
             paste! {
                 #[quickcheck]
-                fn [<test_ op_fn>](lhs: bignum_type, rhs: bignum_type) -> TestResult {
+                fn [<test_ op_fn>](lhs: EncodedType, rhs: EncodedType) -> TestResult {
                     test_bin_op(BinOpsForTypes {
                         predicate: op_test_pred,
                         cbigint_op1: |x, y| op_trait::op_fn(x, y),
@@ -796,7 +796,7 @@ mod test {
             duplicate_prims! {
                 paste! {
                     #[quickcheck]
-                    fn [<test_ op_fn _ prim _rhs>](lhs: bignum_type, rhs: u16) -> TestResult{
+                    fn [<test_ op_fn _ prim _rhs>](lhs: EncodedType, rhs: u16) -> TestResult{
                                 #[allow(irrefutable_let_patterns)]
                         if let Ok(rhs) = prim::try_from(rhs) {
                             test_shift_op(ShiftOpsForType {
@@ -819,10 +819,10 @@ mod test {
             duplicate_uprims_and_iprims_if_signed! { signedness;
                 paste! {
                     #[quickcheck]
-                    fn [<test_ op_fn _ prim _lhs>](lhs: prim, rhs: bignum_type) -> TestResult{
+                    fn [<test_ op_fn _ prim _lhs>](lhs: prim, rhs: EncodedType) -> TestResult{
                         test_bin_op(BinOpsForTypes {
                             predicate: op_test_pred,
-                            cbigint_op1: |x: prim, y: bignum_type| op_trait::op_fn(x, y),
+                            cbigint_op1: |x: prim, y: EncodedType| op_trait::op_fn(x, y),
                             cbigint_op2: |x, y| op_trait::op_fn(x, y),
                             cbigint_op3: |x, y| op_trait::op_fn(x, y),
                             cbigint_op4: |x, y| op_trait::op_fn(x, y),
@@ -832,10 +832,10 @@ mod test {
                         }, lhs, rhs)
                     }
                     #[quickcheck]
-                    fn [<test_ op_fn _ prim _rhs>](lhs: bignum_type, rhs: prim) -> TestResult {
+                    fn [<test_ op_fn _ prim _rhs>](lhs: EncodedType, rhs: prim) -> TestResult {
                         test_bin_op(BinOpsForTypes {
                             predicate: op_test_pred,
-                            cbigint_op1: |x: bignum_type, y: prim| op_trait::op_fn(x, y),
+                            cbigint_op1: |x: EncodedType, y: prim| op_trait::op_fn(x, y),
                             cbigint_op2: |x, y| op_trait::op_fn(x, y),
                             cbigint_op3: |x, y| op_trait::op_fn(x, y),
                             cbigint_op4: |x, y| op_trait::op_fn(x, y),
@@ -853,15 +853,15 @@ mod test {
                 // The #[quickcheck] macro gets confused here, so we have to call the inner function manually.
                 #[test]
                 fn [<test_pow_ prim>]() {
-                    fn inner(lhs: bignum_type, rhs: u8) -> TestResult {
+                    fn inner(lhs: EncodedType, rhs: u8) -> TestResult {
                         let rhs = rhs % 64; // limit the exponent to avoid long test times and potential OOM errors
                         #[allow(irrefutable_let_patterns)]
                         #[allow(clippy::unnecessary_fallible_conversions)]
                         if let Ok(rhs) = prim::try_from(rhs) {
-                            let big_lhs = &bignum_type::from(lhs.clone());
+                            let big_lhs = &EncodedType::from(lhs.clone());
                             let expected = Pow::pow(big_lhs, rhs);
-                            let actual1 = bignum_type::from(Pow::pow(lhs.clone(), rhs));
-                            let actual2 = bignum_type::from(Pow::pow(lhs, rhs));
+                            let actual1 = EncodedType::from(Pow::pow(lhs.clone(), rhs));
+                            let actual2 = EncodedType::from(Pow::pow(lhs, rhs));
                             let label = format!("failed with inputs {}, {}", big_lhs, rhs);
                             assert_eq!(expected, actual1, "{}", label);
                             assert_eq!(expected, actual2, "{}", label);

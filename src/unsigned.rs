@@ -7,7 +7,9 @@ use std::marker::PhantomData;
 
 /// An unsigned big integer type that can be used with any encoding that implements `Encoding` with `Big = BigUint`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct GenericUnsignedBigNum<'a, E: Encoding<'a>>(pub(crate) E, PhantomData<&'a ()>);
+pub struct Uint<'a, E: Encoding<'a>>(pub(crate) E, PhantomData<&'a ()>);
+
+pub type GenericUnsignedBigNum<'a, E> = Uint<'a, E>;
 
 impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     fn from_encoding(encoding: E) -> Self {
