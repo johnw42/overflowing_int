@@ -92,6 +92,8 @@ pub trait SmallNumber:
         self.into()
     }
 
+    fn try_to_unsigned(self) -> Option<Self::Unsigned>;
+
     /// Calls the primitive's `unsigned_abs` method, which returns the unsigned
     /// absolute value of the number.  For unsigned types, this is just the
     /// identity function.
@@ -178,6 +180,10 @@ macro_rules! impl_small_num {
             const MIN: Self = <$signed>::MIN;
             const MINUS_ONE: Self = -1;
 
+            fn try_to_unsigned(self) -> Option<Self::Unsigned> {
+                Self::Unsigned::try_from(self).ok()
+            }
+
             fn unsigned_abs(self) -> Self::Unsigned {
                 self.unsigned_abs()
             }
@@ -213,6 +219,10 @@ macro_rules! impl_small_num {
             const BITS: u32 = <$unsigned>::BITS;
             const MIN: Self = <$unsigned>::MIN;
             const MINUS_ONE: Self = <$unsigned>::MAX;
+
+            fn try_to_unsigned(self) -> Option<Self::Unsigned> {
+                Some(self)
+            }
 
             fn unsigned_abs(self) -> Self::Unsigned {
                 self

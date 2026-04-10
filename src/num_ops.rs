@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use crate::big_number::{BigNumber, BigSigned};
 use crate::encoding::{Decode, Decoded, Encoding};
 use crate::signed::GenericSignedBigNum;
