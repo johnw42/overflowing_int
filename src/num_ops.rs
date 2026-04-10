@@ -31,7 +31,6 @@ trait ArithOp<'e, E: Encoding<'e>> {
     fn update_small(lhs: &mut E::Big, rhs: E::Small);
 
     /// Calls a version of the binary operator that returns a new number.
-    #[inline]
     fn call<'a, 'b, L, R>(lhs: L, rhs: R) -> E
     where
         L: Decode<'a, E::Small>,
@@ -58,7 +57,6 @@ trait ArithOp<'e, E: Encoding<'e>> {
     }
 
     /// Calls a version of the binary operator that updates a bigint argument in place.
-    #[inline]
     fn call_update<'a, 'c, R>(lhs: &'a mut E, rhs: R)
     where
         R: Decode<'c, E::Small>,
@@ -94,7 +92,6 @@ trait BitOp<'e, E: Encoding<'e>> {
     fn on_big(lhs: Cow<E::Big>, rhs: Cow<E::Big>) -> E::Big;
     fn update_big(lhs: &mut E::Big, rhs: Cow<E::Big>);
 
-    #[inline]
     fn call<'a, 'b, L, R>(lhs: L, rhs: R) -> E
     where
         L: Decode<'a, E::Small>,
@@ -103,7 +100,6 @@ trait BitOp<'e, E: Encoding<'e>> {
         E::from_big(lhs.with_big_cows(&rhs, |lhs, rhs| Self::on_big(lhs, rhs)))
     }
 
-    #[inline]
     fn call_update<'a, 'c, R>(lhs: &'a mut E, rhs: R)
     where
         R: Decode<'c, E::Small>,
@@ -161,7 +157,6 @@ trait PowOpTrait<'e, E: Encoding<'e>> {
     fn on_big(lhs: Cow<E::Big>, rhs: Cow<<E::Unsigned as Encoding<'e>>::Big>) -> E::Big;
 
     /// Calls a version of the binary operator that returns a new number.
-    #[inline]
     fn call<'a, 'b, L, R>(lhs: L, rhs: R) -> E
     where
         L: Decode<'a, E::Small>,

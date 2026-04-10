@@ -47,7 +47,8 @@ duplicate! {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
+    let plot_config = PlotConfiguration::default();
+    let plot_config = plot_config.summary_scale(AxisScale::Logarithmic);
 
     let mut group = c.benchmark_group("Pi");
     group.plot_config(plot_config.clone());

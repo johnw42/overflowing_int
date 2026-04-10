@@ -57,14 +57,6 @@ where
         })
     }
 
-    /// Gets the big value  This will always create or clone a bignum.
-    fn big(&self) -> S::Big {
-        match self.clone().decode() {
-            Decoded::Small(s) => s.to_big(),
-            Decoded::Big(b) => b.into_owned(),
-        }
-    }
-
     /// Tests whether this encoding owns its value as a bignum.
     fn owns_bignum(&self) -> bool;
 

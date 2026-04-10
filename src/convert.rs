@@ -158,13 +158,13 @@ pub mod signedness {
     paste! {
         impl<'a> [<To ImplType>] for CowType<'a> {
             fn [<to_ ImplType:lower>](&self) -> Option<ImplType> {
-                Some(self.big())
+                Some(self.clone().into_big())
             }
         }
 
         impl [<To ImplType>] for RcType {
             fn [<to_ ImplType:lower>](&self) -> Option<ImplType> {
-                Some(self.big())
+                Some(self.clone().into_big())
             }
         }
 
@@ -218,13 +218,13 @@ pub mod signedness {
 
 impl<'a> ToBigUint for CowBigInt<'a> {
     fn to_biguint(&self) -> Option<BigUint> {
-        self.big().try_into().ok()
+        self.clone().into_big().try_into().ok()
     }
 }
 
 impl ToBigUint for RcBigInt {
     fn to_biguint(&self) -> Option<BigUint> {
-        self.big().try_into().ok()
+        self.clone().into_big().try_into().ok()
     }
 }
 
@@ -449,7 +449,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> From<BigUint> for GenericSignedBigNum<'a
 
 impl<'a, E: Encoding<'a, Big = BigUint>> From<GenericUnsignedBigNum<'a, E>> for BigInt {
     fn from(value: GenericUnsignedBigNum<'a, E>) -> Self {
-        BigInt::from(value.big())
+        BigInt::from(value.clone().into_big())
     }
 }
 
@@ -604,32 +604,32 @@ mod test {
             fn [<test_from_ref_ ImplType:lower>](value: ImplType) {
                 let rc = RcType::from(&value);
                 let cow = CowType::from(&value);
-                assert_eq!(rc.big(), value);
-                assert_eq!(cow.big(), value);
+                assert_eq!(rc.clone().into_big(), value);
+                assert_eq!(cow.clone().into_big(), value);
             }
 
             #[quickcheck]
             fn [<test_from_cow_ ImplType:lower>](value: ImplType) {
                 let rc = RcType::from(Cow::Owned(value.clone()));
                 let cow = CowType::from(Cow::Owned(value.clone()));
-                assert_eq!(rc.big(), value);
-                assert_eq!(cow.big(), value);
+                assert_eq!(rc.clone().into_big(), value);
+                assert_eq!(cow.clone().into_big(), value);
             }
 
             #[quickcheck]
             fn [<test_from_ref_ CowType:lower>](value: CowType<'static>) {
                 let rc = RcType::from(&value);
                 let cow = CowType::from(&value);
-                assert_eq!(rc.big(), value.big());
-                assert_eq!(cow.big(), value.big());
+                assert_eq!(rc.clone().into_big(), value.clone().into_big());
+                assert_eq!(cow.clone().into_big(), value.clone().into_big());
             }
 
             #[quickcheck]
             fn [<test_from_ref_ RcType:lower>](value: RcType) {
                 let rc = RcType::from(&value);
                 let cow = CowType::from(&value);
-                assert_eq!(rc.big(), value.big());
-                assert_eq!(cow.big(), value.big());
+                assert_eq!(rc.clone().into_big(), value.clone().into_big());
+                assert_eq!(cow.clone().into_big(), value.clone().into_big());
             }
         }
     }

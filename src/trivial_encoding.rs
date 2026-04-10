@@ -12,16 +12,34 @@ impl<S> Decode<'static, S> for TrivialEncoding<S>
 where
     S: SmallNumber,
 {
+    #[inline]
     fn decode(self) -> Decoded<S, Cow<'static, S::Big>> {
         Decoded::Big(Cow::Owned(self.0))
     }
 
+    #[inline]
     fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
         f(Decoded::Big(Cow::Borrowed(&self.0)))
     }
 
+    #[inline]
     fn owns_bignum(&self) -> bool {
         true
+    }
+
+    #[inline]
+    fn small(&self) -> Option<S> {
+        None
+    }
+
+    #[inline]
+    fn into_big(self) -> S::Big {
+        self.0
+    }
+
+    #[inline]
+    fn with_big_cow<T>(&self, f: impl FnOnce(Cow<<S as SmallNumber>::Big>) -> T) -> T {
+        f(Cow::Borrowed(&self.0))
     }
 }
 
@@ -29,12 +47,27 @@ impl<S> Encode<'static, S> for TrivialEncoding<S>
 where
     S: SmallNumber,
 {
+    #[inline]
     fn from_small(s: S) -> Self {
         Self(s.to_big())
     }
 
+    #[inline]
     fn from_big_cow(b: Cow<'static, S::Big>) -> Self {
         Self(b.into_owned())
+    }
+
+    #[inline]
+    fn from_big(b: <S as SmallNumber>::Big) -> Self {
+        Self(b)
+    }
+
+    #[inline]
+    fn from_decoded(enc: Decoded<S, Cow<'static, <S as SmallNumber>::Big>>) -> Self {
+        match enc {
+            Decoded::Small(_) => unreachable!(),
+            Decoded::Big(b) => Self::from_big_cow(b),
+        }
     }
 }
 
@@ -47,15 +80,17 @@ where
     type Unsigned = TrivialEncoding<S::Unsigned>;
     type Static = TrivialEncoding<S>;
 
+    #[inline]
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
         let mut decoded = Decoded::Big(Cow::Borrowed(&self.0));
         f(&mut decoded);
         *self = match decoded {
-            Decoded::Small(s) => Self::from_small(s),
+            Decoded::Small(_) => unreachable!(),
             Decoded::Big(b) => Self::from_big(b.into_owned()),
         };
     }
 
+    #[inline]
     fn into_static(self) -> Self::Static {
         self
     }
