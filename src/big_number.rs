@@ -65,15 +65,22 @@ macro_rules! declare_binary_assign_ref_op {
 macro_rules! impl_binary_ops {
     ($op_fn:ident, $lhs:ty, $rhs:ty) => {
         paste! {
+            #[inline]
             fn [<$op_fn _ $lhs:lower _and_ $rhs:lower>](lhs: $lhs, rhs: $rhs) -> Self {
                 lhs.$op_fn(rhs)
             }
+
+            #[inline]
             fn [<$op_fn _ $lhs:lower _and_ref_ $rhs:lower>](lhs: $lhs, rhs: &$rhs) -> Self {
                 lhs.$op_fn(rhs)
             }
+
+            #[inline]
             fn [<$op_fn _ref_ $lhs:lower _and_ $rhs:lower>](lhs: &$lhs, rhs: $rhs) -> Self {
                 lhs.$op_fn(rhs)
             }
+
+            #[inline]
             fn [<$op_fn _ref_ $lhs:lower _and_ref_ $rhs:lower>](lhs: &$lhs, rhs: &$rhs) -> Self {
                 lhs.$op_fn(rhs)
             }
@@ -83,6 +90,7 @@ macro_rules! impl_binary_ops {
 macro_rules! impl_binary_assign_op {
     ($op_fn:ident, $rhs:ty) => {
         paste! {
+            #[inline]
             fn [<$op_fn _assign_ $rhs:lower>](&mut self, rhs: $rhs) {
                 self.[<$op_fn _assign>](rhs);
             }
@@ -92,6 +100,7 @@ macro_rules! impl_binary_assign_op {
 macro_rules! impl_binary_assign_ref_op {
     ($op_fn:ident) => {
         paste! {
+            #[inline]
             fn [<$op_fn _assign_ref_self>](&mut self, rhs: &Self) {
                 self.[<$op_fn _assign>](rhs);
             }
@@ -303,62 +312,77 @@ macro_rules! impl_big_number_body {
             }
         }
 
+        #[inline]
         fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
             Self::parse_bytes(buf, radix)
         }
 
+        #[inline]
         fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
             self.iter_u32_digits()
         }
 
+        #[inline]
         fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
             self.iter_u64_digits()
         }
 
+        #[inline]
         fn to_str_radix(&self, radix: u32) -> String {
             self.to_str_radix(radix)
         }
 
+        #[inline]
         fn bits(&self) -> u64 {
             self.bits()
         }
 
+        #[inline]
         fn checked_add(&self, v: &Self) -> Option<Self> {
             CheckedAdd::checked_add(self, v)
         }
 
+        #[inline]
         fn checked_sub(&self, v: &Self) -> Option<Self> {
             CheckedSub::checked_sub(self, v)
         }
 
+        #[inline]
         fn checked_mul(&self, v: &Self) -> Option<Self> {
             CheckedMul::checked_mul(self, v)
         }
 
+        #[inline]
         fn checked_div(&self, v: &Self) -> Option<Self> {
             CheckedDiv::checked_div(self, v)
         }
 
+        #[inline]
         fn pow(&self, exponent: u32) -> Self {
             self.pow(exponent)
         }
 
+        #[inline]
         fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
             self.modpow(exponent, modulus)
         }
 
+        #[inline]
         fn modinv(&self, modulus: &Self) -> Option<Self> {
             self.modinv(modulus)
         }
 
+        #[inline]
         fn trailing_zeros(&self) -> Option<u64> {
             self.trailing_zeros()
         }
 
+        #[inline]
         fn bit(&self, bit: u64) -> bool {
             self.bit(bit)
         }
 
+        #[inline]
         fn set_bit(&mut self, bit: u64, value: bool) {
             self.set_bit(bit, value)
         }
@@ -368,18 +392,22 @@ macro_rules! impl_big_number_body {
 impl BigNumber for BigInt {
     impl_big_number_body!();
 
+    #[inline]
     fn into_biguint(self) -> BigUint {
         unreachable!()
     }
 
+    #[inline]
     fn to_ref_biguint(&self) -> &BigUint {
         unreachable!()
     }
 
+    #[inline]
     fn is_minus_one(&self) -> bool {
         self.sign() == Sign::Minus && self.magnitude().is_one()
     }
 
+    #[inline]
     fn is_signed() -> bool {
         true
     }
@@ -388,18 +416,22 @@ impl BigNumber for BigInt {
 impl BigNumber for BigUint {
     impl_big_number_body!();
 
+    #[inline]
     fn into_biguint(self) -> BigUint {
         self
     }
 
+    #[inline]
     fn to_ref_biguint(&self) -> &BigUint {
         self
     }
 
+    #[inline]
     fn is_minus_one(&self) -> bool {
         false
     }
 
+    #[inline]
     fn is_signed() -> bool {
         false
     }
@@ -412,124 +444,154 @@ impl BigSigned for BigInt {
         impl_binary_assign_op!(op_fn, prim);
     } } }
 
+    #[inline]
     fn new(sign: Sign, digits: Vec<u32>) -> Self {
         Self::new(sign, digits)
     }
 
+    #[inline]
     fn from_biguint(sign: Sign, data: BigUint) -> Self {
         Self::from_biguint(sign, data)
     }
 
+    #[inline]
     fn from_slice(sign: Sign, slice: &[u32]) -> Self {
         Self::from_slice(sign, slice)
     }
 
+    #[inline]
     fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
         self.assign_from_slice(sign, slice)
     }
 
+    #[inline]
     fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self {
         Self::from_bytes_be(sign, bytes)
     }
 
+    #[inline]
     fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self {
         Self::from_bytes_le(sign, bytes)
     }
 
+    #[inline]
     fn from_signed_bytes_be(digits: &[u8]) -> Self {
         Self::from_signed_bytes_be(digits)
     }
 
+    #[inline]
     fn from_signed_bytes_le(digits: &[u8]) -> Self {
         Self::from_signed_bytes_le(digits)
     }
 
+    #[inline]
     fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
         Self::from_radix_be(sign, buf, radix)
     }
 
+    #[inline]
     fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
         Self::from_radix_le(sign, buf, radix)
     }
 
+    #[inline]
     fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
         self.to_bytes_be()
     }
 
+    #[inline]
     fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
         self.to_bytes_le()
     }
 
+    #[inline]
     fn to_signed_bytes_be(&self) -> Vec<u8> {
         self.to_signed_bytes_be()
     }
 
+    #[inline]
     fn to_signed_bytes_le(&self) -> Vec<u8> {
         self.to_signed_bytes_le()
     }
 
+    #[inline]
     fn sign(&self) -> Sign {
         self.sign()
     }
 
+    #[inline]
     fn magnitude(&self) -> &BigUint {
         self.magnitude()
     }
 
+    #[inline]
     fn into_parts(self) -> (Sign, BigUint) {
         self.into_parts()
     }
 }
 
 impl BigUnsigned for BigUint {
+    #[inline]
     fn new(digits: Vec<u32>) -> Self {
         Self::new(digits)
     }
 
+    #[inline]
     fn from_slice(slice: &[u32]) -> Self {
         Self::from_slice(slice)
     }
 
+    #[inline]
     fn assign_from_slice(&mut self, slice: &[u32]) {
         self.assign_from_slice(slice)
     }
 
+    #[inline]
     fn from_bytes_be(bytes: &[u8]) -> Self {
         Self::from_bytes_be(bytes)
     }
 
+    #[inline]
     fn from_bytes_le(bytes: &[u8]) -> Self {
         Self::from_bytes_le(bytes)
     }
 
+    #[inline]
     fn from_radix_be(buf: &[u8], radix: u32) -> Option<Self> {
         Self::from_radix_be(buf, radix)
     }
 
+    #[inline]
     fn from_radix_le(buf: &[u8], radix: u32) -> Option<Self> {
         Self::from_radix_le(buf, radix)
     }
 
+    #[inline]
     fn to_bytes_be(&self) -> Vec<u8> {
         self.to_bytes_be()
     }
 
+    #[inline]
     fn to_bytes_le(&self) -> Vec<u8> {
         self.to_bytes_le()
     }
 
+    #[inline]
     fn to_radix_be(&self, radix: u32) -> Vec<u8> {
         self.to_radix_be(radix)
     }
 
+    #[inline]
     fn to_radix_le(&self, radix: u32) -> Vec<u8> {
         self.to_radix_le(radix)
     }
 
+    #[inline]
     fn trailing_ones(&self) -> u64 {
         self.trailing_ones()
     }
 
+    #[inline]
     fn count_ones(&self) -> u64 {
         self.count_ones()
     }
