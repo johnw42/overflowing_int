@@ -643,146 +643,68 @@ mod test {
         T::is_signed() || lhs >= rhs
     }
 
-    duplicate_generic_big_num! { mod signedness {
-        use super::*;
-
-        pub struct ShiftOpsForType<R, E: Encoding<'static, Big = RawType>> {
-            pub cbigint_op1: fn(GenericBigNum<'static, E>, R) -> GenericBigNum<'static, E>,
-            pub cbigint_op2: fn(GenericBigNum<'static, E>, &R) -> GenericBigNum<'static, E>,
-            pub cbigint_op3: fn(&GenericBigNum<'static, E>, R) -> GenericBigNum<'static, E>,
-            pub cbigint_op4: fn(&GenericBigNum<'static, E>, &R) -> GenericBigNum<'static, E>,
-            pub op_assign1: fn(&mut GenericBigNum<'static, E>, R),
-            pub bigint_op: fn(&E::Big, R) -> E::Big,
-        }
-
-        pub struct BinOpsForTypes<L, R, E: Encoding<'static, Big = RawType>> {
-            pub predicate: fn(&E::Big, &E::Big) -> bool,
-            pub cbigint_op1: fn(L, R) -> GenericBigNum<'static, E>,
-            pub cbigint_op2: fn(L, &R) -> GenericBigNum<'static, E>,
-            pub cbigint_op3: fn(&L, R) -> GenericBigNum<'static, E>,
-            pub cbigint_op4: fn(&L, &R) -> GenericBigNum<'static, E>,
-            pub op_assign1: fn(&mut GenericBigNum<'static, E>, R),
-            pub op_assign2: Option<fn(&mut GenericBigNum<'static, E>, &R)>,
-            pub bigint_op: fn(&E::Big, &E::Big) -> E::Big,
-        }
-
-        pub fn test_shift_op<R, E: Encoding<'static, Big = RawType>>(
-            ops: ShiftOpsForType<R, E>,
-            lhs: GenericBigNum<'static, E>,
-            rhs: R,
-        ) -> TestResult
-        where
-            R: Copy + Ord + Zero + Display,
-        {
-            let big_lhs = &E::Big::from(lhs.clone());
-
-            assert!(rhs >= R::zero(), "shift amount must be non-negative");
-            let expected = (ops.bigint_op)(big_lhs, rhs);
-            let actual1 = (ops.cbigint_op1)(lhs.clone(), rhs).into();
-            assert_eq!(expected, actual1, "failed with inputs {}, {}", big_lhs, rhs);
-            let actual2 = (ops.cbigint_op2)(lhs.clone(), &rhs).into();
-            assert_eq!(expected, actual2, "failed with inputs {}, {}", big_lhs, rhs);
-            let actual3 = (ops.cbigint_op3)(&lhs, rhs).into();
-            assert_eq!(expected, actual3, "failed with inputs {}, {}", big_lhs, rhs,);
-            let actual4 = (ops.cbigint_op4)(&lhs, &rhs).into();
-            assert_eq!(expected, actual4, "failed with inputs {}, {}", big_lhs, rhs);
-            let mut actual5 = big_lhs.clone().into();
-            (ops.op_assign1)(&mut actual5, rhs);
-            assert_eq!(
-                expected,
-                actual5.clone().into(),
-                "failed with inputs {}, {}",
-                big_lhs,
-                rhs
-            );
-            TestResult::passed()
-        }
-
-        pub fn test_bin_op<L, R, E: Encoding<'static, Big = RawType>>(
-            ops: BinOpsForTypes<L, R, E>,
-            lhs: L,
-            rhs: R,
-        ) -> TestResult
-        where
-            L: Clone,
-            R: Clone,
-            E::Big: From<L>,
-            E::Big: From<R>,
-        {
-            let big_lhs = &E::Big::from(lhs.clone());
-            let big_rhs = &E::Big::from(rhs.clone());
-
-            if (ops.predicate)(big_lhs, big_rhs) {
-                let expected = (ops.bigint_op)(big_lhs, big_rhs);
-                let actual1 = (ops.cbigint_op1)(lhs.clone(), rhs.clone()).into();
-                assert_eq!(
-                    expected, actual1,
-                    "failed with inputs {}, {}",
-                    big_lhs, big_rhs
-                );
-                let actual2 = (ops.cbigint_op2)(lhs.clone(), &rhs).into();
-                assert_eq!(
-                    expected, actual2,
-                    "failed with inputs {}, {}",
-                    big_lhs, big_rhs
-                );
-                let actual3 = (ops.cbigint_op3)(&lhs, rhs.clone()).into();
-                assert_eq!(
-                    expected, actual3,
-                    "failed with inputs {}, {}",
-                    big_lhs, big_rhs
-                );
-                let actual4 = (ops.cbigint_op4)(&lhs, &rhs).into();
-                assert_eq!(
-                    expected, actual4,
-                    "failed with inputs {}, {}",
-                    big_lhs, big_rhs
-                );
-                let mut actual5 = big_lhs.clone().into();
-                (ops.op_assign1)(&mut actual5, rhs.clone());
-                assert_eq!(
-                    expected,
-                    actual5.clone().into(),
-                    "failed with inputs {}, {}",
-                    big_lhs,
-                    big_rhs
-                );
-                if let Some(op_assign) = ops.op_assign2 {
-                    let mut actual6 = big_lhs.clone().into();
-                    op_assign(&mut actual6, &rhs);
-                    assert_eq!(
-                        expected,
-                        actual6.clone().into(),
-                        "failed with inputs {}, {}",
-                        big_lhs,
-                        big_rhs
-                    );
-                }
-                TestResult::passed()
-            } else {
-                TestResult::discard()
-            }
-        }
-    } }
-
     duplicate_generic_bignum_types! { mod bignum_tag {
         use super::*;
-        use signedness::*;
 
-        duplicate_arith_and_bit_ops! {
+        macro_rules! test_bin_op {
+            ($expected: ident, $lhs: ident, $rhs: ident, $op_trait: ident, $op_fn: ident, $op_test_pred: ident) => {
+                paste! {
+                    let big_lhs = &RawType::from($lhs.clone());
+                    let big_rhs = &RawType::from($rhs.clone());
+
+                    if !$op_test_pred(big_lhs, big_rhs) {
+                        return TestResult::discard();
+                    }
+                    let $expected = $op_trait::$op_fn(big_lhs, big_rhs);
+                    let actual1 = $op_trait::$op_fn($lhs.clone(), $rhs.clone()).into();
+                    assert_eq!($expected, actual1);
+                    let actual2 = $op_trait::$op_fn($lhs.clone(), &$rhs).into();
+                    assert_eq!($expected, actual2);
+                    let actual3 = $op_trait::$op_fn(&$lhs, $rhs.clone()).into();
+                    assert_eq!($expected, actual3);
+                    let actual4 = $op_trait::$op_fn(&$lhs, &$rhs).into();
+                    assert_eq!($expected, actual4);
+                }
+            };
+        }
+
+        macro_rules! test_bin_op_with_assign {
+            ($expected: ident, $lhs: ident, $rhs: ident, $op_trait: ident, $op_fn: ident, $op_test_pred: ident) => {
+                paste! {
+                    test_bin_op!($expected, $lhs, $rhs, $op_trait, $op_fn, $op_test_pred);
+                    let mut actual5 = $lhs.clone();
+                    [<$op_trait Assign>]::[<$op_fn _assign>](&mut actual5, $rhs.clone());
+                    assert_eq!($expected, actual5.into());
+                }
+            };
+        }
+
+        macro_rules! test_bin_op_with_ref_assign {
+            ($expected: ident, $lhs: ident, $rhs: ident, $op_trait: ident, $op_fn: ident, $op_test_pred: ident) => {
+                paste! {
+                    test_bin_op_with_assign!($expected, $lhs, $rhs, $op_trait, $op_fn, $op_test_pred);
+                    let mut actual6 = $lhs.clone();
+                    [<$op_trait Assign>]::[<$op_fn _assign>](&mut actual6, &$rhs);
+                    assert_eq!($expected, actual6.into());
+                }
+            };
+        }
+
+        duplicate_arith_ops! {
             paste! {
                 #[quickcheck]
                 fn [<test_ op_fn>](lhs: EncodedType, rhs: EncodedType) -> TestResult {
-                    test_bin_op(BinOpsForTypes {
-                        predicate: op_test_pred,
-                        cbigint_op1: |x, y| op_trait::op_fn(x, y),
-                        cbigint_op2: |x, y| op_trait::op_fn(x, y),
-                        cbigint_op3: |x, y| op_trait::op_fn(x, y),
-                        cbigint_op4: |x, y| op_trait::op_fn(x, y),
-                        op_assign1: |x, y| [<op_trait Assign>]::[<op_fn _assign>](x, y),
-                        op_assign2: Some(|x, y| [<op_trait Assign>]::[<op_fn _assign>](x, y)),
-                        bigint_op: |x, y| op_trait::op_fn(x, y),
-                    }, lhs, rhs)
+                    test_bin_op_with_ref_assign!(expected,lhs, rhs, op_trait, op_fn, op_test_pred);
+                    TestResult::passed()
+                }
+            }
+        }
+        duplicate_bit_ops! {
+            paste! {
+                #[quickcheck]
+                fn [<test_ op_fn>](lhs: EncodedType, rhs: EncodedType) -> TestResult {
+                    test_bin_op_with_assign!(expected, lhs, rhs, op_trait, op_fn, op_test_pred);
+                    TestResult::passed()
                 }
             }
         }
@@ -792,16 +714,27 @@ mod test {
                 paste! {
                     #[quickcheck]
                     fn [<test_ op_fn _ prim _rhs>](lhs: EncodedType, rhs: u16) -> TestResult{
-                                #[allow(irrefutable_let_patterns)]
+                        #[allow(irrefutable_let_patterns)]
                         if let Ok(rhs) = prim::try_from(rhs) {
-                            test_shift_op(ShiftOpsForType {
-                                cbigint_op1: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op2: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op3: |x, y| op_trait::op_fn(x, y),
-                                cbigint_op4: |x, y| op_trait::op_fn(x, y),
-                                op_assign1: |x, y| [<op_trait Assign>]::[<op_fn _assign>](x, y),
-                                bigint_op: |x, y| op_trait::op_fn(x, y),
-                            }, lhs, rhs)
+                            let big_lhs = &RawType::from(lhs.clone());
+
+                            #[allow(unused_comparisons)]
+                            let nonnegative_rhs = rhs >= 0;
+                            assert!(nonnegative_rhs, "shift amount must be non-negative");
+
+                            let expected = op_trait::op_fn(big_lhs, rhs);
+                            let actual1 = op_trait::op_fn(lhs.clone(), rhs).into();
+                            assert_eq!(expected, actual1);
+                            let actual2 = op_trait::op_fn(lhs.clone(), &rhs).into();
+                            assert_eq!(expected, actual2);
+                            let actual3 = op_trait::op_fn(&lhs, rhs).into();
+                            assert_eq!(expected, actual3,);
+                            let actual4 = op_trait::op_fn(&lhs, &rhs).into();
+                            assert_eq!(expected, actual4);
+                            let mut actual5 = lhs.clone();
+                            [<op_trait Assign>]::[<op_fn _assign>](&mut actual5, rhs);
+                            assert_eq!(expected, actual5.clone().into());
+                            TestResult::passed()
                         } else {
                             TestResult::discard()
                         }
@@ -815,29 +748,13 @@ mod test {
                 paste! {
                     #[quickcheck]
                     fn [<test_ op_fn _ prim _lhs>](lhs: prim, rhs: EncodedType) -> TestResult{
-                        test_bin_op(BinOpsForTypes {
-                            predicate: op_test_pred,
-                            cbigint_op1: |x: prim, y: EncodedType| op_trait::op_fn(x, y),
-                            cbigint_op2: |x, y| op_trait::op_fn(x, y),
-                            cbigint_op3: |x, y| op_trait::op_fn(x, y),
-                            cbigint_op4: |x, y| op_trait::op_fn(x, y),
-                            op_assign1: |x, y| [<op_trait Assign>]::[<op_fn _assign>](x, y),
-                            op_assign2: Some(|x, y| [<op_trait Assign>]::[<op_fn _assign>](x, y)),
-                            bigint_op: |x, y| op_trait::op_fn(x, y),
-                        }, lhs, rhs)
+                        test_bin_op!(expected, lhs, rhs, op_trait, op_fn, op_test_pred);
+                        TestResult::passed()
                     }
                     #[quickcheck]
                     fn [<test_ op_fn _ prim _rhs>](lhs: EncodedType, rhs: prim) -> TestResult {
-                        test_bin_op(BinOpsForTypes {
-                            predicate: op_test_pred,
-                            cbigint_op1: |x: EncodedType, y: prim| op_trait::op_fn(x, y),
-                            cbigint_op2: |x, y| op_trait::op_fn(x, y),
-                            cbigint_op3: |x, y| op_trait::op_fn(x, y),
-                            cbigint_op4: |x, y| op_trait::op_fn(x, y),
-                            op_assign1: |x, y| [<op_trait Assign>]::[<op_fn _assign>](x, y),
-                            op_assign2: None,
-                            bigint_op: |x, y| op_trait::op_fn(x, y),
-                        }, lhs, rhs)
+                        test_bin_op_with_assign!(expected, lhs, rhs, op_trait, op_fn, op_test_pred);
+                        TestResult::passed()
                     }
                 }
             }
@@ -857,9 +774,8 @@ mod test {
                             let expected = Pow::pow(big_lhs, rhs);
                             let actual1 = EncodedType::from(Pow::pow(lhs.clone(), rhs));
                             let actual2 = EncodedType::from(Pow::pow(lhs, rhs));
-                            let label = format!("failed with inputs {}, {}", big_lhs, rhs);
-                            assert_eq!(expected, actual1, "{}", label);
-                            assert_eq!(expected, actual2, "{}", label);
+                            assert_eq!(expected, actual1);
+                            assert_eq!(expected, actual2);
                             TestResult::passed()
                         } else {
                             TestResult::discard()
