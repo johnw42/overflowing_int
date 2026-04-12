@@ -26,16 +26,16 @@ use {
 use crate::{
     duplicate_iprims, duplicate_prims, duplicate_uprims,
     encoding::{Decode, Decoded, Encode, Encoding},
-    signed::GenericSignedBigNum,
+    signed::Int,
     small_num::SmallNumber,
-    unsigned::GenericUnsignedBigNum,
+    unsigned::Uint,
 };
 
 #[allow(unused_imports)]
 #[duplicate_item(
-    mod_name   RawType GenericBigNumType;
-    [signed]   [BigInt]   [GenericSignedBigNum];
-    [unsigned] [BigUint]  [GenericUnsignedBigNum];
+    mod_name   RawType    GenericBigNumType;
+    [signed]   [BigInt]   [Int];
+    [unsigned] [BigUint]  [Uint];
 )]
 pub mod mod_name {
     use std::{
@@ -481,7 +481,7 @@ pub mod mod_name {
 // CheckedEuclid
 //
 
-impl<'a, E: Encoding<'a, Big = BigInt>> CheckedEuclid for GenericSignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> CheckedEuclid for Int<'a, E> {
     fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
         self.with_big_cows(v, |lhs, rhs| {
             lhs.checked_rem_euclid(rhs.as_ref()).map(Into::into)
@@ -499,7 +499,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> CheckedEuclid for GenericSignedBigNum<'a
 // Euclid
 //
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Euclid for GenericSignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Euclid for Int<'a, E> {
     fn rem_euclid(&self, v: &Self) -> Self {
         self.with_big_cows(v, |lhs, rhs| lhs.rem_euclid(rhs.as_ref()).into())
     }
@@ -513,7 +513,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Euclid for GenericSignedBigNum<'a, E> {
 // FromBytes
 //
 
-impl<'a, E: Encoding<'a, Big = BigInt>> FromBytes for GenericSignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> FromBytes for Int<'a, E> {
     type Bytes = [u8];
 
     fn from_be_bytes(bytes: &[u8]) -> Self {
@@ -525,7 +525,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> FromBytes for GenericSignedBigNum<'a, E>
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigUint>> FromBytes for GenericUnsignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigUint>> FromBytes for Uint<'a, E> {
     type Bytes = [u8];
 
     fn from_be_bytes(bytes: &[u8]) -> Self {
@@ -541,10 +541,10 @@ impl<'a, E: Encoding<'a, Big = BigUint>> FromBytes for GenericUnsignedBigNum<'a,
 // FromPrimitive
 //
 
-impl<'a, E: Encoding<'a, Big = BigInt>> FromPrimitive for GenericSignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> FromPrimitive for Int<'a, E> {
     duplicate_prims! { paste! {
         fn [<from_ prim>](n: prim) -> Option<Self> {
-            Some(GenericSignedBigNum::from(n))
+            Some(Int::from(n))
         }
     } }
 }
@@ -553,18 +553,18 @@ impl<'a, E: Encoding<'a, Big = BigInt>> FromPrimitive for GenericSignedBigNum<'a
 // FromPrimitive
 //
 
-impl<'a, E: Encoding<'a, Big = BigUint>> FromPrimitive for GenericUnsignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigUint>> FromPrimitive for Uint<'a, E> {
     duplicate_iprims! { paste! {
         fn [<from_ prim>](n: prim) -> Option<Self> {
             match uprim::try_from(n) {
-                Ok(small) => Some(GenericUnsignedBigNum::from(small)),
+                Ok(small) => Some(Uint::from(small)),
                 Err(_) => None,
             }
         }
     } }
     duplicate_uprims! { paste! {
         fn [<from_ prim>](n: prim) -> Option<Self> {
-            Some(GenericUnsignedBigNum::from(n))
+            Some(Uint::from(n))
         }
     } }
 }
@@ -573,8 +573,8 @@ impl<'a, E: Encoding<'a, Big = BigUint>> FromPrimitive for GenericUnsignedBigNum
 // Neg
 //
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Neg for GenericSignedBigNum<'a, E> {
-    type Output = GenericSignedBigNum<'a, E>;
+impl<'a, E: Encoding<'a, Big = BigInt>> Neg for Int<'a, E> {
+    type Output = Int<'a, E>;
 
     fn neg(self) -> Self::Output {
         if let Some(a) = self.small()
@@ -587,8 +587,8 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Neg for GenericSignedBigNum<'a, E> {
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Neg for &GenericSignedBigNum<'a, E> {
-    type Output = GenericSignedBigNum<'a, E>;
+impl<'a, E: Encoding<'a, Big = BigInt>> Neg for &Int<'a, E> {
+    type Output = Int<'a, E>;
 
     fn neg(self) -> Self::Output {
         if let Some(a) = self.small()
@@ -605,8 +605,8 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Neg for &GenericSignedBigNum<'a, E> {
 // Not
 //
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Not for GenericSignedBigNum<'a, E> {
-    type Output = GenericSignedBigNum<'a, E>;
+impl<'a, E: Encoding<'a, Big = BigInt>> Not for Int<'a, E> {
+    type Output = Int<'a, E>;
 
     fn not(self) -> Self::Output {
         self.with_decoded(|encoded| match encoded {
@@ -616,13 +616,13 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Not for GenericSignedBigNum<'a, E> {
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Not for &GenericSignedBigNum<'a, E> {
-    type Output = GenericSignedBigNum<'a, E>;
+impl<'a, E: Encoding<'a, Big = BigInt>> Not for &Int<'a, E> {
+    type Output = Int<'a, E>;
 
     fn not(self) -> Self::Output {
         self.with_decoded(|encoded| match encoded {
-            Decoded::Small(n) => GenericSignedBigNum::from_small(n.not()),
-            Decoded::Big(n) => GenericSignedBigNum::from_big(n.as_ref().not()),
+            Decoded::Small(n) => Int::from_small(n.not()),
+            Decoded::Big(n) => Int::from_big(n.as_ref().not()),
         })
     }
 }
@@ -631,7 +631,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Not for &GenericSignedBigNum<'a, E> {
 // Ord
 //
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Ord for GenericSignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Ord for Int<'a, E> {
     fn cmp(&self, other: &Self) -> Ordering {
         use Decoded::*;
         use Ordering::*;
@@ -660,7 +660,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Ord for GenericSignedBigNum<'a, E> {
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigUint>> Ord for GenericUnsignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigUint>> Ord for Uint<'a, E> {
     fn cmp(&self, other: &Self) -> Ordering {
         use Decoded::*;
         use Ordering::*;
@@ -680,7 +680,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Ord for GenericUnsignedBigNum<'a, E> {
 // Signed
 //
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Signed for GenericSignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Signed for Int<'a, E> {
     fn abs(&self) -> Self {
         self.with_decoded(|decoded| match decoded {
             Decoded::Small(a) => {

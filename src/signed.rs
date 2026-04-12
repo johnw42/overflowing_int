@@ -12,25 +12,23 @@ use std::ops::Neg;
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Int<'a, E>(pub(crate) E, PhantomData<&'a ()>);
 
-pub type GenericSignedBigNum<'a, E> = Int<'a, E>;
-
-impl<'a, E: Encoding<'a, Big = BigInt>> GenericSignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     fn from_encoding(encoding: E) -> Self {
         Self(encoding, PhantomData)
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
-    pub fn into_static(self) -> GenericSignedBigNum<'static, E::Static> {
-        GenericSignedBigNum::from_encoding(self.0.into_static())
+    pub fn into_static(self) -> Int<'static, E::Static> {
+        Int::from_encoding(self.0.into_static())
     }
 
     /// Converts this big integer to into one that borrows from this one's data.
-    pub fn borrow<'b>(&'b self) -> GenericSignedBigNum<'b, E::WithLifetime<'b>>
+    pub fn borrow<'b>(&'b self) -> Int<'b, E::WithLifetime<'b>>
     where
         E: BorrowingEncoding<'a>,
         'a: 'b,
     {
-        GenericSignedBigNum::from_encoding(self.0.borrow())
+        Int::from_encoding(self.0.borrow())
     }
 
     /// Creates and initializes a E::Big.
@@ -437,15 +435,12 @@ impl<'a, E: Encoding<'a, Big = BigInt>> GenericSignedBigNum<'a, E> {
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for GenericSignedBigNum<'a, E> {
-    fn decode(self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for Int<'a, E> {
+    fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
         self.0.decode()
     }
 
-    fn with_decoded<T>(
-        &self,
-        f: impl FnOnce(Decoded<E::Small, Cow<<E::Small as SmallNumber>::Big>>) -> T,
-    ) -> T {
+    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
         self.0.with_decoded(f)
     }
 
@@ -454,15 +449,13 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for GenericSignedBi
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for &GenericSignedBigNum<'a, E> {
-    fn decode(self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for &Int<'a, E> {
+    fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+        // TODO Can we do this without cloning?
         self.0.clone().decode()
     }
 
-    fn with_decoded<T>(
-        &self,
-        f: impl FnOnce(Decoded<E::Small, Cow<<E::Small as SmallNumber>::Big>>) -> T,
-    ) -> T {
+    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
         self.0.with_decoded(f)
     }
 
@@ -471,7 +464,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for &GenericSignedB
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Encode<'a, E::Small> for GenericSignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Encode<'a, E::Small> for Int<'a, E> {
     fn from_small(s: E::Small) -> Self {
         Self::from_encoding(E::from_small(s))
     }
@@ -481,17 +474,17 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Encode<'a, E::Small> for GenericSignedBi
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Encoding<'a> for GenericSignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> Encoding<'a> for Int<'a, E> {
     type Small = E::Small;
     type Big = E::Big;
     type Unsigned = E::Unsigned;
-    type Static = GenericSignedBigNum<'static, E::Static>;
+    type Static = Int<'static, E::Static>;
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
         self.0.update_encoding(f);
     }
 
     fn into_static(self) -> Self::Static {
-        GenericSignedBigNum::from_encoding(self.0.into_static())
+        Int::from_encoding(self.0.into_static())
     }
 }

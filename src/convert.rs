@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
 use crate::encoding::{Decode, Decode as _, Decoded, Encode, Encoding};
-use crate::signed::GenericSignedBigNum;
+use crate::signed::Int;
 use crate::small_num::SmallNumber;
-use crate::unsigned::GenericUnsignedBigNum;
+use crate::unsigned::Uint;
 use crate::{
     CowBigInt, CowBigUint, RcBigInt, RcBigUint, duplicate_iprims, duplicate_iprims_if_unsigned,
     duplicate_prims, duplicate_uprims, duplicate_uprims_and_iprims_if_signed,
@@ -380,7 +380,7 @@ duplicate_prims! {
 // TryFrom Signed to Unsigned
 // =============================================================================
 
-impl<'a, E: Encoding<'a, Big = BigUint>> TryFrom<BigInt> for GenericUnsignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigUint>> TryFrom<BigInt> for Uint<'a, E> {
     type Error = TryFromBigIntError<BigInt>;
 
     fn try_from(value: BigInt) -> Result<Self, Self::Error> {
@@ -391,25 +391,25 @@ impl<'a, E: Encoding<'a, Big = BigUint>> TryFrom<BigInt> for GenericUnsignedBigN
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> TryFrom<GenericSignedBigNum<'a, E>> for BigUint {
-    type Error = TryFromBigIntError<GenericSignedBigNum<'a, E>>;
+impl<'a, E: Encoding<'a, Big = BigInt>> TryFrom<Int<'a, E>> for BigUint {
+    type Error = TryFromBigIntError<Int<'a, E>>;
 
-    fn try_from(value: GenericSignedBigNum<'a, E>) -> Result<Self, Self::Error> {
+    fn try_from(value: Int<'a, E>) -> Result<Self, Self::Error> {
         value
             .to_biguint()
             .ok_or_else(|| TryFromBigIntError::new(value))
     }
 }
 
-impl<'a, 'b, E1, E2> TryFrom<GenericSignedBigNum<'a, E1>> for GenericUnsignedBigNum<'b, E2>
+impl<'a, 'b, E1, E2> TryFrom<Int<'a, E1>> for Uint<'b, E2>
 where
     E1: Encoding<'a, Big = BigInt>,
     E2: Encoding<'b, Big = BigUint>,
     E2::Small: TryFrom<E1::Small>,
 {
-    type Error = TryFromBigIntError<GenericSignedBigNum<'a, E1>>;
+    type Error = TryFromBigIntError<Int<'a, E1>>;
 
-    fn try_from(value: GenericSignedBigNum<'a, E1>) -> Result<Self, Self::Error> {
+    fn try_from(value: Int<'a, E1>) -> Result<Self, Self::Error> {
         value
             .with_decoded(|decoded| match decoded {
                 Decoded::Small(s) => match E2::Small::try_from(s) {
@@ -441,25 +441,25 @@ duplicate_uprims! {
 // From Unsigned to Signed
 // =============================================================================
 
-impl<'a, E: Encoding<'a, Big = BigInt>> From<BigUint> for GenericSignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigInt>> From<BigUint> for Int<'a, E> {
     fn from(value: BigUint) -> Self {
         Self::from_big(value.into())
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigUint>> From<GenericUnsignedBigNum<'a, E>> for BigInt {
-    fn from(value: GenericUnsignedBigNum<'a, E>) -> Self {
+impl<'a, E: Encoding<'a, Big = BigUint>> From<Uint<'a, E>> for BigInt {
+    fn from(value: Uint<'a, E>) -> Self {
         BigInt::from(value.clone().into_big())
     }
 }
 
-impl<'a, 'b, E1, E2> From<GenericUnsignedBigNum<'a, E1>> for GenericSignedBigNum<'b, E2>
+impl<'a, 'b, E1, E2> From<Uint<'a, E1>> for Int<'b, E2>
 where
     E1: Encoding<'a, Big = BigUint>,
     E2: Encoding<'b, Big = BigInt>,
     E2::Small: TryFrom<E1::Small>,
 {
-    fn from(value: GenericUnsignedBigNum<'a, E1>) -> Self {
+    fn from(value: Uint<'a, E1>) -> Self {
         value.with_decoded(|decoded| match decoded {
             Decoded::Small(s) => match E2::Small::try_from(s) {
                 Ok(small) => Self::from_small(small),
@@ -472,8 +472,8 @@ where
 
 #[duplicate_item(
     tag       signedness  ImplType    EncodedType;
-    [bigint]  [signed]    [BigInt]   [GenericSignedBigNum];
-    [biguint] [unsigned]  [BigUint]  [GenericUnsignedBigNum];
+    [bigint]  [signed]    [BigInt]    [Int];
+    [biguint] [unsigned]  [BigUint]   [Uint];
 )]
 pub mod tag {
     use super::*;

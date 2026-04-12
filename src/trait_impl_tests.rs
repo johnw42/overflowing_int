@@ -1,9 +1,9 @@
 #![cfg(test)]
 #![allow(unused_imports)]
 use crate::encoding::{Decode, Decoded, Encode, Encoding};
-use crate::signed::GenericSignedBigNum;
+use crate::signed::Int;
 use crate::small_num::SmallNumber;
-use crate::unsigned::GenericUnsignedBigNum;
+use crate::unsigned::Uint;
 use crate::{CowBigInt, CowBigUint, RcBigInt, RcBigUint, duplicate_generic_bignum_types};
 use crate::{duplicate_iprims, duplicate_prims, duplicate_uprims};
 use duplicate::duplicate_item;

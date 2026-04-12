@@ -9,44 +9,42 @@ use std::marker::PhantomData;
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Uint<'a, E: Encoding<'a>>(pub(crate) E, PhantomData<&'a ()>);
 
-pub type GenericUnsignedBigNum<'a, E> = Uint<'a, E>;
-
-impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     fn from_encoding(encoding: E) -> Self {
         Self(encoding, PhantomData)
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
-    pub fn into_static(self) -> GenericUnsignedBigNum<'static, E::Static> {
-        GenericUnsignedBigNum::from_encoding(self.0.into_static())
+    pub fn into_static(self) -> Uint<'static, E::Static> {
+        Uint::from_encoding(self.0.into_static())
     }
 
     /// Converts this big integer to into one that borrows from this one's data.
-    pub fn borrow<'b>(&'b self) -> GenericUnsignedBigNum<'b, E::WithLifetime<'b>>
+    pub fn borrow<'b>(&'b self) -> Uint<'b, E::WithLifetime<'b>>
     where
         E: BorrowingEncoding<'a>,
         'a: 'b,
     {
-        GenericUnsignedBigNum::from_encoding(self.0.borrow())
+        Uint::from_encoding(self.0.borrow())
     }
 
-    /// Creates and initializes a [`GenericUnsignedBigNum`].
+    /// Creates and initializes a [`Uint`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn new(digits: Vec<u32>) -> GenericUnsignedBigNum<'a, E> {
+    pub fn new(digits: Vec<u32>) -> Uint<'a, E> {
         Self::from_encoding(E::from_big(E::Big::new(digits)))
     }
 
-    /// Creates and initializes a [`GenericUnsignedBigNum`].
+    /// Creates and initializes a [`Uint`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn from_slice(slice: &[u32]) -> GenericUnsignedBigNum<'a, E> {
+    pub fn from_slice(slice: &[u32]) -> Uint<'a, E> {
         Self::from_encoding(E::from_big(E::Big::from_slice(slice)))
     }
 
-    /// Assign a value to a [`GenericUnsignedBigNum`].
+    /// Assign a value to a [`Uint`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
@@ -54,7 +52,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
         *self = Self::from_slice(slice);
     }
 
-    /// Creates and initializes a [`GenericUnsignedBigNum`].
+    /// Creates and initializes a [`Uint`].
     ///
     /// The bytes are in big-endian byte order.
     ///
@@ -73,7 +71,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     ///            RcBigUint::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     #[inline]
-    pub fn from_bytes_be(bytes: &[u8]) -> GenericUnsignedBigNum<'a, E> {
+    pub fn from_bytes_be(bytes: &[u8]) -> Uint<'a, E> {
         Self::from_encoding(
             if let Some(from_bytes) = SmallNumber::from_bytes_be(bytes) {
                 E::from_small(from_bytes)
@@ -83,15 +81,15 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
         )
     }
 
-    /// Creates and initializes a [`GenericUnsignedBigNum`].
+    /// Creates and initializes a [`Uint`].
     ///
     /// The bytes are in little-endian byte order.
     #[inline]
-    pub fn from_bytes_le(bytes: &[u8]) -> GenericUnsignedBigNum<'a, E> {
+    pub fn from_bytes_le(bytes: &[u8]) -> Uint<'a, E> {
         Self::from_encoding(E::from_big(E::Big::from_bytes_le(bytes)))
     }
 
-    /// Creates and initializes a [`GenericUnsignedBigNum`]. The input slice must contain
+    /// Creates and initializes a [`Uint`]. The input slice must contain
     /// ascii/utf8 characters in [0-9a-zA-Z].
     /// `radix` must be in the range `2...36`.
     ///
@@ -112,7 +110,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
         E::parse_bytes(buf, radix).map(Self::from_encoding)
     }
 
-    /// Creates and initializes a [`GenericUnsignedBigNum`]. Each `u8` of the input slice is
+    /// Creates and initializes a [`Uint`]. Each `u8` of the input slice is
     /// interpreted as one digit of the number
     /// and must therefore be less than `radix`.
     ///
@@ -134,7 +132,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
             .map(Self::from_encoding)
     }
 
-    /// Creates and initializes a [`GenericUnsignedBigNum`]. Each `u8` of the input slice is
+    /// Creates and initializes a [`Uint`]. Each `u8` of the input slice is
     /// interpreted as one digit of the number
     /// and must therefore be less than `radix`.
     ///
@@ -150,13 +148,13 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     /// let a = RcBigUint::from_radix_le(inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_le(190), inbase190);
     /// ```
-    pub fn from_radix_le(buf: &[u8], radix: u32) -> Option<GenericUnsignedBigNum<'a, E>> {
+    pub fn from_radix_le(buf: &[u8], radix: u32) -> Option<Uint<'a, E>> {
         E::Big::from_radix_le(buf, radix)
             .map(E::from_big)
             .map(Self::from_encoding)
     }
 
-    /// Returns the byte representation of the [`GenericUnsignedBigNum`] in big-endian byte order.
+    /// Returns the byte representation of the [`Uint`] in big-endian byte order.
     ///
     /// # Examples
     ///
@@ -171,7 +169,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
         self.0.with_big_cow(|big| big.as_ref().to_bytes_be())
     }
 
-    /// Returns the byte representation of the [`GenericUnsignedBigNum`] in little-endian byte order.
+    /// Returns the byte representation of the [`Uint`] in little-endian byte order.
     ///
     /// # Examples
     ///
@@ -186,7 +184,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
         self.0.with_big_cow(|big| big.as_ref().to_bytes_le())
     }
 
-    /// Returns the `u32` digits representation of the [`GenericUnsignedBigNum`] ordered least significant digit
+    /// Returns the `u32` digits representation of the [`Uint`] ordered least significant digit
     /// first.
     ///
     /// # Examples
@@ -204,7 +202,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
         self.0.with_big_cow(|big| big.as_ref().to_u32_digits())
     }
 
-    /// Returns the `u64` digits representation of the [`GenericUnsignedBigNum`] ordered least significant digit
+    /// Returns the `u64` digits representation of the [`Uint`] ordered least significant digit
     /// first.
     ///
     /// # Examples
@@ -223,7 +221,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
         self.0.with_big_cow(|big| big.as_ref().to_u64_digits())
     }
 
-    /// Returns an iterator of `u32` digits representation of the [`GenericUnsignedBigNum`] ordered least
+    /// Returns an iterator of `u32` digits representation of the [`Uint`] ordered least
     /// significant digit first.
     ///
     /// # Examples
@@ -241,7 +239,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
         self.0.iter_u32_digits()
     }
 
-    /// Returns an iterator of `u64` digits representation of the [`GenericUnsignedBigNum`] ordered least
+    /// Returns an iterator of `u64` digits representation of the [`Uint`] ordered least
     /// significant digit first.
     ///
     /// # Examples
@@ -314,7 +312,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
         self.0.with_big_cow(|big| big.as_ref().to_radix_le(radix))
     }
 
-    /// Determines the fewest bits necessary to express the [`GenericUnsignedBigNum`].
+    /// Determines the fewest bits necessary to express the [`Uint`].
     #[inline]
     pub fn bits(&self) -> u64 {
         self.0.bits()
@@ -408,15 +406,12 @@ impl<'a, E: Encoding<'a, Big = BigUint>> GenericUnsignedBigNum<'a, E> {
     }
 }
 
-impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for GenericUnsignedBigNum<'a, E> {
-    fn decode(self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
+impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for Uint<'a, E> {
+    fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
         self.0.decode()
     }
 
-    fn with_decoded<T>(
-        &self,
-        f: impl FnOnce(Decoded<E::Small, Cow<<E::Small as SmallNumber>::Big>>) -> T,
-    ) -> T {
+    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
         self.0.with_decoded(f)
     }
 
@@ -425,15 +420,13 @@ impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for GenericUnsignedBigNum<'a, E> 
     }
 }
 
-impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &GenericUnsignedBigNum<'a, E> {
-    fn decode(self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
+impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &Uint<'a, E> {
+    fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+        // TODO Can we do this without cloning?
         self.0.clone().decode()
     }
 
-    fn with_decoded<T>(
-        &self,
-        f: impl FnOnce(Decoded<E::Small, Cow<<E::Small as SmallNumber>::Big>>) -> T,
-    ) -> T {
+    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
         self.0.with_decoded(f)
     }
 
@@ -442,7 +435,7 @@ impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &GenericUnsignedBigNum<'a, E>
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigUint>> Encode<'a, E::Small> for GenericUnsignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigUint>> Encode<'a, E::Small> for Uint<'a, E> {
     fn from_small(s: E::Small) -> Self {
         Self::from_encoding(E::from_small(s))
     }
@@ -452,18 +445,18 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Encode<'a, E::Small> for GenericUnsigne
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigUint>> Encoding<'a> for GenericUnsignedBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = BigUint>> Encoding<'a> for Uint<'a, E> {
     type Small = E::Small;
     type Big = E::Big;
     type Unsigned = E::Unsigned;
-    type Static = GenericUnsignedBigNum<'static, E::Static>;
+    type Static = Uint<'static, E::Static>;
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
         self.0.update_encoding(f);
     }
 
     fn into_static(self) -> Self::Static {
-        GenericUnsignedBigNum::from_encoding(self.0.into_static())
+        Uint::from_encoding(self.0.into_static())
     }
 }
 

@@ -1,9 +1,9 @@
 #![allow(unused_imports)]
 use crate::big_number::{BigNumber, BigSigned};
 use crate::encoding::{Decode, Decoded, Encoding};
-use crate::signed::GenericSignedBigNum;
+use crate::signed::Int;
 use crate::small_num::SmallNumber as _;
-use crate::unsigned::GenericUnsignedBigNum;
+use crate::unsigned::Uint;
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_generic_big_num, duplicate_iprims,
     duplicate_prims, duplicate_shift_ops, duplicate_uprims, duplicate_uprims_and_iprims_if_signed,
@@ -422,7 +422,6 @@ duplicate_arith_ops! {
             impl<'a, E: Encoding<'a, Big = RawType>> op_trait<GenericBigNum<'a, E>> for prim {
                 type Output = GenericBigNum<'a, E>;
 
-                #[inline(never)]
                 fn op_fn(self, rhs: GenericBigNum<'a, E>) -> Self::Output {
                     [<op_trait Op>]::call(self, rhs)
                 }
@@ -439,7 +438,6 @@ duplicate_arith_ops! {
             impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&GenericBigNum<'a, E>> for prim {
                 type Output = GenericBigNum<'a, E>;
 
-                #[inline(never)]
                 fn op_fn(self, rhs: &GenericBigNum<'a, E>) -> Self::Output {
                     [<op_trait Op>]::call(self, rhs)
                 }
@@ -547,34 +545,34 @@ duplicate_shift_ops! {
 // -----------------------------------------------------------------------------
 duplicate_generic_big_num! {
 
-impl<'a, E: Encoding<'a, Big = RawType>> Pow<GenericUnsignedBigNum<'a, E::Unsigned>> for GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<Uint<'a, E::Unsigned>> for GenericBigNum<'a, E> {
     type Output = GenericBigNum<'a, E>;
 
-    fn pow(self, rhs: GenericUnsignedBigNum<'a, E::Unsigned>) -> Self::Output {
+    fn pow(self, rhs: Uint<'a, E::Unsigned>) -> Self::Output {
         PowOp::call(self, rhs)
     }
 }
 
-impl<'a, E: Encoding<'a, Big = RawType>> Pow<&GenericUnsignedBigNum<'a, E::Unsigned>> for GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<&Uint<'a, E::Unsigned>> for GenericBigNum<'a, E> {
     type Output = GenericBigNum<'a, E>;
 
-    fn pow(self, rhs: &GenericUnsignedBigNum<'a, E::Unsigned>) -> Self::Output {
+    fn pow(self, rhs: &Uint<'a, E::Unsigned>) -> Self::Output {
         PowOp::call(self, rhs)
     }
 }
 
-impl<'a, E: Encoding<'a, Big = RawType>> Pow<GenericUnsignedBigNum<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<Uint<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
     type Output = GenericBigNum<'a, E>;
 
-    fn pow(self, rhs: GenericUnsignedBigNum<'a, E::Unsigned>) -> Self::Output {
+    fn pow(self, rhs: Uint<'a, E::Unsigned>) -> Self::Output {
         PowOp::call(self, rhs)
     }
 }
 
-impl<'a, E: Encoding<'a, Big = RawType>> Pow<&GenericUnsignedBigNum<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<&Uint<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
     type Output = GenericBigNum<'a, E>;
 
-    fn pow(self, rhs: &GenericUnsignedBigNum<'a, E::Unsigned>) -> Self::Output {
+    fn pow(self, rhs: &Uint<'a, E::Unsigned>) -> Self::Output {
         PowOp::call(self, rhs)
     }
 }
@@ -625,7 +623,7 @@ mod test {
     use super::*;
     use crate::duplicate_arith_and_bit_ops;
     use crate::duplicate_generic_bignum_types;
-    use crate::signed::GenericSignedBigNum;
+    use crate::signed::Int;
     use num_bigint::BigInt;
     use num_traits::Zero;
     use quickcheck::TestResult;
