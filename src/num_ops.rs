@@ -31,10 +31,10 @@ trait ArithOp<'e, E: Encoding<'e>> {
     fn update_small(lhs: &mut E::Big, rhs: E::Small);
 
     /// Calls a version of the binary operator that returns a new number.
-    fn call<'a, 'b, L, R>(lhs: L, rhs: R) -> E
+    fn call<L, R>(lhs: L, rhs: R) -> E
     where
-        L: Decode<'a, E::Small>,
-        R: Decode<'b, E::Small>,
+        L: Decode<'e, E::Small>,
+        R: Decode<'e, E::Small>,
     {
         match (lhs.decode(), rhs.decode()) {
             (Decoded::Small(lhs), Decoded::Small(rhs)) => {
@@ -54,12 +54,33 @@ trait ArithOp<'e, E: Encoding<'e>> {
                 E::from_big(Self::on_big(big_lhs, big_rhs))
             }
         }
+
+        // lhs.with_decoded(|lhs| {
+        //     rhs.with_decoded(|rhs| match (lhs, rhs) {
+        //         (Decoded::Small(lhs), Decoded::Small(rhs)) => {
+        //             if let Ok(out) = Self::on_small(lhs, rhs) {
+        //                 E::from_small(out)
+        //             } else {
+        //                 E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
+        //             }
+        //         }
+        //         (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
+        //             E::from_big(Self::on_small_big(small_lhs, big_rhs))
+        //         }
+        //         (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
+        //             E::from_big(Self::on_big_small(big_lhs, small_rhs))
+        //         }
+        //         (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
+        //             E::from_big(Self::on_big(big_lhs, big_rhs))
+        //         }
+        //     })
+        // })
     }
 
     /// Calls a version of the binary operator that updates a bigint argument in place.
-    fn call_update<'a, 'c, R>(lhs: &'a mut E, rhs: R)
+    fn call_update<R>(lhs: &mut E, rhs: R)
     where
-        R: Decode<'c, E::Small>,
+        R: Decode<'e, E::Small>,
     {
         lhs.update_encoding(|encoding| match encoding {
             Decoded::Small(small_lhs) => match rhs.decode() {
@@ -92,10 +113,10 @@ trait BitOp<'e, E: Encoding<'e>> {
     fn on_big(lhs: Cow<E::Big>, rhs: Cow<E::Big>) -> E::Big;
     fn update_big(lhs: &mut E::Big, rhs: Cow<E::Big>);
 
-    fn call<'a, 'b, L, R>(lhs: L, rhs: R) -> E
+    fn call<L, R>(lhs: L, rhs: R) -> E
     where
-        L: Decode<'a, E::Small>,
-        R: Decode<'b, E::Small>,
+        L: Decode<'e, E::Small>,
+        R: Decode<'e, E::Small>,
     {
         E::from_big(lhs.with_big_cows(&rhs, |lhs, rhs| Self::on_big(lhs, rhs)))
     }
@@ -157,10 +178,10 @@ trait PowOpTrait<'e, E: Encoding<'e>> {
     fn on_big(lhs: Cow<E::Big>, rhs: Cow<<E::Unsigned as Encoding<'e>>::Big>) -> E::Big;
 
     /// Calls a version of the binary operator that returns a new number.
-    fn call<'a, 'b, L, R>(lhs: L, rhs: R) -> E
+    fn call<L, R>(lhs: L, rhs: R) -> E
     where
-        L: Decode<'a, E::Small>,
-        R: Decode<'b, <E::Unsigned as Encoding<'e>>::Small>,
+        L: Decode<'e, E::Small>,
+        R: Decode<'e, <E::Unsigned as Encoding<'e>>::Small>,
     {
         lhs.with_decoded(|lhs| {
             rhs.with_decoded(|rhs| match (lhs, rhs) {
@@ -456,9 +477,9 @@ duplicate_arith_ops! {
 
 duplicate_bit_ops! {
     paste! {
-        impl<'a, 'b, T, E: Encoding<'a, Big = RawType>> op_trait<T> for GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for GenericBigNum<'a, E>
         where
-            T: Decode<'b, E::Small>,
+            T: Decode<'a, E::Small>,
         {
             type Output = GenericBigNum<'a, E>;
 
@@ -467,9 +488,9 @@ duplicate_bit_ops! {
             }
         }
 
-        impl<'a, 'b, T, E: Encoding<'a, Big = RawType>> op_trait<T> for &GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for &GenericBigNum<'a, E>
         where
-            T: Decode<'b, E::Small>,
+            T: Decode<'a, E::Small>,
         {
             type Output = GenericBigNum<'a, E>;
 
@@ -478,9 +499,9 @@ duplicate_bit_ops! {
             }
         }
 
-        impl<'a, 'b, T, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<T> for GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<T> for GenericBigNum<'a, E>
         where
-            T: Decode<'b, E::Small>
+            T: Decode<'a, E::Small>
         {
             fn [<op_fn _assign>](&mut self, rhs: T) {
                 [<op_trait Op>]::call_update(self, rhs);

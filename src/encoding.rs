@@ -73,9 +73,9 @@ where
     /// passes the resulting big `Cow`s to the provided function.  This is useful
     /// for implementing binary operations on big numbers, since it allows us to
     /// avoid cloning the big values when both encodings are big.
-    fn with_big_cows<'b, T>(
+    fn with_big_cows<T>(
         &self,
-        other: &impl Decode<'b, S>,
+        other: &impl Decode<'a, S>,
         f: impl FnOnce(Cow<S::Big>, Cow<S::Big>) -> T,
     ) -> T {
         self.with_big_cow(|lhs| other.with_big_cow(|rhs| f(lhs, rhs)))
@@ -88,9 +88,9 @@ where
     /// implementing binary operations on big numbers, since it allows us to
     /// avoid cloning the big values when both encodings are big, while still
     /// allowing us to work with the small values when both encodings are small.
-    fn with_matching_size<'b, T>(
+    fn with_matching_size<T>(
         &self,
-        other: &impl Decode<'b, S>,
+        other: &impl Decode<'a, S>,
         f: impl FnOnce(Decoded<(S, S), (Cow<S::Big>, Cow<S::Big>)>) -> T,
     ) -> T {
         self.with_decoded(|lhs| {

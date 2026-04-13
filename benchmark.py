@@ -17,6 +17,7 @@ REVISIONS = [
     "nsy",
     "kpw",
     "tkr",
+    "mwu",
 ]
 
 FUNCTIONS = ["Control", "Cow", "Rc", "RcIsize", "Trivial", "Box"]
