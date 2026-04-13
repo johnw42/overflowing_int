@@ -3,6 +3,7 @@ use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encode;
 use crate::encoding::Encoding;
+use crate::encoding::EncodingKind;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -30,6 +31,10 @@ impl<'a, S> Decode<'a, S> for CowEncoding<'a, S>
 where
     S: SmallNumber,
 {
+    fn kind() -> EncodingKind {
+        EncodingKind::Cow
+    }
+
     fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
         self.0
     }

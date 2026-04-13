@@ -1,4 +1,4 @@
-use crate::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingKind};
 use crate::small_num::SmallNumber;
 use std::hash::Hash;
 use std::{borrow::Cow, fmt::Debug};
@@ -12,6 +12,10 @@ impl<S> Decode<'static, S> for TrivialEncoding<S>
 where
     S: SmallNumber,
 {
+    fn kind() -> EncodingKind {
+        EncodingKind::Trivial
+    }
+
     #[inline]
     fn decode(self) -> Decoded<S, Cow<'static, S::Big>> {
         Decoded::Big(Cow::Owned(self.0))

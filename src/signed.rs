@@ -1,5 +1,5 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{BorrowingEncoding, Decode, Decoded, Encode, Encoding};
+use crate::encoding::{BorrowingEncoding, Decode, Decoded, Encode, Encoding, EncodingKind};
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::Zero;
@@ -436,6 +436,10 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
 }
 
 impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for Int<'a, E> {
+    fn kind() -> EncodingKind {
+        E::kind()
+    }
+
     fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
         self.0.decode()
     }
@@ -450,6 +454,10 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for Int<'a, E> {
 }
 
 impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for &Int<'a, E> {
+    fn kind() -> EncodingKind {
+        E::kind()
+    }
+
     fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
         // TODO Can we do this without cloning?
         self.0.clone().decode()

@@ -8,19 +8,9 @@ TOP_DIR = os.path.dirname(__file__)
 
 BASELINE = "lmu"
 
-REVISIONS = [
-    "lmu",
-    "tyq",
-    "uxw",
-    "vuq",
-    "nws",
-    "nsy",
-    "kpw",
-    "tkr",
-    "mwu",
-]
+REVISIONS = ["lmu", "tyq", "uxw", "vuq", "nws", "nsy", "kpw", "tkr", "ply"]
 
-FUNCTIONS = ["Control", "Cow", "Rc", "RcIsize", "Trivial", "Box"]
+FUNCTIONS = ["Control", "Cow", "Rc", "RcIsize", "Identity", "Box"]
 SIZES = [10, 15, 20, 30, 40, 50, 100]
 
 
@@ -63,6 +53,7 @@ def main():
     s = p.add_subparsers(dest="command")
     s.add_parser("all", help="Run benchmarks for all revisions.")
     s.add_parser("summary", help="Print a summary of the benchmark results.")
+    s.add_parser("profile", help="Profile the benchmarks.")
     s.add_parser("run", help="Run benchmarks for the current revision.")
     p.add_argument(
         "--function",
@@ -107,11 +98,33 @@ def main():
                         if (function, size) in data.data:
                             reference = baseline_data.data[(function, size)]
                             throughput = data.data[(function, size)]
-                            percent = 100 * throughput / reference
+                            fraction = throughput / reference
+                            delta_percent = 100 * (fraction - 1)
                             if throughput is not None:
                                 print(
-                                    f"  {rev}: {throughput:.2f} ME/s ({percent:.2f}%)"
+                                    f"  {rev}: {throughput:.2f} ME/s ({delta_percent:+.2f}%)"
                                 )
+        case "profile":
+            jq_output = os.popen(
+                "cargo bench --no-run --message-format=json | jq -r 'select(.executable != null) | .executable'"
+            ).read()
+            m = re.search(
+                r"(?m)^(?:/\S+)*/target/release/deps/pi-[0-9a-f]+$",
+                jq_output,
+            )
+            print(repr(jq_output))
+            assert m, jq_output
+            executable = m.group(0)
+            os.system(
+                f"perf record --call-graph dwarf -- {executable} --bench --profile-time 5 'Pi/({opts.function})/({opts.size})'"
+            )
+            data_path = f"perf.{current_revision()[:3]}.data"
+            try:
+                os.remove(data_path)
+            except FileNotFoundError:
+                pass
+            os.rename("perf.data", data_path)
+            print(f"Saved profile data to {data_path}")
         case "run":
             os.system(
                 f"cargo bench -p compact_bigint --bench=pi -- --save-baseline={current_revision()[:3]} 'Pi/({opts.function})/({opts.size})'"

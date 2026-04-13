@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 use crate::big_number::{BigNumber, BigSigned};
-use crate::encoding::{Decode, Decoded, Encoding};
+use crate::encoding::{Decode, Decoded, Encoding, EncodingKind};
 use crate::signed::Int;
 use crate::small_num::SmallNumber as _;
 use crate::unsigned::Uint;
@@ -36,45 +36,46 @@ trait ArithOp<'e, E: Encoding<'e>> {
         L: Decode<'e, E::Small>,
         R: Decode<'e, E::Small>,
     {
-        match (lhs.decode(), rhs.decode()) {
-            (Decoded::Small(lhs), Decoded::Small(rhs)) => {
-                if let Ok(out) = Self::on_small(lhs, rhs) {
-                    E::from_small(out)
-                } else {
-                    E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
+        match E::kind() {
+            EncodingKind::Cow => match (lhs.decode(), rhs.decode()) {
+                (Decoded::Small(lhs), Decoded::Small(rhs)) => {
+                    if let Ok(out) = Self::on_small(lhs, rhs) {
+                        E::from_small(out)
+                    } else {
+                        E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
+                    }
                 }
-            }
-            (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
-                E::from_big(Self::on_small_big(small_lhs, big_rhs))
-            }
-            (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
-                E::from_big(Self::on_big_small(big_lhs, small_rhs))
-            }
-            (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
-                E::from_big(Self::on_big(big_lhs, big_rhs))
-            }
+                (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
+                    E::from_big(Self::on_small_big(small_lhs, big_rhs))
+                }
+                (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
+                    E::from_big(Self::on_big_small(big_lhs, small_rhs))
+                }
+                (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
+                    E::from_big(Self::on_big(big_lhs, big_rhs))
+                }
+            },
+            _ => lhs.with_decoded(|lhs| {
+                rhs.with_decoded(|rhs| match (lhs, rhs) {
+                    (Decoded::Small(lhs), Decoded::Small(rhs)) => {
+                        if let Ok(out) = Self::on_small(lhs, rhs) {
+                            E::from_small(out)
+                        } else {
+                            E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
+                        }
+                    }
+                    (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
+                        E::from_big(Self::on_small_big(small_lhs, big_rhs))
+                    }
+                    (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
+                        E::from_big(Self::on_big_small(big_lhs, small_rhs))
+                    }
+                    (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
+                        E::from_big(Self::on_big(big_lhs, big_rhs))
+                    }
+                })
+            }),
         }
-
-        // lhs.with_decoded(|lhs| {
-        //     rhs.with_decoded(|rhs| match (lhs, rhs) {
-        //         (Decoded::Small(lhs), Decoded::Small(rhs)) => {
-        //             if let Ok(out) = Self::on_small(lhs, rhs) {
-        //                 E::from_small(out)
-        //             } else {
-        //                 E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
-        //             }
-        //         }
-        //         (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
-        //             E::from_big(Self::on_small_big(small_lhs, big_rhs))
-        //         }
-        //         (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
-        //             E::from_big(Self::on_big_small(big_lhs, small_rhs))
-        //         }
-        //         (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
-        //             E::from_big(Self::on_big(big_lhs, big_rhs))
-        //         }
-        //     })
-        // })
     }
 
     /// Calls a version of the binary operator that updates a bigint argument in place.

@@ -14,6 +14,14 @@ pub enum Decoded<S, B> {
     Big(B),
 }
 
+pub enum EncodingKind {
+    Box,
+    Rc,
+    Cow,
+    Trivial,
+    Primitive,
+}
+
 /// A type that can be decoded into a small or big value.  This this applies to
 /// encoded big numbers, but it also applies to types that can be trivially
 /// decoded, such as integer types and bignum types.
@@ -21,6 +29,8 @@ pub trait Decode<'a, S>: Sized + Clone
 where
     S: SmallNumber,
 {
+    fn kind() -> EncodingKind;
+
     /// The main method of this trait, which decodes the value into either a
     /// small or big value without ever cloning a big value.  This method is
     /// preferable to [`Self::decode`] in most cases, but if `f` needs to
@@ -308,6 +318,10 @@ impl<'a, S> Decode<'a, S> for Cow<'a, S::Big>
 where
     S: SmallNumber,
 {
+    fn kind() -> EncodingKind {
+        EncodingKind::Cow
+    }
+
     fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
         Decoded::Big(self)
     }
@@ -332,6 +346,10 @@ impl<'a, S> Decode<'a, S> for Rc<S::Big>
 where
     S: SmallNumber,
 {
+    fn kind() -> EncodingKind {
+        EncodingKind::Rc
+    }
+
     fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
         Decoded::Big(Cow::Owned((*self).clone()))
     }
@@ -358,6 +376,10 @@ duplicate_prims! {
         S: SmallNumber,
         S::Big: BigNumber + From<prim>
     {
+        fn kind() -> EncodingKind {
+            EncodingKind::Primitive
+        }
+
         fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
             #[allow(irrefutable_let_patterns)]
             #[allow(clippy::unnecessary_fallible_conversions)]
@@ -386,6 +408,10 @@ duplicate_prims! {
         S::Big: From<prim>,
         S: TryFrom<prim>
     {
+        fn kind() -> EncodingKind {
+            EncodingKind::Primitive
+        }
+
         fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
             #[allow(irrefutable_let_patterns)]
             #[allow(clippy::unnecessary_fallible_conversions)]

@@ -1,4 +1,4 @@
-use crate::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingKind};
 use crate::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
@@ -36,6 +36,10 @@ impl<S> Decode<'static, S> for RcEncoding<S>
 where
     S: SmallNumber,
 {
+    fn kind() -> EncodingKind {
+        EncodingKind::Rc
+    }
+
     fn decode(mut self) -> Decoded<S, Cow<'static, S::Big>> {
         unsafe {
             if let Some(s) = self.0.small.validate() {
