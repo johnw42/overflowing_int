@@ -12,6 +12,7 @@ impl<S> Decode<'static, S> for TrivialEncoding<S>
 where
     S: SmallNumber,
 {
+    #[inline]
     fn kind() -> EncodingKind {
         EncodingKind::Trivial
     }

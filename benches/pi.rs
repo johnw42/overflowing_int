@@ -1,25 +1,34 @@
+use std::panic::{AssertUnwindSafe, catch_unwind};
+
 use criterion::{
     AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group, criterion_main,
 };
 
-use compact_bigint::{BoxBigInt, CowBigInt, RcBigInt, RcBigIsize, TrivialBigInt};
-use duplicate::duplicate;
+use compact_bigint::{BoxBigInt, CowBigInt, IdentityBigInt, RcBigInt, RcBigIsize};
 use num_bigint::BigInt;
 use num_traits::Zero;
 use paste::paste;
 
-duplicate! {
-    [
-        label         BigInt;
-        [bigint]      [BigInt];
-        [rcbigint]    [RcBigInt];
-        [rcbigisize]  [RcBigIsize];
-        [cow]         [CowBigInt::<'static>];
-        [trivial]     [TrivialBigInt];
-        [box]         [BoxBigInt];
-    ]
+macro_rules! duplicate_bigint_types {
+    ($($body:tt)*) => {
+        duplicate::duplicate! {
+            [
+                label         BigInt;
+                [Box]         [BoxBigInt];
+                [Cow]         [CowBigInt::<'static>];
+                [Identity]    [IdentityBigInt];
+                [Rc]          [RcBigInt];
+                [RcIsize]     [RcBigIsize];
+                [Control]     [BigInt];
+            ]
+            $($body)*
+        }
+    }
+}
+
+duplicate_bigint_types! {
     paste! {
-        fn [<calc_pi_atan_rc_ label>](digits: u32) -> BigInt {
+        fn [<calc_pi_atan_ label:lower>](digits: u32) -> BigInt {
             fn pi_atan_rc(k: BigInt, n: BigInt) -> BigInt {
                 let mut a = BigInt::zero();
                 let mut w = n * &k;
@@ -54,30 +63,15 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     group.plot_config(plot_config.clone());
     for digits in [10, 15, 20, 30, 40, 50, 100] {
         group.throughput(criterion::Throughput::Elements(digits as u64));
-        group.bench_with_input(
-            BenchmarkId::new("Control", digits),
-            &digits,
-            |b, &digits| b.iter(|| calc_pi_atan_rc_bigint(digits)),
-        );
-        group.bench_with_input(BenchmarkId::new("Rc", digits), &digits, |b, &digits| {
-            b.iter(|| calc_pi_atan_rc_rcbigint(digits))
-        });
-        group.bench_with_input(
-            BenchmarkId::new("RcIsize", digits),
-            &digits,
-            |b, &digits| b.iter(|| calc_pi_atan_rc_rcbigisize(digits)),
-        );
-        group.bench_with_input(BenchmarkId::new("Cow", digits), &digits, |b, &digits| {
-            b.iter(|| calc_pi_atan_rc_cow(digits))
-        });
-        group.bench_with_input(
-            BenchmarkId::new("Trivial", digits),
-            &digits,
-            |b, &digits| b.iter(|| calc_pi_atan_rc_trivial(digits)),
-        );
-        group.bench_with_input(BenchmarkId::new("Box", digits), &digits, |b, &digits| {
-            b.iter(|| calc_pi_atan_rc_box(digits))
-        });
+        duplicate_bigint_types! {
+            paste! {
+                group.bench_with_input(
+                    BenchmarkId::new(stringify!(label), digits),
+                    &digits,
+                    |b, &digits| b.iter(|| [<calc_pi_atan_ label:lower>](digits)),
+                );
+            }
+        }
     }
 }
 
