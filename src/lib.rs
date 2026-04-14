@@ -24,8 +24,6 @@ mod trait_impl_tests;
 mod trait_impls;
 mod unsigned;
 
-pub use crate::convert::{ToCowBigInt, ToCowBigUint, ToRcBigInt, ToRcBigUint};
-
 pub type CowBigInt<'a> = Int<'a, CowEncoding<'a, i128>>;
 pub type CowBigUint<'a> = Uint<'a, CowEncoding<'a, u128>>;
 pub type RcBigInt = Int<'static, RcEncoding<i128>>;

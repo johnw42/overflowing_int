@@ -5,7 +5,7 @@ use crate::signed::Int;
 use crate::small_num::SmallNumber as _;
 use crate::unsigned::Uint;
 use crate::{
-    duplicate_arith_ops, duplicate_bit_ops, duplicate_generic_big_num, duplicate_iprims,
+    duplicate_arith_ops, duplicate_bit_ops, duplicate_generic_bignum, duplicate_iprims,
     duplicate_prims, duplicate_shift_ops, duplicate_uprims, duplicate_uprims_and_iprims_if_signed,
 };
 use num_bigint::{BigInt, BigUint};
@@ -353,33 +353,33 @@ impl<'e, E: Encoding<'e>> PowOpTrait<'e, E> for PowOp {
 
 // MARK: Operator Trait Implementations
 // -----------------------------------------------------------------------------
-duplicate_generic_big_num! {
+duplicate_generic_bignum! {
 
 duplicate_arith_ops! {
     paste! {
-        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for EncodedType<'a, E>
         where
             T: Decode<'a, E::Small>,
         {
-            type Output = GenericBigNum<'a, E>;
+            type Output = EncodedType<'a, E>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
                 [<op_trait Op>]::call(self, rhs)
             }
         }
 
-        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for &GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for &EncodedType<'a, E>
         where
             T: Decode<'a, E::Small>,
         {
-            type Output = GenericBigNum<'a, E>;
+            type Output = EncodedType<'a, E>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
                 [<op_trait Op>]::call(self, rhs)
             }
         }
 
-        impl<'a, T, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<T> for GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<T> for EncodedType<'a, E>
         where
             T: Decode<'a, E::Small>
         {
@@ -391,48 +391,48 @@ duplicate_arith_ops! {
 
     duplicate_iprims! {
         paste! {
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<GenericBigNum<'a, E>> for prim
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<EncodedType<'a, E>> for prim
             where
                 E::Big: BigSigned,
             {
-                type Output = GenericBigNum<'a, E>;
+                type Output = EncodedType<'a, E>;
 
                 #[inline(never)]
-                fn op_fn(self, rhs: GenericBigNum<'a, E>) -> Self::Output {
+                fn op_fn(self, rhs: EncodedType<'a, E>) -> Self::Output {
                     [<op_trait Op>]::call(self, rhs)
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<GenericBigNum<'a, E>> for &prim
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<EncodedType<'a, E>> for &prim
             where
                 E::Big: BigSigned,
             {
-                type Output = GenericBigNum<'a, E>;
+                type Output = EncodedType<'a, E>;
 
-                fn op_fn(self, rhs: GenericBigNum<'a, E>) -> Self::Output {
+                fn op_fn(self, rhs: EncodedType<'a, E>) -> Self::Output {
                     (*self).op_fn(rhs)
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&GenericBigNum<'a, E>> for prim
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&EncodedType<'a, E>> for prim
             where
                 E::Big: BigSigned,
             {
-                type Output = GenericBigNum<'a, E>;
+                type Output = EncodedType<'a, E>;
 
                 #[inline(never)]
-                fn op_fn(self, rhs: &GenericBigNum<'a, E>) -> Self::Output {
+                fn op_fn(self, rhs: &EncodedType<'a, E>) -> Self::Output {
                     [<op_trait Op>]::call(self, rhs)
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&GenericBigNum<'a, E>> for &prim
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&EncodedType<'a, E>> for &prim
             where
                 E::Big: BigSigned,
             {
-                type Output = GenericBigNum<'a, E>;
+                type Output = EncodedType<'a, E>;
 
-                fn op_fn(self, rhs: &GenericBigNum<'a, E>) -> Self::Output {
+                fn op_fn(self, rhs: &EncodedType<'a, E>) -> Self::Output {
                     (*self).op_fn(rhs)
                 }
             }
@@ -441,34 +441,34 @@ duplicate_arith_ops! {
 
     duplicate_uprims! {
         paste! {
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<GenericBigNum<'a, E>> for prim {
-                type Output = GenericBigNum<'a, E>;
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<EncodedType<'a, E>> for prim {
+                type Output = EncodedType<'a, E>;
 
-                fn op_fn(self, rhs: GenericBigNum<'a, E>) -> Self::Output {
+                fn op_fn(self, rhs: EncodedType<'a, E>) -> Self::Output {
                     [<op_trait Op>]::call(self, rhs)
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<GenericBigNum<'a, E>> for &prim {
-                type Output = GenericBigNum<'a, E>;
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<EncodedType<'a, E>> for &prim {
+                type Output = EncodedType<'a, E>;
 
-                fn op_fn(self, rhs: GenericBigNum<'a, E>) -> Self::Output {
+                fn op_fn(self, rhs: EncodedType<'a, E>) -> Self::Output {
                     (*self).op_fn(rhs)
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&GenericBigNum<'a, E>> for prim {
-                type Output = GenericBigNum<'a, E>;
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&EncodedType<'a, E>> for prim {
+                type Output = EncodedType<'a, E>;
 
-                fn op_fn(self, rhs: &GenericBigNum<'a, E>) -> Self::Output {
+                fn op_fn(self, rhs: &EncodedType<'a, E>) -> Self::Output {
                     [<op_trait Op>]::call(self, rhs)
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&GenericBigNum<'a, E>> for &prim {
-                type Output = GenericBigNum<'a, E>;
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&EncodedType<'a, E>> for &prim {
+                type Output = EncodedType<'a, E>;
 
-                fn op_fn(self, rhs: &GenericBigNum<'a, E>) -> Self::Output {
+                fn op_fn(self, rhs: &EncodedType<'a, E>) -> Self::Output {
                     (*self).op_fn(rhs)
                 }
             }
@@ -478,29 +478,29 @@ duplicate_arith_ops! {
 
 duplicate_bit_ops! {
     paste! {
-        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for EncodedType<'a, E>
         where
             T: Decode<'a, E::Small>,
         {
-            type Output = GenericBigNum<'a, E>;
+            type Output = EncodedType<'a, E>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
                 [<op_trait Op>]::call(self, rhs)
             }
         }
 
-        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for &GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> op_trait<T> for &EncodedType<'a, E>
         where
             T: Decode<'a, E::Small>,
         {
-            type Output = GenericBigNum<'a, E>;
+            type Output = EncodedType<'a, E>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
                 [<op_trait Op>]::call(self, rhs)
             }
         }
 
-        impl<'a, T, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<T> for GenericBigNum<'a, E>
+        impl<'a, T, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<T> for EncodedType<'a, E>
         where
             T: Decode<'a, E::Small>
         {
@@ -514,45 +514,45 @@ duplicate_bit_ops! {
 duplicate_shift_ops! {
     duplicate_prims! {
         paste! {
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<prim> for GenericBigNum<'a, E> {
-                type Output = GenericBigNum<'a, E>;
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<prim> for EncodedType<'a, E> {
+                type Output = EncodedType<'a, E>;
 
                 fn op_fn(self, rhs: prim) -> Self::Output {
                     [<op_trait Op>]::[<call_ prim>](self, rhs)
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&prim> for GenericBigNum<'a, E> {
-                type Output = GenericBigNum<'a, E>;
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&prim> for EncodedType<'a, E> {
+                type Output = EncodedType<'a, E>;
 
                 fn op_fn(self, rhs: &prim) -> Self::Output {
                     self.op_fn(*rhs)
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<prim> for &GenericBigNum<'a, E> {
-                type Output = GenericBigNum<'a, E>;
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<prim> for &EncodedType<'a, E> {
+                type Output = EncodedType<'a, E>;
 
                 fn op_fn(self, rhs: prim) -> Self::Output {
                     [<op_trait Op>]::[<call_ prim>](self, rhs)
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&prim> for &GenericBigNum<'a, E> {
-                type Output = GenericBigNum<'a, E>;
+            impl<'a, E: Encoding<'a, Big = RawType>> op_trait<&prim> for &EncodedType<'a, E> {
+                type Output = EncodedType<'a, E>;
 
                 fn op_fn(self, rhs: &prim) -> Self::Output {
                     self.op_fn(*rhs)
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<prim> for GenericBigNum<'a, E> {
+            impl<'a, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<prim> for EncodedType<'a, E> {
                 fn [<op_fn _assign>](&mut self, rhs: prim) {
                     [<op_trait Op>]::[<call_update_big_ prim>](self, rhs);
                 }
             }
 
-            impl<'a, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<&prim> for GenericBigNum<'a, E> {
+            impl<'a, E: Encoding<'a, Big = RawType>> [<op_trait Assign>]<&prim> for EncodedType<'a, E> {
                 fn [<op_fn _assign>](&mut self, rhs: &prim) {
                     self.[<op_fn _assign>](*rhs);
                 }
@@ -561,38 +561,38 @@ duplicate_shift_ops! {
     }
 }
 
-} // duplicate_generic_big_num!
+} // duplicate_generic_bignum!
 
 // MARK: Pow Operator Implementations
 // -----------------------------------------------------------------------------
-duplicate_generic_big_num! {
+duplicate_generic_bignum! {
 
-impl<'a, E: Encoding<'a, Big = RawType>> Pow<Uint<'a, E::Unsigned>> for GenericBigNum<'a, E> {
-    type Output = GenericBigNum<'a, E>;
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<Uint<'a, E::Unsigned>> for EncodedType<'a, E> {
+    type Output = EncodedType<'a, E>;
 
     fn pow(self, rhs: Uint<'a, E::Unsigned>) -> Self::Output {
         PowOp::call(self, rhs)
     }
 }
 
-impl<'a, E: Encoding<'a, Big = RawType>> Pow<&Uint<'a, E::Unsigned>> for GenericBigNum<'a, E> {
-    type Output = GenericBigNum<'a, E>;
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<&Uint<'a, E::Unsigned>> for EncodedType<'a, E> {
+    type Output = EncodedType<'a, E>;
 
     fn pow(self, rhs: &Uint<'a, E::Unsigned>) -> Self::Output {
         PowOp::call(self, rhs)
     }
 }
 
-impl<'a, E: Encoding<'a, Big = RawType>> Pow<Uint<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
-    type Output = GenericBigNum<'a, E>;
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<Uint<'a, E::Unsigned>> for &EncodedType<'a, E> {
+    type Output = EncodedType<'a, E>;
 
     fn pow(self, rhs: Uint<'a, E::Unsigned>) -> Self::Output {
         PowOp::call(self, rhs)
     }
 }
 
-impl<'a, E: Encoding<'a, Big = RawType>> Pow<&Uint<'a, E::Unsigned>> for &GenericBigNum<'a, E> {
-    type Output = GenericBigNum<'a, E>;
+impl<'a, E: Encoding<'a, Big = RawType>> Pow<&Uint<'a, E::Unsigned>> for &EncodedType<'a, E> {
+    type Output = EncodedType<'a, E>;
 
     fn pow(self, rhs: &Uint<'a, E::Unsigned>) -> Self::Output {
         PowOp::call(self, rhs)
@@ -601,32 +601,32 @@ impl<'a, E: Encoding<'a, Big = RawType>> Pow<&Uint<'a, E::Unsigned>> for &Generi
 
 duplicate_uprims! {
     paste! {
-        impl<'a, E: Encoding<'a, Big = RawType>> Pow<prim> for GenericBigNum<'a, E> {
-            type Output = GenericBigNum<'a, E>;
+        impl<'a, E: Encoding<'a, Big = RawType>> Pow<prim> for EncodedType<'a, E> {
+            type Output = EncodedType<'a, E>;
 
             fn pow(self, rhs: prim) -> Self::Output {
                 PowOp::call(self, rhs)
             }
         }
 
-        impl<'a, E: Encoding<'a, Big = RawType>> Pow<&prim> for GenericBigNum<'a, E> {
-            type Output = GenericBigNum<'a, E>;
+        impl<'a, E: Encoding<'a, Big = RawType>> Pow<&prim> for EncodedType<'a, E> {
+            type Output = EncodedType<'a, E>;
 
             fn pow(self, rhs: &prim) -> Self::Output {
                 PowOp::call(self, rhs)
             }
         }
 
-        impl<'a, E: Encoding<'a, Big = RawType>> Pow<prim> for &GenericBigNum<'a, E> {
-            type Output = GenericBigNum<'a, E>;
+        impl<'a, E: Encoding<'a, Big = RawType>> Pow<prim> for &EncodedType<'a, E> {
+            type Output = EncodedType<'a, E>;
 
             fn pow(self, rhs: prim) -> Self::Output {
                 PowOp::call(self, rhs)
             }
         }
 
-        impl<'a, E: Encoding<'a, Big = RawType>> Pow<&prim> for &GenericBigNum<'a, E> {
-            type Output = GenericBigNum<'a, E>;
+        impl<'a, E: Encoding<'a, Big = RawType>> Pow<&prim> for &EncodedType<'a, E> {
+            type Output = EncodedType<'a, E>;
 
             fn pow(self, rhs: &prim) -> Self::Output {
                 PowOp::call(self, rhs)
@@ -635,7 +635,7 @@ duplicate_uprims! {
     }
 }
 
-} // duplicate_generic_big_num!
+} // duplicate_generic_bignum!
 
 // MARK: Tests
 #[cfg(test)]

@@ -18,11 +18,11 @@ macro_rules! duplicate_generic_bignum_types {
     };
 }
 #[macro_export]
-macro_rules! duplicate_generic_big_num {
+macro_rules! duplicate_generic_bignum {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                signedness GenericBigNum  RawType;
+                signedness EncodedType    RawType;
                 [signed]   [Int]          [BigInt];
                 [unsigned] [Uint]         [BigUint];
             ]
@@ -108,13 +108,13 @@ macro_rules! duplicate_uprims {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                prim;
-                [u8];
-                [u16];
-                [u32];
-                [u64];
-                [u128];
-                [usize];
+                prim    iprim;
+                [u8]    [i8];
+                [u16]   [i16];
+                [u32]   [i32];
+                [u64]   [i64];
+                [u128]  [i128];
+                [usize] [isize];
             ]
             $($body)*
         }
@@ -143,6 +143,16 @@ macro_rules! duplicate_uprims_and_iprims_if_signed {
     (signed; $($body:tt)*) => {
         $crate::duplicate_iprims! { $($body)* }
         $crate::duplicate_uprims! { $($body)* }
+    };
+    (unsigned; $($body:tt)*) => {
+        $crate::duplicate_uprims! { $($body)* }
+    };
+}
+
+#[macro_export]
+macro_rules! duplicate_prims_with_signedness {
+    (signed; $($body:tt)*) => {
+        $crate::duplicate_iprims! { $($body)* }
     };
     (unsigned; $($body:tt)*) => {
         $crate::duplicate_uprims! { $($body)* }
