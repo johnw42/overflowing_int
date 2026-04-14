@@ -38,9 +38,8 @@
 //! performance than their `Arc` or `Rc` counterparts, but benchmark your code
 //! to be sure!
 
-pub use num_bigint::{
-    BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint, TryFromBigIntError,
-};
+pub use crate::{borrow_bignum::BorrowBignum, convert::TryFromBigIntError};
+pub use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint};
 
 use crate::{
     arc_encoding::ArcEncoding, box_encoding::BoxEncoding, cow_encoding::CowEncoding,
@@ -49,6 +48,7 @@ use crate::{
 
 pub mod arc_encoding;
 pub mod big_number;
+pub mod borrow_bignum;
 mod bounds;
 mod box_encoding;
 mod convert;
@@ -67,24 +67,24 @@ mod unsigned;
 
 pub type CowBigInt<'a> = Int<'a, CowEncoding<'a, i128>>;
 pub type CowBigUint<'a> = Uint<'a, CowEncoding<'a, u128>>;
-pub type RcBigInt = Int<'static, RcEncoding<i128>>;
-pub type RcBigUint = Uint<'static, RcEncoding<u128>>;
-pub type RcBigIsize = Int<'static, RcEncoding<isize>>;
-pub type RcBigUsize = Uint<'static, RcEncoding<usize>>;
-pub type ArcBigInt = Int<'static, ArcEncoding<i128>>;
-pub type ArcBigUint = Uint<'static, ArcEncoding<u128>>;
-pub type ArcBigIsize = Int<'static, ArcEncoding<isize>>;
-pub type ArcBigUsize = Uint<'static, ArcEncoding<usize>>;
-pub type BoxBigInt = Int<'static, BoxEncoding<i128>>;
-pub type BoxBigUint = Uint<'static, BoxEncoding<u128>>;
-pub type BoxBigIsize = Int<'static, BoxEncoding<isize>>;
-pub type BoxBigUsize = Uint<'static, BoxEncoding<usize>>;
+pub type RcBigInt = Int<'static, RcEncoding<'static, i128>>;
+pub type RcBigUint = Uint<'static, RcEncoding<'static, u128>>;
+pub type RcBigIsize = Int<'static, RcEncoding<'static, isize>>;
+pub type RcBigUsize = Uint<'static, RcEncoding<'static, usize>>;
+pub type ArcBigInt = Int<'static, ArcEncoding<'static, i128>>;
+pub type ArcBigUint = Uint<'static, ArcEncoding<'static, u128>>;
+pub type ArcBigIsize = Int<'static, ArcEncoding<'static, isize>>;
+pub type ArcBigUsize = Uint<'static, ArcEncoding<'static, usize>>;
+pub type BoxBigInt = Int<'static, BoxEncoding<'static, i128>>;
+pub type BoxBigUint = Uint<'static, BoxEncoding<'static, u128>>;
+pub type BoxBigIsize = Int<'static, BoxEncoding<'static, isize>>;
+pub type BoxBigUsize = Uint<'static, BoxEncoding<'static, usize>>;
 
 // Only for benchmarking, not for general use.
 pub mod bench {
     use super::*;
     use crate::identity_encoding::IdentityEncoding;
 
-    pub type IdentityBigInt = Int<'static, IdentityEncoding<isize>>;
-    pub type IdentityBigUint = Uint<'static, IdentityEncoding<usize>>;
+    pub type IdentityBigInt<'a> = Int<'static, IdentityEncoding<'a, isize>>;
+    pub type IdentityBigUint<'a> = Uint<'static, IdentityEncoding<'a, usize>>;
 }

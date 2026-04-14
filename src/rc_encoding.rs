@@ -3,6 +3,7 @@ use crate::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::rc::Rc;
 use std::{borrow::Cow, fmt::Debug};
@@ -18,21 +19,21 @@ const _: () = {
 /// set to 1 for small values.  This encoding is used for `RcBigInt` and
 /// `RcBigUint`.
 #[derive(Clone)]
-pub struct RcEncoding<S>(RcEncodedRepr<S>)
+pub struct RcEncoding<'a, S>(RcEncodedRepr<S>, PhantomData<&'a ()>)
 where
     S: SmallNumber;
 
-impl<S> RcEncoding<S>
+impl<'a, S> RcEncoding<'a, S>
 where
     S: SmallNumber,
 {
     #[allow(unused)]
     fn from_shifted(shifted: Shifted<S>) -> Self {
-        Self(RcEncodedRepr { small: shifted })
+        Self(RcEncodedRepr { small: shifted }, PhantomData)
     }
 }
 
-impl<S> Decode<'static, S> for RcEncoding<S>
+impl<'a, S> Decode<'a, S> for RcEncoding<'a, S>
 where
     S: SmallNumber,
 {
@@ -53,7 +54,17 @@ where
         }
     }
 
-    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
+    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+        unsafe {
+            if let Some(s) = self.0.small.validate() {
+                Decoded::Small(s)
+            } else {
+                Decoded::Big(Cow::Borrowed(Rc::as_ref(&self.0.big)))
+            }
+        }
+    }
+
+    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
         unsafe {
             if let Some(s) = self.0.small.validate() {
                 f(Decoded::Small(s))
@@ -71,13 +82,13 @@ where
     }
 }
 
-impl<S> Encode<'static, S> for RcEncoding<S>
+impl<'a, S> Encode<'a, S> for RcEncoding<'a, S>
 where
     S: SmallNumber,
 {
     fn from_small(s: S) -> Self {
         if let Some(shifted) = Shifted::try_new(s) {
-            Self(RcEncodedRepr { small: shifted })
+            Self(RcEncodedRepr { small: shifted }, PhantomData)
         } else {
             let r = Self::from_big(s.to_big());
             unsafe {
@@ -87,7 +98,7 @@ where
         }
     }
 
-    fn from_big_cow(b: Cow<'static, S::Big>) -> Self {
+    fn from_big_cow(b: Cow<'a, S::Big>) -> Self {
         Self(
             if let Some(small) = S::try_from(b.as_ref()).ok()
                 && let Some(shifted) = Shifted::try_new(small)
@@ -98,22 +109,55 @@ where
                     big: ManuallyDrop::new(Rc::new(b.into_owned())),
                 }
             },
+            PhantomData,
         )
     }
 }
 
-impl<S> Encoding<'static> for RcEncoding<S>
+impl<'a, S> Encoding<'a> for RcEncoding<'a, S>
 where
     S: SmallNumber,
 {
     type Small = S;
     type Big = S::Big;
-    type Unsigned = RcEncoding<S::Unsigned>;
-    type Static = RcEncoding<S>;
+    type Unsigned = RcEncoding<'a, S::Unsigned>;
+    type Static = RcEncoding<'static, S>;
+    type WithLifetime<'b>
+        = RcEncoding<'b, S>
+    where
+        Self: 'b,
+        'static: 'b;
 
-    const ZERO: Self = Self(RcEncodedRepr {
-        small: Shifted::ZERO,
-    });
+    const ZERO: Self = Self(
+        RcEncodedRepr {
+            small: Shifted::ZERO,
+        },
+        PhantomData,
+    );
+
+    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    where
+        Self: 'b,
+        'a: 'b,
+    {
+        unsafe {
+            if self.0.small.validate().is_some() {
+                RcEncoding(
+                    RcEncodedRepr {
+                        small: self.0.small,
+                    },
+                    PhantomData,
+                )
+            } else {
+                RcEncoding(
+                    RcEncodedRepr {
+                        big: ManuallyDrop::new(Rc::clone(&self.0.big)),
+                    },
+                    PhantomData,
+                )
+            }
+        }
+    }
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
         let mut decoded = unsafe {
@@ -131,7 +175,7 @@ where
     }
 
     fn into_static(self) -> Self::Static {
-        RcEncoding(self.0)
+        RcEncoding(self.0, PhantomData)
     }
 }
 
@@ -170,7 +214,7 @@ where
     }
 }
 
-impl<S> Debug for RcEncoding<S>
+impl<'a, S> Debug for RcEncoding<'a, S>
 where
     S: SmallNumber,
 {
@@ -182,7 +226,7 @@ where
     }
 }
 
-impl<S> Hash for RcEncoding<S>
+impl<'a, S> Hash for RcEncoding<'a, S>
 where
     S: SmallNumber,
 {
@@ -194,7 +238,7 @@ where
     }
 }
 
-impl<S> PartialEq for RcEncoding<S>
+impl<'a, S> PartialEq for RcEncoding<'a, S>
 where
     S: SmallNumber,
 {
@@ -209,10 +253,10 @@ where
     }
 }
 
-impl<S> Eq for RcEncoding<S> where S: SmallNumber {}
+impl<'a, S> Eq for RcEncoding<'a, S> where S: SmallNumber {}
 
 #[cfg(any(test, feature = "quickcheck"))]
-impl<S: SmallNumber> quickcheck::Arbitrary for RcEncoding<S> {
+impl<S: SmallNumber> quickcheck::Arbitrary for RcEncoding<'static, S> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         if bool::arbitrary(g) {
             Self::from_shifted(Shifted::<S>::arbitrary(g))
@@ -223,7 +267,7 @@ impl<S: SmallNumber> quickcheck::Arbitrary for RcEncoding<S> {
 }
 
 #[cfg(feature = "arbitrary")]
-impl<S: SmallNumber> arbitrary::Arbitrary<'_> for RcEncoding<S> {
+impl<'a, S: SmallNumber> arbitrary::Arbitrary<'a> for RcEncoding<'a, S> {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         Ok(if bool::arbitrary(u)? {
             Self::from_shifted(Shifted::<S>::arbitrary(u)?)

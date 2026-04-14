@@ -6,9 +6,21 @@ import json
 
 TOP_DIR = os.path.dirname(__file__)
 
-BASELINE = "lmu"
+BASELINE = "pxr"
 
-REVISIONS = ["lmu", "tyq", "uxw", "vuq", "nws", "nsy", "kpw", "tkr", "ply"]
+REVISIONS = [
+    "lmu",
+    "tyq",
+    "uxw",
+    "vuq",
+    "nws",
+    "nsy",
+    "kpw",
+    "tkr",
+    "ply",
+    "pxr",
+    "uny",
+]
 
 FUNCTIONS = ["Control", "Cow", "Rc", "RcIsize", "Identity", "Box"]
 SIZES = [10, 15, 20, 30, 40, 50, 100]
@@ -67,8 +79,10 @@ def main():
         default=".*",
         help="Regex to filter which input sizes to benchmark.",
     )
+    p.add_argument("--baseline", "-b", help="Revision to use as baseline.")
 
     opts = p.parse_args()
+    baseline = opts.baseline if opts.baseline else BASELINE
 
     match opts.command:
         case "all":
@@ -87,7 +101,7 @@ def main():
         case "summary":
             print("Printing summary of benchmark results...")
             rev_data = {rev: RevisionData(rev) for rev in REVISIONS}
-            baseline_data = rev_data[BASELINE]
+            baseline_data = rev_data[baseline]
             for function in FUNCTIONS:
                 for size in SIZES:
                     print(f"{function}({size}):")
@@ -126,9 +140,14 @@ def main():
             os.rename("perf.data", data_path)
             print(f"Saved profile data to {data_path}")
         case "run":
-            os.system(
-                f"cargo bench -p compact_bigint --bench=pi -- --save-baseline={current_revision()[:3]} 'Pi/({opts.function})/({opts.size})'"
-            )
+            if opts.baseline:
+                os.system(
+                    f"cargo bench -p compact_bigint --bench=pi -- --save-baseline={opts.baseline} 'Pi/({opts.function})/({opts.size})'"
+                )
+            else:
+                os.system(
+                    f"cargo bench -p compact_bigint --bench=pi -- --save-baseline={current_revision()[:3]} 'Pi/({opts.function})/({opts.size})'"
+                )
 
 
 main()

@@ -6,7 +6,8 @@ use criterion::{
 };
 
 use compact_bigint::{
-    ArcBigInt, ArcBigIsize, BoxBigInt, CowBigInt, RcBigInt, RcBigIsize, bench::IdentityBigInt,
+    ArcBigInt, ArcBigIsize, BorrowBignum, BoxBigInt, CowBigInt, RcBigInt, RcBigIsize,
+    bench::IdentityBigInt,
 };
 use num_bigint::BigInt;
 use num_traits::Zero;
@@ -16,12 +17,12 @@ macro_rules! duplicate_bigint_types {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                label         BigInt;
+                label         BigInt(lifetime);
                 [Arc]         [ArcBigInt];
                 [ArcIsize]    [ArcBigIsize];
                 [Box]         [BoxBigInt];
-                [Cow]         [CowBigInt::<'static>];
-                [Identity]    [IdentityBigInt];
+                [Cow]         [CowBigInt::<lifetime>];
+                [Identity]    [IdentityBigInt::<lifetime>];
                 [Rc]          [RcBigInt];
                 [RcIsize]     [RcBigIsize];
                 [Control]     [BigInt];
@@ -33,29 +34,29 @@ macro_rules! duplicate_bigint_types {
 
 duplicate_bigint_types! {
     paste! {
-        fn [<calc_pi_atan_ label:lower>](digits: u32) -> BigInt {
-            fn pi_atan_rc(k: BigInt, n: BigInt) -> BigInt {
-                let mut a = BigInt::zero();
-                let mut w = n * &k;
-                let k2 = &k * &k;
+        fn [<calc_pi_atan_ label:lower>](digits: u32) -> BigInt(['static]) {
+            fn pi_atan_rc(k: BigInt(['static]), n: BigInt(['static])) -> BigInt(['static]) {
+                let mut a = BigInt(['static])::zero();
+                let mut w = n * k.borrow();
+                let k2 = k.borrow() * k.borrow();
                 let mut i = -1;
                 while !w.is_zero() {
-                    w /= &k2;
+                    w /= k2.borrow();
                     i += 2;
                     a += &w / i;
-                    w /= &k2;
+                    w /= k2.borrow();
                     i += 2;
                     a -= &w / i;
                 }
-                a
+                a.into_static()
             }
 
             let n = digits;
             let m = n + 3;
-            let tenpower = BigInt::from(10).pow(m);
-            pi_atan_rc(BigInt::from(18), &tenpower * BigInt::from(48))
-                + pi_atan_rc(BigInt::from(57), &tenpower * BigInt::from(32))
-                - pi_atan_rc(BigInt::from(239), &tenpower * BigInt::from(20))
+            let tenpower = BigInt(['static])::from(10).pow(m);
+            pi_atan_rc(BigInt(['static])::from(18), &tenpower * BigInt(['static])::from(48))
+                + pi_atan_rc(BigInt(['static])::from(57), &tenpower * BigInt(['static])::from(32))
+                - pi_atan_rc(BigInt(['static])::from(239), &tenpower * BigInt(['static])::from(20))
         }
     }
 }

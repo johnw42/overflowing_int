@@ -3,13 +3,13 @@ macro_rules! duplicate_unsigned_encoded_types {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                signedness  ImplType    encoding_tag        EncodedType;
-                [unsigned]  [BigUint]   [cow_unsigned]      [$crate::CowBigUint::<'static>];
-                [unsigned]  [BigUint]   [rc_unsigned]       [$crate::RcBigUint];
-                [unsigned]  [BigUint]   [rc_usize]          [$crate::RcBigUsize];
-                [unsigned]  [BigUint]   [arc_unsigned]      [$crate::ArcBigUint];
-                [unsigned]  [BigUint]   [trivial_unsigned]  [$crate::bench::IdentityBigUint];
-                [unsigned]  [BigUint]   [box_unsigned]      [$crate::BoxBigUint];
+                signedness  ImplType   encoding_tag        EncodedType;
+                [unsigned]  [BigUint]  [cow_unsigned]      [$crate::CowBigUint::<'static>];
+                [unsigned]  [BigUint]  [rc_unsigned]       [$crate::RcBigUint];
+                [unsigned]  [BigUint]  [rc_usize]          [$crate::RcBigUsize];
+                [unsigned]  [BigUint]  [arc_unsigned]      [$crate::ArcBigUint];
+                [unsigned]  [BigUint]  [identity_unsigned] [$crate::bench::IdentityBigUint::<'static>];
+                [unsigned]  [BigUint]  [box_unsigned]      [$crate::BoxBigUint];
             ]
             $($body)*
         }
@@ -21,13 +21,13 @@ macro_rules! duplicate_signed_encoded_types {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                signedness  ImplType    encoding_tag      EncodedType;
-                [signed]    [BigInt]    [cow_signed]      [$crate::CowBigInt::<'static>];
-                [signed]    [BigInt]    [rc_signed]       [$crate::RcBigInt];
-                [signed]    [BigInt]    [rc_isize]        [$crate::RcBigIsize];
-                [signed]    [BigInt]    [arc_signed]      [$crate::ArcBigInt];
-                [signed]    [BigInt]    [trivial_signed]  [$crate::bench::IdentityBigInt];
-                [signed]    [BigInt]    [box_signed]      [$crate::BoxBigInt];
+                signedness  ImplType  encoding_tag      EncodedType;
+                [signed]    [BigInt]  [cow_signed]      [$crate::CowBigInt::<'static>];
+                [signed]    [BigInt]  [rc_signed]       [$crate::RcBigInt];
+                [signed]    [BigInt]  [rc_isize]        [$crate::RcBigIsize];
+                [signed]    [BigInt]  [arc_signed]      [$crate::ArcBigInt];
+                [signed]    [BigInt]  [identity_signed] [$crate::bench::IdentityBigInt::<'static>];
+                [signed]    [BigInt]  [box_signed]      [$crate::BoxBigInt];
             ]
             $($body)*
         }

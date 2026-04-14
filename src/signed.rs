@@ -23,6 +23,13 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
         Int::from_encoding(self.0.into_static())
     }
 
+    /// Converts this big integer to into one that borrows from this one's data,
+    /// if possible.  If the encoding does not support borrowing, this will
+    /// simply clone self.
+    pub fn borrow<'b>(&'b self) -> Int<'b, E::WithLifetime<'b>> {
+        <Self as Encoding>::WithLifetime::from_decoded(self.decode_ref())
+    }
+
     /// A constant bigint with value 0, useful for static initialization.
     pub const ZERO: Self = Self::from_encoding(E::ZERO);
 
@@ -599,7 +606,11 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for Int<'a, E> {
         self.0.decode()
     }
 
-    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
+    fn decode_ref<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
+        self.0.decode_ref()
+    }
+
+    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<E::Small, Cow<'b, E::Big>>) -> T) -> T {
         self.0.with_decoded(f)
     }
 
@@ -618,7 +629,11 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for &Int<'a, E> {
         self.0.clone().decode()
     }
 
-    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<E::Small, Cow<E::Big>>) -> T) -> T {
+    fn decode_ref<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
+        self.0.decode_ref()
+    }
+
+    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<E::Small, Cow<'b, E::Big>>) -> T) -> T {
         self.0.with_decoded(f)
     }
 
@@ -642,8 +657,21 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Encoding<'a> for Int<'a, E> {
     type Big = E::Big;
     type Unsigned = E::Unsigned;
     type Static = Int<'static, E::Static>;
+    type WithLifetime<'b>
+        = Int<'b, E::WithLifetime<'b>>
+    where
+        Self: 'b,
+        'a: 'b;
 
     const ZERO: Self = Self::ZERO;
+
+    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    where
+        Self: 'b,
+        'a: 'b,
+    {
+        Int::from_encoding(self.0.borrow())
+    }
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
         self.0.update_encoding(f);

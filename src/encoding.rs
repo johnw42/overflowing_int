@@ -35,7 +35,9 @@ where
     /// small or big value without ever cloning a big value.  This method is
     /// preferable to [`Self::decode`] in most cases, but if `f` needs to
     /// clone the big value, using `decode` may avoid cloning.
-    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T;
+    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T;
+
+    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, S::Big>>;
 
     /// Decodes the value, consuming self.
     fn decode(self) -> Decoded<S, Cow<'a, S::Big>>;
@@ -170,18 +172,27 @@ where
     /// A version of this encoding that has a static lifetime.
     type Static: Encoding<'static, Small = Self::Small, Big = Self::Big>;
 
+    type WithLifetime<'b>: Encoding<'b, Small = Self::Small, Big = Self::Big>
+    where
+        Self: 'b,
+        'a: 'b;
+
     const ZERO: Self;
+
+    /// Converts this encoding into a version with a shorter lifetime.
+    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    where
+        Self: 'b,
+        'a: 'b,
+    {
+        Self::WithLifetime::from_decoded(self.decode_ref())
+    }
 
     /// Updates the encoding in place using the provided function.
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>));
 
     /// Converts this encoding to a version with a static lifetime.
     fn into_static(self) -> Self::Static;
-
-    /// Create a new encoding from a reference to another encoding.
-    fn from_ref(other: &'a Self) -> Self {
-        other.clone()
-    }
 
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
         Self::Big::parse_bytes(buf, radix).map(Self::from_big)
@@ -322,11 +333,15 @@ where
         Decoded::Big(self)
     }
 
+    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, S::Big>> {
+        Decoded::Big(Cow::Borrowed(self.as_ref()))
+    }
+
     fn into_big_cow(self) -> Cow<'a, S::Big> {
         self
     }
 
-    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
+    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
         f(Decoded::Big(Cow::Borrowed(self.as_ref())))
     }
 
@@ -350,6 +365,10 @@ where
         Decoded::Big(Cow::Owned((*self).clone()))
     }
 
+    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+        Decoded::Big(Cow::Borrowed(self.as_ref()))
+    }
+
     fn into_big_cow(self) -> Cow<'a, S::Big> {
         match Rc::try_unwrap(self) {
             Ok(b) => Cow::Owned(b),
@@ -357,7 +376,7 @@ where
         }
     }
 
-    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
+    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
         f(Decoded::Big(Cow::Borrowed(self.as_ref())))
     }
 
@@ -386,7 +405,17 @@ duplicate_prims! {
             }
         }
 
-        fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
+        fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+            #[allow(irrefutable_let_patterns)]
+            #[allow(clippy::unnecessary_fallible_conversions)]
+            if let Ok(small) = S::try_from(*self) {
+                Decoded::Small(small)
+            } else {
+                Decoded::Big(Cow::Owned(S::Big::from(*self)))
+            }
+        }
+
+        fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
             #[allow(clippy::unnecessary_fallible_conversions)]
             match S::try_from(*self) {
                 Ok(small) => f(Decoded::Small(small)),
@@ -418,7 +447,17 @@ duplicate_prims! {
             }
         }
 
-        fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
+        fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+            #[allow(irrefutable_let_patterns)]
+            #[allow(clippy::unnecessary_fallible_conversions)]
+            if let Ok(small) = S::try_from(**self) {
+                Decoded::Small(small)
+            } else {
+                Decoded::Big(Cow::Owned(S::Big::from(**self)))
+            }
+        }
+
+        fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
             #[allow(clippy::unnecessary_fallible_conversions)]
             match S::try_from(**self) {
                 Ok(small) => f(Decoded::Small(small)),

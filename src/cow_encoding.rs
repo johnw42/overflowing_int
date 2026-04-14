@@ -38,6 +38,13 @@ where
         self.0
     }
 
+    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+        match &self.0 {
+            Decoded::Small(s) => Decoded::Small(*s),
+            Decoded::Big(b) => Decoded::Big(Cow::Borrowed(b.as_ref())),
+        }
+    }
+
     fn into_big_cow(self) -> Cow<'a, S::Big> {
         match self.0 {
             Decoded::Small(s) => Cow::Owned(s.to_big()),
@@ -45,7 +52,7 @@ where
         }
     }
 
-    fn with_decoded<T>(&self, f: impl FnOnce(Decoded<S, Cow<S::Big>>) -> T) -> T {
+    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
         match &self.0 {
             Decoded::Small(s) => f(Decoded::Small(*s)),
             Decoded::Big(b) => f(Decoded::Big(Cow::Borrowed(b.as_ref()))),
@@ -83,8 +90,22 @@ impl<'a, S: SmallNumber> Encoding<'a> for CowEncoding<'a, S> {
     type Big = S::Big;
     type Unsigned = CowEncoding<'a, S::Unsigned>;
     type Static = CowEncoding<'static, S>;
+    type WithLifetime<'b>
+        = CowEncoding<'b, S>
+    where
+        'a: 'b;
 
     const ZERO: Self = Self(Decoded::Small(S::ZERO));
+
+    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    where
+        'a: 'b,
+    {
+        match &self.0 {
+            Decoded::Small(s) => CowEncoding(Decoded::Small(*s)),
+            Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Borrowed(b.as_ref()))),
+        }
+    }
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<'a, Self::Big>>)) {
         f(&mut self.0);
@@ -95,13 +116,6 @@ impl<'a, S: SmallNumber> Encoding<'a> for CowEncoding<'a, S> {
         match self.0 {
             Decoded::Small(s) => CowEncoding(Decoded::Small(s)),
             Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Owned(b.into_owned()))),
-        }
-    }
-
-    fn from_ref(other: &'a Self) -> Self {
-        match &other.0 {
-            Decoded::Small(s) => CowEncoding(Decoded::Small(*s)),
-            Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Borrowed(b.as_ref()))),
         }
     }
 }

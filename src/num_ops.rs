@@ -37,7 +37,25 @@ trait ArithOp<'e, E: Encoding<'e>> {
         R: Decode<'e, E::Small>,
     {
         match E::kind() {
-            EncodingKind::Cow => match (lhs.decode(), rhs.decode()) {
+            // EncodingKind::Cow => match (lhs.decode(), rhs.decode()) {
+            //     (Decoded::Small(lhs), Decoded::Small(rhs)) => {
+            //         if let Ok(out) = Self::on_small(lhs, rhs) {
+            //             E::from_small(out)
+            //         } else {
+            //             E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
+            //         }
+            //     }
+            //     (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
+            //         E::from_big(Self::on_small_big(small_lhs, big_rhs))
+            //     }
+            //     (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
+            //         E::from_big(Self::on_big_small(big_lhs, small_rhs))
+            //     }
+            //     (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
+            //         E::from_big(Self::on_big(big_lhs, big_rhs))
+            //     }
+            // },
+            _ => match (lhs.decode_ref(), rhs.decode_ref()) {
                 (Decoded::Small(lhs), Decoded::Small(rhs)) => {
                     if let Ok(out) = Self::on_small(lhs, rhs) {
                         E::from_small(out)
@@ -55,26 +73,26 @@ trait ArithOp<'e, E: Encoding<'e>> {
                     E::from_big(Self::on_big(big_lhs, big_rhs))
                 }
             },
-            _ => lhs.with_decoded(|lhs| {
-                rhs.with_decoded(|rhs| match (lhs, rhs) {
-                    (Decoded::Small(lhs), Decoded::Small(rhs)) => {
-                        if let Ok(out) = Self::on_small(lhs, rhs) {
-                            E::from_small(out)
-                        } else {
-                            E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
-                        }
-                    }
-                    (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
-                        E::from_big(Self::on_small_big(small_lhs, big_rhs))
-                    }
-                    (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
-                        E::from_big(Self::on_big_small(big_lhs, small_rhs))
-                    }
-                    (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
-                        E::from_big(Self::on_big(big_lhs, big_rhs))
-                    }
-                })
-            }),
+            // _ => lhs.with_decoded(|lhs| {
+            //     rhs.with_decoded(|rhs| match (lhs, rhs) {
+            //         (Decoded::Small(lhs), Decoded::Small(rhs)) => {
+            //             if let Ok(out) = Self::on_small(lhs, rhs) {
+            //                 E::from_small(out)
+            //             } else {
+            //                 E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
+            //             }
+            //         }
+            //         (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
+            //             E::from_big(Self::on_small_big(small_lhs, big_rhs))
+            //         }
+            //         (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
+            //             E::from_big(Self::on_big_small(big_lhs, small_rhs))
+            //         }
+            //         (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
+            //             E::from_big(Self::on_big(big_lhs, big_rhs))
+            //         }
+            //     })
+            // }),
         }
     }
 

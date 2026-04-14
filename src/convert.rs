@@ -43,24 +43,6 @@ impl<T: Debug> Display for TryFromBigIntError<T> {
 impl<T> Error for TryFromBigIntError<T> where T: Debug {}
 
 // =============================================================================
-// From Reference
-// =============================================================================
-
-// TODO
-
-// duplicate_generic_bignum! {
-//     impl<'a, 'b, E> From<&'b EncodedType<'a, E>> for EncodedType<'a, E>
-//     where
-//         E: Encoding<'a, Big = ImplType>,
-//         'a: 'b,
-//     {
-//         fn from(value: &'b EncodedType<'a, E>) -> Self {
-//             EncodedType::from_ref(value)
-//         }
-//     }
-// }
-
-// =============================================================================
 // ToBigInt/ToBigUint Traits
 // =============================================================================
 
@@ -338,17 +320,14 @@ mod test {
 
     use super::*;
 
-    // TODO
-
-    // duplicate_encoded_types! {
-    //     paste! {
-    //         #[quickcheck]
-    //         fn [<test_ encoding_tag _from_ref>](value: EncodedType) {
-    //             let copy = EncodedType::from(&value);
-    //             assert_eq!(copy, value);
-    //         }
-    //     }
-    // }
+    duplicate_encoded_types! {
+        paste! {
+            #[quickcheck]
+            fn [<test_borrow_ encoding_tag>](value: EncodedType) {
+                assert_eq!(value, value.borrow());
+            }
+        }
+    }
 
     // Test infallible conversion from foreign types to signed encoded types.
     duplicate! {
