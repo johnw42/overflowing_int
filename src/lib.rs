@@ -3,10 +3,11 @@ pub use num_bigint::{
 };
 
 use crate::{
-    box_encoding::BoxEncoding, cow_encoding::CowEncoding, rc_encoding::RcEncoding, signed::Int,
-    unsigned::Uint,
+    arc_encoding::ArcEncoding, box_encoding::BoxEncoding, cow_encoding::CowEncoding,
+    rc_encoding::RcEncoding, signed::Int, unsigned::Uint,
 };
 
+pub mod arc_encoding;
 pub mod big_number;
 mod bounds;
 mod box_encoding;
@@ -30,6 +31,10 @@ pub type RcBigInt = Int<'static, RcEncoding<i128>>;
 pub type RcBigUint = Uint<'static, RcEncoding<u128>>;
 pub type RcBigIsize = Int<'static, RcEncoding<isize>>;
 pub type RcBigUsize = Uint<'static, RcEncoding<usize>>;
+pub type ArcBigInt = Int<'static, ArcEncoding<i128>>;
+pub type ArcBigUint = Uint<'static, ArcEncoding<u128>>;
+pub type ArcBigIsize = Int<'static, ArcEncoding<isize>>;
+pub type ArcBigUsize = Uint<'static, ArcEncoding<usize>>;
 pub type BoxBigInt = Int<'static, BoxEncoding<i128>>;
 pub type BoxBigUint = Uint<'static, BoxEncoding<u128>>;
 

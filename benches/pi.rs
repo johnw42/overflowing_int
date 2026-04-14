@@ -5,7 +5,9 @@ use criterion::{
     AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group, criterion_main,
 };
 
-use compact_bigint::{BoxBigInt, CowBigInt, RcBigInt, RcBigIsize, bench::IdentityBigInt};
+use compact_bigint::{
+    ArcBigInt, ArcBigIsize, BoxBigInt, CowBigInt, RcBigInt, RcBigIsize, bench::IdentityBigInt,
+};
 use num_bigint::BigInt;
 use num_traits::Zero;
 use paste::paste;
@@ -15,6 +17,8 @@ macro_rules! duplicate_bigint_types {
         duplicate::duplicate! {
             [
                 label         BigInt;
+                [Arc]         [ArcBigInt];
+                [ArcIsize]    [ArcBigIsize];
                 [Box]         [BoxBigInt];
                 [Cow]         [CowBigInt::<'static>];
                 [Identity]    [IdentityBigInt];
