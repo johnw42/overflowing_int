@@ -1,26 +1,47 @@
 #[macro_export]
-macro_rules! duplicate_generic_bignum_types {
+macro_rules! duplicate_unsigned_encoded_types {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                signedness  ImplType    bignum_tag          EncodedType;
-                [signed]    [BigInt]    [cow_signed]        [$crate::CowBigInt::<'static>];
+                signedness  ImplType    encoding_tag        EncodedType;
                 [unsigned]  [BigUint]   [cow_unsigned]      [$crate::CowBigUint::<'static>];
-                [signed]    [BigInt]    [rc_signed]         [$crate::RcBigInt];
                 [unsigned]  [BigUint]   [rc_unsigned]       [$crate::RcBigUint];
-                [signed]    [BigInt]    [rc_isize]          [$crate::RcBigIsize];
                 [unsigned]  [BigUint]   [rc_usize]          [$crate::RcBigUsize];
-                [signed]    [BigInt]    [arc_signed]        [$crate::ArcBigInt];
                 [unsigned]  [BigUint]   [arc_unsigned]      [$crate::ArcBigUint];
-                [signed]    [BigInt]    [trivial_signed]    [$crate::bench::IdentityBigInt];
                 [unsigned]  [BigUint]   [trivial_unsigned]  [$crate::bench::IdentityBigUint];
-                [signed]    [BigInt]    [box_signed]        [$crate::BoxBigInt];
                 [unsigned]  [BigUint]   [box_unsigned]      [$crate::BoxBigUint];
             ]
             $($body)*
         }
     };
 }
+
+#[macro_export]
+macro_rules! duplicate_signed_encoded_types {
+    ($($body:tt)*) => {
+        duplicate::duplicate! {
+            [
+                signedness  ImplType    encoding_tag      EncodedType;
+                [signed]    [BigInt]    [cow_signed]      [$crate::CowBigInt::<'static>];
+                [signed]    [BigInt]    [rc_signed]       [$crate::RcBigInt];
+                [signed]    [BigInt]    [rc_isize]        [$crate::RcBigIsize];
+                [signed]    [BigInt]    [arc_signed]      [$crate::ArcBigInt];
+                [signed]    [BigInt]    [trivial_signed]  [$crate::bench::IdentityBigInt];
+                [signed]    [BigInt]    [box_signed]      [$crate::BoxBigInt];
+            ]
+            $($body)*
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! duplicate_encoded_types {
+    ($($body:tt)*) => {
+        crate::duplicate_signed_encoded_types! { $($body)* }
+        crate::duplicate_unsigned_encoded_types! { $($body)* }
+    };
+}
+
 #[macro_export]
 macro_rules! duplicate_generic_bignum {
     ($($body:tt)*) => {

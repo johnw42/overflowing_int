@@ -1,5 +1,5 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{BorrowingEncoding, Decode, Decoded, Encode, Encoding, EncodingKind};
+use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingKind};
 use crate::small_num::SmallNumber;
 use num_bigint::BigUint;
 use std::borrow::Cow;
@@ -17,15 +17,6 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
     pub fn into_static(self) -> Uint<'static, E::Static> {
         Uint::from_encoding(self.0.into_static())
-    }
-
-    /// Converts this big integer to into one that borrows from this one's data.
-    pub fn borrow<'b>(&'b self) -> Uint<'b, E::WithLifetime<'b>>
-    where
-        E: BorrowingEncoding<'a>,
-        'a: 'b,
-    {
-        Uint::from_encoding(self.0.borrow())
     }
 
     /// A constant bigint with value 0, useful for static initialization.
@@ -474,7 +465,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Encoding<'a> for Uint<'a, E> {
 }
 
 #[test]
-fn test_borrow_and_static() {
+fn test_into_static() {
     use crate::CowBigUint;
     use num_traits::Zero;
 
@@ -483,7 +474,7 @@ fn test_borrow_and_static() {
     impl<'a> CowTest<'a> {
         fn test(self) {
             // Prove that we can change the lifetime to a shorter one.
-            Self::wants_borrowed(self.0.borrow());
+            Self::wants_borrowed(CowBigUint::from(&self.0));
 
             // Prove we can change the lifetime to 'static.
             Self::wants_static(self.0.clone().into_static());

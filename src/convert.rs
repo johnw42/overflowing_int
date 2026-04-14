@@ -5,8 +5,8 @@ use crate::small_num::SmallNumber;
 use crate::unsigned::Uint;
 use crate::{
     CowBigInt, CowBigUint, RcBigInt, RcBigUint, duplicate_generic_bignum, duplicate_iprims,
-    duplicate_iprims_if_unsigned, duplicate_prims, duplicate_uprims,
-    duplicate_uprims_and_iprims_if_signed,
+    duplicate_iprims_if_unsigned, duplicate_prims, duplicate_signed_encoded_types,
+    duplicate_unsigned_encoded_types, duplicate_uprims, duplicate_uprims_and_iprims_if_signed,
 };
 use duplicate::{duplicate, duplicate_item};
 use num_bigint::{BigInt, BigUint, Sign, ToBigInt, ToBigUint};
@@ -41,6 +41,24 @@ impl<T: Debug> Display for TryFromBigIntError<T> {
 }
 
 impl<T> Error for TryFromBigIntError<T> where T: Debug {}
+
+// =============================================================================
+// From Reference
+// =============================================================================
+
+// TODO
+
+// duplicate_generic_bignum! {
+//     impl<'a, 'b, E> From<&'b EncodedType<'a, E>> for EncodedType<'a, E>
+//     where
+//         E: Encoding<'a, Big = ImplType>,
+//         'a: 'b,
+//     {
+//         fn from(value: &'b EncodedType<'a, E>) -> Self {
+//             EncodedType::from_ref(value)
+//         }
+//     }
+// }
 
 // =============================================================================
 // ToBigInt/ToBigUint Traits
@@ -316,15 +334,26 @@ mod test {
     use if_tokens::if_tokens;
     use quickcheck_macros::quickcheck;
 
+    use crate::duplicate_encoded_types;
+
     use super::*;
 
-    type StaticCowBigInt = CowBigInt<'static>;
-    type StaticCowBigUint = CowBigUint<'static>;
+    // TODO
+
+    // duplicate_encoded_types! {
+    //     paste! {
+    //         #[quickcheck]
+    //         fn [<test_ encoding_tag _from_ref>](value: EncodedType) {
+    //             let copy = EncodedType::from(&value);
+    //             assert_eq!(copy, value);
+    //         }
+    //     }
+    // }
 
     // Test infallible conversion from foreign types to signed encoded types.
     duplicate! {
         [
-            SourceType;
+            ForeignType;
             [BigInt];
             [i8];
             [i16];
@@ -340,19 +369,14 @@ mod test {
             [u128];
             [usize];
         ]
-        duplicate! {
-            [
-                TargetType;
-                [StaticCowBigInt];
-                [RcBigInt];
-            ]
+        duplicate_signed_encoded_types! {
             paste! {
                 #[quickcheck]
-                fn [<test_ SourceType:lower _to_ TargetType:lower>](value: SourceType) {
+                fn [<test_ ForeignType:lower _to_ encoding_tag>](value: ForeignType) {
                     // #[allow(clippy::clone_on_copy)]
-                    let converted: TargetType = TargetType::from(value.clone());
+                    let converted: EncodedType = EncodedType::from(value.clone());
                     #[allow(clippy::unnecessary_fallible_conversions)]
-                    let round_trip: Option<SourceType> = SourceType::try_from(converted).ok();
+                    let round_trip: Option<ForeignType> = ForeignType::try_from(converted).ok();
                     assert_eq!(Some(value), round_trip);
                 }
             }
@@ -367,17 +391,12 @@ mod test {
             [BigUint];
 
         ]
-        duplicate! {
-            [
-                TargetType;
-                [StaticCowBigInt];
-                [RcBigInt];
-            ]
+        duplicate_signed_encoded_types! {
             paste! {
                 #[quickcheck]
-                fn [<test_ref_ SourceType:lower _to_ TargetType:lower>](value: SourceType) {
+                fn [<test_ref_ SourceType:lower _to_ encoding_tag>](value: SourceType) {
                     // #[allow(clippy::clone_on_copy)]
-                    let converted: TargetType = TargetType::from(&value);
+                    let converted: EncodedType = EncodedType::from(&value);
                     #[allow(clippy::unnecessary_fallible_conversions)]
                     let round_trip: Option<SourceType> = SourceType::try_from(converted).ok();
                     assert_eq!(Some(value), round_trip);
@@ -398,17 +417,12 @@ mod test {
             [u128];
             [usize];
         ]
-        duplicate! {
-            [
-                TargetType;
-                [StaticCowBigUint];
-                [RcBigUint];
-            ]
+        duplicate_unsigned_encoded_types! {
             paste! {
                 #[quickcheck]
-                fn [<test_ SourceType:lower _to_ TargetType:lower>](value: SourceType) {
+                fn [<test_ SourceType:lower _to_ encoding_tag>](value: SourceType) {
                     // #[allow(clippy::clone_on_copy)]
-                    let converted: TargetType = TargetType::from(value.clone());
+                    let converted: EncodedType = EncodedType::from(value.clone());
                     // #[allow(clippy::unnecessary_fallible_conversions)]
                     let round_trip: Option<SourceType> = SourceType::try_from(converted).ok();
                     assert_eq!(Some(value), round_trip);
@@ -418,56 +432,31 @@ mod test {
     }
 
     // Test infallible conversion from unsigned foreign type refs to unsigned encoded types.
-    duplicate! {
-        [
-            SourceType;
-            [BigUint];
-        ]
-        duplicate! {
-            [
-                TargetType;
-                [StaticCowBigUint];
-                [RcBigUint];
-            ]
-            paste! {
-                #[quickcheck]
-                fn [<test_ref_ SourceType:lower _to_ TargetType:lower>](value: SourceType) {
-                    let converted: TargetType = TargetType::from(&value);
-                    // #[allow(clippy::unnecessary_fallible_conversions)]
-                    let round_trip: Option<SourceType> = SourceType::try_from(converted).ok();
-                    assert_eq!(Some(value), round_trip);
-                }
+    duplicate_unsigned_encoded_types! {
+        paste! {
+            #[quickcheck]
+            fn [<test_ref_biguint_to_ encoding_tag>](value: BigUint) {
+                let converted: EncodedType = EncodedType::from(&value);
+                // #[allow(clippy::unnecessary_fallible_conversions)]
+                let round_trip: Option<BigUint> = BigUint::try_from(converted).ok();
+                assert_eq!(Some(value), round_trip);
             }
         }
     }
 
     // Test conversion from bool to encoded types.
-    duplicate! {
-        [
-            TargetType;
-            [CowBigInt];
-            [CowBigUint];
-            [RcBigInt];
-            [RcBigUint];
-        ]
+    duplicate_encoded_types! {
         paste! {
             #[test]
-            fn [<test_bool_to_ TargetType:lower>]() {
-                assert!(TargetType::from(true).is_one());
-                assert!(TargetType::from(false).is_zero());
+            fn [<test_bool_to_ encoding_tag>]() {
+                assert!(EncodedType::from(true).is_one());
+                assert!(EncodedType::from(false).is_zero());
             }
         }
     }
 
     // Test fallible conversions to/from encoded types from owned value.
-    duplicate! {
-        [
-            EncodedType        ImplType;
-            [StaticCowBigInt]  [BigInt];
-            [StaticCowBigUint] [BigUint];
-            [RcBigInt]         [BigInt];
-            [RcBigUint]        [BigUint];
-        ]
+    duplicate_encoded_types! {
         duplicate! {
             [
                 ForeignType;
@@ -488,7 +477,7 @@ mod test {
             ]
             paste! {
                 #[quickcheck]
-                fn [<test_try_ EncodedType:lower _to_ ForeignType:lower>](value: EncodedType) {
+                fn [<test_try_ encoding_tag _to_ ForeignType:lower>](value: EncodedType) {
                     #[allow(clippy::unnecessary_fallible_conversions)]
                     let converted: Option<ForeignType> = ForeignType::try_from(value.clone()).ok();
                     #[allow(clippy::unnecessary_fallible_conversions)]
@@ -499,7 +488,7 @@ mod test {
                 }
 
                 #[quickcheck]
-                fn [<test_try_ ForeignType:lower _to_ EncodedType:lower>](value: ForeignType) {
+                fn [<test_try_ ForeignType:lower _to_ encoding_tag>](value: ForeignType) {
                     #[allow(clippy::clone_on_copy)]
                     #[allow(clippy::unnecessary_fallible_conversions)]
                     let converted: Option<EncodedType> = EncodedType::try_from(value.clone()).ok();
@@ -514,14 +503,7 @@ mod test {
     }
 
     // Test fallible conversions to/from encoded type from ref.
-    duplicate! {
-        [
-            EncodedType        ImplType;
-            [StaticCowBigInt]  [BigInt];
-            [StaticCowBigUint] [BigUint];
-            [RcBigInt]         [BigInt];
-            [RcBigUint]        [BigUint];
-        ]
+    duplicate_encoded_types! {
         duplicate! {
             [
                 ForeignType;
@@ -530,7 +512,7 @@ mod test {
             ]
             paste! {
                 #[quickcheck]
-                fn [<test_try_ref_ EncodedType:lower _to_ ForeignType:lower>](value: EncodedType) {
+                fn [<test_try_ref_ encoding_tag _to_ ForeignType:lower>](value: EncodedType) {
                     #[allow(clippy::unnecessary_fallible_conversions)]
                     let converted: Option<ForeignType> = ForeignType::try_from(&value).ok();
                     #[allow(clippy::unnecessary_fallible_conversions)]
@@ -541,7 +523,7 @@ mod test {
                 }
 
                 #[quickcheck]
-                fn [<test_try_ref_ EncodedType:lower _to ForeignType:lower>](value: EncodedType) {
+                fn [<test_try_ref_ encoding_tag _to ForeignType:lower>](value: EncodedType) {
                     #[allow(clippy::unnecessary_fallible_conversions)]
                     let converted: Option<ForeignType> = [<To ForeignType>]::[<to_ ForeignType:lower>](&value);
                     #[allow(clippy::unnecessary_fallible_conversions)]
@@ -552,7 +534,7 @@ mod test {
                 }
 
                 #[quickcheck]
-                fn [<test_try_ref_ ForeignType:lower _to_ EncodedType:lower>](value: ForeignType) {
+                fn [<test_try_ref_ ForeignType:lower _to_ encoding_tag>](value: ForeignType) {
                     #[allow(clippy::clone_on_copy)]
                     #[allow(clippy::unnecessary_fallible_conversions)]
                     let converted: Option<EncodedType> = EncodedType::try_from(&value).ok();

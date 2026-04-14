@@ -178,6 +178,11 @@ where
     /// Converts this encoding to a version with a static lifetime.
     fn into_static(self) -> Self::Static;
 
+    /// Create a new encoding from a reference to another encoding.
+    fn from_ref(other: &'a Self) -> Self {
+        other.clone()
+    }
+
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
         Self::Big::parse_bytes(buf, radix).map(Self::from_big)
     }
@@ -299,17 +304,6 @@ where
             Decoded::Big(n) => n.to_mut().set_bit(bit, value),
         })
     }
-}
-
-pub trait BorrowingEncoding<'a>: Encoding<'a> + 'a {
-    type WithLifetime<'b>: Encoding<'b, Small = Self::Small, Big = Self::Big>
-    where
-        'a: 'b;
-
-    /// Converts this encoding into a version with a shorter lifetime.
-    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
-    where
-        'a: 'b;
 }
 
 // =============================================================================

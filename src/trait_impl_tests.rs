@@ -4,7 +4,7 @@ use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::signed::Int;
 use crate::small_num::SmallNumber;
 use crate::unsigned::Uint;
-use crate::{CowBigInt, CowBigUint, RcBigInt, RcBigUint, duplicate_generic_bignum_types};
+use crate::{CowBigInt, CowBigUint, RcBigInt, RcBigUint, duplicate_encoded_types};
 use crate::{duplicate_iprims, duplicate_prims, duplicate_uprims};
 use duplicate::duplicate_item;
 use num_bigint::{
@@ -27,7 +27,7 @@ use std::fmt::{Binary, Formatter, LowerHex, Octal, UpperHex};
 use std::ops::{Neg, Not};
 use std::str::FromStr;
 
-duplicate_generic_bignum_types! { mod bignum_tag {
+duplicate_encoded_types! { mod encoding_tag {
     use super::*;
     use quickcheck::TestResult;
     use quickcheck_macros::quickcheck;

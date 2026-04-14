@@ -644,7 +644,7 @@ mod test {
 
     use super::*;
     use crate::duplicate_arith_and_bit_ops;
-    use crate::duplicate_generic_bignum_types;
+    use crate::duplicate_encoded_types;
     use crate::signed::Int;
     use num_bigint::BigInt;
     use num_traits::Zero;
@@ -663,7 +663,7 @@ mod test {
         T::is_signed() || lhs >= rhs
     }
 
-    duplicate_generic_bignum_types! { mod bignum_tag {
+    duplicate_encoded_types! { mod encoding_tag {
         use super::*;
 
         macro_rules! test_bin_op {
