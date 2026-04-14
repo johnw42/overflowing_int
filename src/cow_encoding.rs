@@ -85,6 +85,8 @@ impl<'a, S: SmallNumber> Encoding<'a> for CowEncoding<'a, S> {
     type Unsigned = CowEncoding<'a, S::Unsigned>;
     type Static = CowEncoding<'static, S>;
 
+    const ZERO: Self = Self(Decoded::Small(S::ZERO));
+
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<'a, Self::Big>>)) {
         f(&mut self.0);
         self.normalize();

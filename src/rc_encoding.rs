@@ -111,6 +111,10 @@ where
     type Unsigned = RcEncoding<S::Unsigned>;
     type Static = RcEncoding<S>;
 
+    const ZERO: Self = Self(RcEncodedRepr {
+        small: Shifted::ZERO,
+    });
+
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
         let mut decoded = unsafe {
             if let Some(s) = self.0.small.validate() {

@@ -110,6 +110,10 @@ where
     type Unsigned = BoxEncoding<S::Unsigned>;
     type Static = BoxEncoding<S>;
 
+    const ZERO: Self = Self(BoxEncodedRepr {
+        small: Shifted::ZERO,
+    });
+
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
         let mut decoded = unsafe {
             if let Some(s) = self.0.small.validate() {

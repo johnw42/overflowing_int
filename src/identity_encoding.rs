@@ -1,5 +1,6 @@
 use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingKind};
 use crate::small_num::SmallNumber;
+use num_traits::ConstZero as _;
 use std::hash::Hash;
 use std::{borrow::Cow, fmt::Debug};
 
@@ -84,6 +85,8 @@ where
     type Big = S::Big;
     type Unsigned = IdentityEncoding<S::Unsigned>;
     type Static = IdentityEncoding<S>;
+
+    const ZERO: Self = Self(S::Big::ZERO);
 
     #[inline]
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {

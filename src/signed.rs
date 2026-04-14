@@ -1,6 +1,7 @@
 use crate::big_number::BigNumberDigits;
 use crate::encoding::{BorrowingEncoding, Decode, Decoded, Encode, Encoding, EncodingKind};
 use crate::small_num::SmallNumber;
+use crate::unsigned::Uint;
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::Zero;
 use std::borrow::Cow;
@@ -13,7 +14,7 @@ use std::ops::Neg;
 pub struct Int<'a, E>(pub(crate) E, PhantomData<&'a ()>);
 
 impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
-    fn from_encoding(encoding: E) -> Self {
+    const fn from_encoding(encoding: E) -> Self {
         Self(encoding, PhantomData)
     }
 
@@ -31,7 +32,10 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
         Int::from_encoding(self.0.borrow())
     }
 
-    /// Creates and initializes a E::Big.
+    /// A constant bigint with value 0, useful for static initialization.
+    pub const ZERO: Self = Self::from_encoding(E::ZERO);
+
+    /// Creates and initializes a bigint.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
@@ -41,6 +45,14 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
         } else {
             E::from_big(E::Big::new(sign, digits))
         })
+    }
+
+    /// Creates and initializes a bigint.
+    ///
+    /// The base 2<sup>32</sup> digits are ordered least significant digit first.
+    #[inline]
+    pub fn from_biguint(sign: Sign, data: Uint<'a, E::Unsigned>) -> Self {
+        Self::from(BigInt::from_biguint(sign, BigUint::from(data)))
     }
 
     /// Creates and initializes a bigint.
@@ -242,9 +254,63 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
         self.0.with_big_cow(|big| big.as_ref().to_u32_digits())
     }
 
+    /// Returns the sign and the `u64` digits representation of the [`BigInt`] ordered least
+    /// significant digit first.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::compact_bigint::{RcBigInt, Sign};
+    ///
+    /// assert_eq!(RcBigInt::from(-1125).to_u64_digits(), (Sign::Minus, vec![1125]));
+    /// assert_eq!(RcBigInt::from(4294967295u32).to_u64_digits(), (Sign::Plus, vec![4294967295]));
+    /// assert_eq!(RcBigInt::from(4294967296u64).to_u64_digits(), (Sign::Plus, vec![4294967296]));
+    /// assert_eq!(RcBigInt::from(-112500000000i64).to_u64_digits(), (Sign::Minus, vec![112500000000]));
+    /// assert_eq!(RcBigInt::from(112500000000i64).to_u64_digits(), (Sign::Plus, vec![112500000000]));
+    /// assert_eq!(RcBigInt::from(1u128 << 64).to_u64_digits(), (Sign::Plus, vec![0, 1]));
+    /// ```
     #[inline]
     pub fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
         self.0.with_big_cow(|big| big.as_ref().to_u64_digits())
+    }
+
+    /// Returns an iterator of `u32` digits representation of the bigint ordered least
+    /// significant digit first.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use compact_bigint::RcBigInt;
+    ///
+    /// assert_eq!(RcBigInt::from(-1125).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
+    /// assert_eq!(RcBigInt::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
+    /// assert_eq!(RcBigInt::from(4294967296u64).iter_u32_digits().collect::<Vec<u32>>(), vec![0, 1]);
+    /// assert_eq!(RcBigInt::from(-112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
+    /// assert_eq!(RcBigInt::from(112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
+    /// ```
+    #[inline]
+    pub fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
+        self.0.iter_u32_digits()
+    }
+
+    /// Returns an iterator of `u64` digits representation of the bigint ordered least
+    /// significant digit first.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use compact_bigint::RcBigInt;
+    ///
+    /// assert_eq!(RcBigInt::from(-1125).iter_u64_digits().collect::<Vec<u64>>(), vec![1125u64]);
+    /// assert_eq!(RcBigInt::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295u64]);
+    /// assert_eq!(RcBigInt::from(4294967296u64).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967296u64]);
+    /// assert_eq!(RcBigInt::from(-112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
+    /// assert_eq!(RcBigInt::from(112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
+    /// assert_eq!(RcBigInt::from(1u128 << 64).iter_u64_digits().collect::<Vec<u64>>(), vec![0, 1]);
+    /// ```
+    #[inline]
+    pub fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
+        self.0.iter_u64_digits()
     }
 
     /// Returns the two's-complement byte representation of the bigint in big-endian byte order.
@@ -331,6 +397,24 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
         self.0.with_big_cow(|big| big.as_ref().to_radix_le(radix))
     }
 
+    /// Returns the magnitude of the bigint as an unsigned bigint.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use compact_bigint::{RcBigInt, RcBigUint};
+    /// use num_traits::Zero;
+    ///
+    /// assert_eq!(RcBigInt::from(1234).magnitude(), RcBigUint::from(1234u32));
+    /// assert_eq!(RcBigInt::from(-4321).magnitude(), RcBigUint::from(4321u32));
+    /// assert!(RcBigInt::ZERO.clone().magnitude().is_zero());
+    /// ```
+    #[inline]
+    pub fn magnitude(self) -> Uint<'a, E::Unsigned> {
+        Uint::from(self.into_parts().1)
+    }
+
+    // Returns the sign of the [`Int`] as a Sign.
     #[inline]
     pub fn sign(&self) -> Sign {
         self.0.with_decoded(|encoded| match encoded {
@@ -343,24 +427,38 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
         })
     }
 
+    /// Convert this bigint into its [`Sign`] and unsigned bigint magnitude,
+    /// the reverse of [`Self::from_biguint()`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use compact_bigint::{RcBigInt, Sign};
+    /// use num_bigint::BigUint;
+    ///
+    /// assert_eq!(RcBigInt::from(1234).into_parts(), (Sign::Plus, BigUint::from(1234u32)));
+    /// assert_eq!(RcBigInt::from(-4321).into_parts(), (Sign::Minus, BigUint::from(4321u32)));
+    /// assert_eq!(RcBigInt::ZERO.into_parts(), (Sign::NoSign, BigUint::ZERO));
+    /// ```
     #[inline]
     pub fn into_parts(self) -> (Sign, BigUint) {
         self.0.into_bigint().into_parts()
     }
 
-    #[inline]
-    pub fn bit(&self, bit: u64) -> bool {
-        self.0.bit(bit)
-    }
-
+    /// Determines the fewest bits necessary to express the bigint,
+    /// not including the sign.
     #[inline]
     pub fn bits(&self) -> u64 {
         self.0.bits()
     }
 
+    /// Converts this bigint into a an unsigned bigint, if it's not negative.
     #[inline]
-    pub fn to_biguint(&self) -> Option<BigUint> {
-        self.0.with_big_cow(|big| big.as_ref().to_biguint())
+    pub fn to_biguint(&self) -> Option<Uint<'a, E::Unsigned>> {
+        match self.sign() {
+            Sign::Minus => None,
+            _ => Some(self.clone().magnitude()),
+        }
     }
 
     #[inline]
@@ -383,52 +481,118 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
         self.0.checked_div(&v.0).map(Self::from_encoding)
     }
 
+    /// Returns `self ^ exponent`.
     #[inline]
     pub fn pow(&self, exponent: u32) -> Self {
         #[allow(clippy::needless_borrow)]
         Self::from_encoding((&self.0).pow(exponent))
     }
 
+    /// Returns `(self ^ exponent) mod modulus`
+    ///
+    /// Note that this rounds like `mod_floor`, not like the `%` operator,
+    /// which makes a difference when given a negative `self` or `modulus`.
+    /// The result will be in the interval `[0, modulus)` for `modulus > 0`,
+    /// or in the interval `(modulus, 0]` for `modulus < 0`
+    ///
+    /// Panics if the exponent is negative or the modulus is zero.
     #[inline]
-    pub fn modpow(&self, exponent: Self, modulus: Self) -> Self {
+    pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         Self::from_encoding(self.0.modpow(&exponent.0, &modulus.0))
     }
 
+    /// Returns the modular multiplicative inverse if it exists, otherwise `None`.
+    ///
+    /// This solves for `x` such that `self * x ≡ 1 (mod modulus)`.
+    /// Note that this rounds like `mod_floor`, not like the `%` operator,
+    /// which makes a difference when given a negative `self` or `modulus`.
+    /// The solution will be in the interval `[0, modulus)` for `modulus > 0`,
+    /// or in the interval `(modulus, 0]` for `modulus < 0`,
+    /// and it exists if and only if `gcd(self, modulus) == 1`.
+    ///
+    /// ```
+    /// use compact_bigint::RcBigInt;
+    /// use num_integer::Integer;
+    /// use num_traits::{One, Zero};
+    ///
+    /// let m = RcBigInt::from(383);
+    ///
+    /// // Trivial cases
+    /// assert_eq!(RcBigInt::zero().modinv(&m), None);
+    /// assert_eq!(RcBigInt::one().modinv(&m), Some(RcBigInt::one()));
+    /// let neg1 = &m - 1u32;
+    /// assert_eq!(neg1.modinv(&m), Some(neg1));
+    ///
+    /// // Positive self and modulus
+    /// let a = RcBigInt::from(271);
+    /// let x = a.modinv(&m).unwrap();
+    /// assert_eq!(x, RcBigInt::from(106));
+    /// assert_eq!(x.modinv(&m).unwrap(), a);
+    /// assert_eq!((&a * x).mod_floor(&m), RcBigInt::one());
+    ///
+    /// // Negative self and positive modulus
+    /// let b = -&a;
+    /// let x = b.modinv(&m).unwrap();
+    /// assert_eq!(x, RcBigInt::from(277));
+    /// assert_eq!((&b * x).mod_floor(&m), RcBigInt::one());
+    ///
+    /// // Positive self and negative modulus
+    /// let n = -&m;
+    /// let x = a.modinv(&n).unwrap();
+    /// assert_eq!(x, RcBigInt::from(-277));
+    /// assert_eq!((&a * x).mod_floor(&n), &n + 1);
+    ///
+    /// // Negative self and modulus
+    /// let x = b.modinv(&n).unwrap();
+    /// assert_eq!(x, RcBigInt::from(-106));
+    /// assert_eq!((&b * x).mod_floor(&n), &n + 1);
+    /// ```
+    #[inline]
+    pub fn modinv(&self, modulus: &Self) -> Option<Self> {
+        self.0.modinv(&modulus.0).map(Self::from_encoding)
+    }
+
+    /// Returns the truncated principal square root of `self` --
+    /// see [`num_integer::Roots::sqrt()`].
     #[inline]
     pub fn sqrt(&self) -> Self {
         Self::from_encoding(self.0.sqrt())
     }
 
+    /// Returns the truncated principal cube root of `self` --
+    /// see [`num_integer::Roots::cbrt()`].
     #[inline]
     pub fn cbrt(&self) -> Self {
         Self::from_encoding(self.0.cbrt())
     }
 
+    /// Returns the truncated principal `n`th root of `self` --
+    /// See [`num_integer::Roots::nth_root()`].
     #[inline]
     pub fn nth_root(&self, n: u32) -> Self {
         Self::from_encoding(self.0.nth_root(n))
     }
 
+    /// Returns the number of least-significant bits that are zero,
+    /// or `None` if the entire number is zero.
     #[inline]
     pub fn trailing_zeros(&self) -> Option<u64> {
         self.0.trailing_zeros()
     }
 
+    /// Returns whether the bit in position `bit` is set,
+    /// using the two's complement for negative numbers
     #[inline]
-    pub fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
-        self.0.iter_u32_digits()
+    pub fn bit(&self, bit: u64) -> bool {
+        self.0.bit(bit)
     }
 
-    #[inline]
-    pub fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
-        self.0.iter_u64_digits()
-    }
-
-    #[inline]
-    pub fn modinv(&self, modulus: Self) -> Option<Self> {
-        self.0.modinv(&modulus.0).map(Self::from_encoding)
-    }
-
+    /// Sets or clears the bit in the given position,
+    /// using the two's complement for negative numbers
+    ///
+    /// Note that setting/clearing a bit (for positive/negative numbers,
+    /// respectively) greater than the current bit length, a reallocation
+    /// may be needed to store the new digits
     #[inline]
     pub fn set_bit(&mut self, bit: u64, value: bool) {
         self.0.set_bit(bit, value);
@@ -487,6 +651,8 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Encoding<'a> for Int<'a, E> {
     type Big = E::Big;
     type Unsigned = E::Unsigned;
     type Static = Int<'static, E::Static>;
+
+    const ZERO: Self = Self::ZERO;
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
         self.0.update_encoding(f);

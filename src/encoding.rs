@@ -170,6 +170,8 @@ where
     /// A version of this encoding that has a static lifetime.
     type Static: Encoding<'static, Small = Self::Small, Big = Self::Big>;
 
+    const ZERO: Self;
+
     /// Updates the encoding in place using the provided function.
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>));
 

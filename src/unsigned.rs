@@ -10,7 +10,7 @@ use std::marker::PhantomData;
 pub struct Uint<'a, E: Encoding<'a>>(pub(crate) E, PhantomData<&'a ()>);
 
 impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
-    fn from_encoding(encoding: E) -> Self {
+    const fn from_encoding(encoding: E) -> Self {
         Self(encoding, PhantomData)
     }
 
@@ -27,6 +27,9 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     {
         Uint::from_encoding(self.0.borrow())
     }
+
+    /// A constant bigint with value 0, useful for static initialization.
+    pub const ZERO: Self = Self::from_encoding(E::ZERO);
 
     /// Creates and initializes a [`Uint`].
     ///
@@ -458,6 +461,8 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Encoding<'a> for Uint<'a, E> {
     type Big = E::Big;
     type Unsigned = E::Unsigned;
     type Static = Uint<'static, E::Static>;
+
+    const ZERO: Self = Self::ZERO;
 
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
         self.0.update_encoding(f);

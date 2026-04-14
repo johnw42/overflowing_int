@@ -13,12 +13,14 @@ impl<S> Shifted<S>
 where
     S: SmallNumber,
 {
+    pub const ZERO: Self = Self(S::ONE);
+
     /// Creates a new `Shifted` value from a small number, if it can be represented as such.
     pub fn try_new(s: S) -> Option<Self> {
         let shifted = s << 1u32;
         let unshifted = shifted >> 1u32;
         if unshifted == s {
-            Some(Self(shifted | S::one()))
+            Some(Self(shifted | S::ONE))
         } else {
             None
         }
@@ -28,7 +30,7 @@ where
     /// original small number if it is.  The only way a shifted number can be
     /// invalid is through the use of unsafe operations.
     pub fn validate(self) -> Option<S> {
-        if self.0 & S::one() == S::one() {
+        if self.0 & S::ONE == S::ONE {
             Some(self.0 >> 1u32)
         } else {
             None
@@ -41,7 +43,7 @@ where
     S: SmallNumber,
 {
     fn default() -> Self {
-        Self(S::one())
+        Self::ZERO
     }
 }
 

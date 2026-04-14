@@ -7,8 +7,8 @@ use std::{
 use num_bigint::{BigInt, BigUint, ToBigUint};
 use num_integer::Roots;
 use num_traits::{
-    CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, Num, One, PrimInt, ToBytes,
-    ToPrimitive, Unsigned, Zero,
+    CheckedAdd, CheckedDiv, CheckedMul, CheckedRem, CheckedSub, ConstOne, ConstZero, Num, One,
+    PrimInt, ToBytes, ToPrimitive, Unsigned, Zero,
 };
 use paste::paste;
 
@@ -35,6 +35,8 @@ pub trait SmallNumber:
     + CheckedMul
     + CheckedRem
     + CheckedSub
+    + ConstOne
+    + ConstZero
     + LowerHex
     + Shl<u32, Output = Self>
     + Shr<u32, Output = Self>

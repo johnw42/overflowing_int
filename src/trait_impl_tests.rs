@@ -12,7 +12,7 @@ use num_bigint::{
 };
 use num_integer::{Integer, Roots};
 use num_traits::{
-    CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, Euclid, FromBytes,
+    CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, ConstZero, Euclid, FromBytes,
     FromPrimitive, Num, One, Signed, ToBytes, ToPrimitive, Zero,
 };
 use paste::paste;
@@ -76,6 +76,15 @@ duplicate_generic_bignum_types! { mod bignum_tag {
     fn test_checked_sub(a: ImplType, b: ImplType) -> bool {
         CheckedSub::checked_sub(&a, &b)
             == CheckedSub::checked_sub(&EncodedType::from(a), &EncodedType::from(b)).map(Into::into)
+    }
+
+    //
+    // ConstZero
+    //
+
+    #[quickcheck]
+    fn test_const_zero() -> bool {
+        <EncodedType as ConstZero>::ZERO.is_zero()
     }
 
     //

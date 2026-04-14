@@ -43,6 +43,8 @@ pub mod mod_name {
         marker::PhantomData,
     };
 
+    use num_traits::ConstZero;
+
     use super::*;
 
     //
@@ -132,6 +134,14 @@ pub mod mod_name {
         fn checked_sub(&self, v: &Self) -> Option<Self> {
             <Self as Encoding>::checked_sub(self, v)
         }
+    }
+
+    //
+    // CheckedSub
+    //
+
+    impl<'a, E: Encoding<'a, Big = ImplType>> ConstZero for GenericBigNumType<'a, E> {
+        const ZERO: Self = Self::ZERO;
     }
 
     //

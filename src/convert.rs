@@ -99,6 +99,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> TryFrom<Int<'a, E>> for BigUint {
     fn try_from(value: Int<'a, E>) -> Result<Self, Self::Error> {
         value
             .to_biguint()
+            .map(Uint::into_big)
             .ok_or_else(|| TryFromBigIntError::new(value))
     }
 }
@@ -109,6 +110,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> TryFrom<&Int<'a, E>> for BigUint {
     fn try_from(value: &Int<'a, E>) -> Result<Self, Self::Error> {
         value
             .to_biguint()
+            .map(Uint::into_big)
             .ok_or_else(|| TryFromBigIntError::new(()))
     }
 }
