@@ -153,19 +153,19 @@ macro_rules! impl_binary_ops {
     () => {
         duplicate_arith_ops!(paste! {
             fn [<op_fn _small_big>](lhs: Self, rhs: Self::Big) -> Self::Big {
-                std::ops::op_trait::op_fn(lhs, rhs)
+                std::ops::OpTrait::op_fn(lhs, rhs)
             }
             fn [<op_fn _small_big_ref>](lhs: Self, rhs: &Self::Big) -> Self::Big {
-                std::ops::op_trait::op_fn(lhs, rhs)
+                std::ops::OpTrait::op_fn(lhs, rhs)
             }
             fn [<op_fn _big_small>](lhs: Self::Big, rhs: Self) -> Self::Big {
-                std::ops::op_trait::op_fn(lhs, rhs)
+                std::ops::OpTrait::op_fn(lhs, rhs)
             }
             fn [<op_fn _big_ref_small>](lhs: &Self::Big, rhs: Self) -> Self::Big {
-                std::ops::op_trait::op_fn(lhs, rhs)
+                std::ops::OpTrait::op_fn(lhs, rhs)
             }
             fn [<op_fn _assign_small>](lhs: &mut Self::Big, rhs: Self) {
-                std::ops::[<op_trait Assign>]::[<op_fn _assign>](lhs, rhs)
+                std::ops::[<OpTrait  Assign>]::[<op_fn _assign>](lhs, rhs)
             }
         });
     };

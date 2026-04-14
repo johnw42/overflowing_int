@@ -33,7 +33,7 @@ use crate::{
 
 #[allow(unused_imports)]
 #[duplicate_item(
-    mod_name   RawType    GenericBigNumType;
+    mod_name   ImplType   GenericBigNumType;
     [signed]   [BigInt]   [Int];
     [unsigned] [BigUint]  [Uint];
 )]
@@ -50,7 +50,7 @@ pub mod mod_name {
     //
 
     #[cfg(any(test, feature = "quickcheck"))]
-    impl<E: Encoding<'static, Big = RawType> + 'static> quickcheck::Arbitrary
+    impl<E: Encoding<'static, Big = ImplType> + 'static> quickcheck::Arbitrary
         for GenericBigNumType<'static, E>
     {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
@@ -75,7 +75,7 @@ pub mod mod_name {
     //
 
     #[cfg(feature = "arbitrary")]
-    impl<'a, E: Encoding<'a, Big = RawType>> arbitrary::Arbitrary<'_> for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> arbitrary::Arbitrary<'_> for GenericBigNumType<'a, E> {
         fn arbitrary(g: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
             Ok(match bool::arbitrary(g)? {
                 true => Self::from_small(E::Small::arbitrary(g)?),
@@ -88,7 +88,7 @@ pub mod mod_name {
     // Binary
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> Binary for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> Binary for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
             self.with_big_cow(|cow| Binary::fmt(cow.as_ref(), f))
         }
@@ -98,7 +98,7 @@ pub mod mod_name {
     // CheckedAdd
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> CheckedAdd for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> CheckedAdd for GenericBigNumType<'a, E> {
         fn checked_add(&self, v: &Self) -> Option<Self> {
             <Self as Encoding>::checked_add(self, v)
         }
@@ -108,7 +108,7 @@ pub mod mod_name {
     // CheckedDiv
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> CheckedDiv for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> CheckedDiv for GenericBigNumType<'a, E> {
         fn checked_div(&self, v: &Self) -> Option<Self> {
             <Self as Encoding>::checked_div(self, v)
         }
@@ -118,7 +118,7 @@ pub mod mod_name {
     // CheckedMul
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> CheckedMul for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> CheckedMul for GenericBigNumType<'a, E> {
         fn checked_mul(&self, v: &Self) -> Option<Self> {
             <Self as Encoding>::checked_mul(self, v)
         }
@@ -128,7 +128,7 @@ pub mod mod_name {
     // CheckedSub
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> CheckedSub for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> CheckedSub for GenericBigNumType<'a, E> {
         fn checked_sub(&self, v: &Self) -> Option<Self> {
             <Self as Encoding>::checked_sub(self, v)
         }
@@ -138,7 +138,7 @@ pub mod mod_name {
     // Debug
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> Debug for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> Debug for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
             self.with_decoded(|encoded| Debug::fmt(&encoded, f))
         }
@@ -149,12 +149,12 @@ pub mod mod_name {
     //
 
     #[cfg(any(test, feature = "serde"))]
-    impl<'a, 'de, E: Encoding<'a, Big = RawType>> Deserialize<'de> for GenericBigNumType<'a, E> {
+    impl<'a, 'de, E: Encoding<'a, Big = ImplType>> Deserialize<'de> for GenericBigNumType<'a, E> {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
-            RawType::deserialize(deserializer).map(Into::into)
+            ImplType::deserialize(deserializer).map(Into::into)
         }
     }
 
@@ -162,7 +162,7 @@ pub mod mod_name {
     // Display
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> Display for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> Display for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
             self.with_big_cow(|cow| Display::fmt(cow.as_ref(), f))
         }
@@ -173,9 +173,9 @@ pub mod mod_name {
     //
 
     #[cfg(any(test, feature = "rand"))]
-    impl<'a, E: Encoding<'a, Big = RawType>> Distribution<GenericBigNumType<'a, E>> for RandomBits {
+    impl<'a, E: Encoding<'a, Big = ImplType>> Distribution<GenericBigNumType<'a, E>> for RandomBits {
         fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> GenericBigNumType<'a, E> {
-            <RandomBits as Distribution<RawType>>::sample(self, rng).into()
+            <RandomBits as Distribution<ImplType>>::sample(self, rng).into()
         }
     }
 
@@ -183,11 +183,11 @@ pub mod mod_name {
     // FromStr
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> FromStr for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> FromStr for GenericBigNumType<'a, E> {
         type Err = num_bigint::ParseBigIntError;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
-            RawType::from_str(s).map(Self::from)
+            ImplType::from_str(s).map(Self::from)
         }
     }
 
@@ -195,7 +195,7 @@ pub mod mod_name {
     // Integer
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> Integer for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> Integer for GenericBigNumType<'a, E> {
         fn div_floor(&self, other: &Self) -> Self {
             if let Some(lhs) = self.small()
                 && let Some(rhs) = other.small()
@@ -279,11 +279,11 @@ pub mod mod_name {
     // Num
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> Num for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> Num for GenericBigNumType<'a, E> {
         type FromStrRadixErr = ParseBigIntError;
 
         fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-            RawType::from_str_radix(str, radix).map(Into::into)
+            ImplType::from_str_radix(str, radix).map(Into::into)
         }
     }
 
@@ -291,7 +291,7 @@ pub mod mod_name {
     // One
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> One for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> One for GenericBigNumType<'a, E> {
         fn one() -> Self {
             Self::from_small(E::Small::one())
         }
@@ -308,7 +308,7 @@ pub mod mod_name {
     // PartialOrd
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> PartialOrd for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> PartialOrd for GenericBigNumType<'a, E> {
         fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
             Some(self.cmp(other))
         }
@@ -318,7 +318,7 @@ pub mod mod_name {
     // Roots
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> Roots for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> Roots for GenericBigNumType<'a, E> {
         fn nth_root(&self, n: u32) -> Self {
             self.with_decoded(|encoded| match encoded {
                 Decoded::Small(a) => Self::from_small(a.nth_root(n)),
@@ -332,16 +332,16 @@ pub mod mod_name {
     //
 
     #[cfg(any(test, feature = "rand"))]
-    impl<'a, E: Encoding<'a, Big = RawType> + 'a> SampleUniform for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType> + 'a> SampleUniform for GenericBigNumType<'a, E> {
         type Sampler = UniformSamplerImpl<'a, E>;
     }
 
     paste! {
         #[cfg(any(test, feature = "rand"))]
-        pub struct UniformSamplerImpl<'a, E: Encoding<'a, Big = RawType>>([<Uniform RawType>], PhantomData<&'a E>);
+        pub struct UniformSamplerImpl<'a, E: Encoding<'a, Big = ImplType>>([<Uniform ImplType>], PhantomData<&'a E>);
 
         #[cfg(any(test, feature = "rand"))]
-        impl<'a, E: Encoding<'a, Big = RawType>> UniformSampler for UniformSamplerImpl<'a, E> {
+        impl<'a, E: Encoding<'a, Big = ImplType>> UniformSampler for UniformSamplerImpl<'a, E> {
             type X = GenericBigNumType<'a, E>;
 
             fn new<B1, B2>(low: B1, high: B2) -> Self
@@ -350,7 +350,7 @@ pub mod mod_name {
                 B2: SampleBorrow<Self::X> + Sized,
             {
                 low.borrow().with_big_cows(high.borrow(), |low, high| {
-                        Self([<Uniform RawType>]::new(
+                        Self([<Uniform ImplType>]::new(
                             low.as_ref(),
                             high.as_ref(),
                         ), PhantomData)
@@ -363,7 +363,7 @@ pub mod mod_name {
                 B2: SampleBorrow<Self::X> + Sized,
             {
                 low.borrow().with_big_cows(high.borrow(), |low, high| {
-                    Self([<Uniform RawType>]::new_inclusive(
+                    Self([<Uniform ImplType>]::new_inclusive(
                         low.as_ref(),
                         high.as_ref(),
                     ), PhantomData)
@@ -380,7 +380,7 @@ pub mod mod_name {
     // ToBytes
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> ToBytes for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> ToBytes for GenericBigNumType<'a, E> {
         type Bytes = Vec<u8>;
 
         fn to_be_bytes(&self) -> Self::Bytes {
@@ -396,7 +396,7 @@ pub mod mod_name {
     // ToPrimitive
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> ToPrimitive for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> ToPrimitive for GenericBigNumType<'a, E> {
         duplicate_prims! {
             paste! {
                 fn [< to_ prim >](&self) -> Option<prim> {
@@ -413,7 +413,7 @@ pub mod mod_name {
     // LowerHex
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> LowerHex for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> LowerHex for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
             self.with_big_cow(|cow| LowerHex::fmt(cow.as_ref(), f))
         }
@@ -423,7 +423,7 @@ pub mod mod_name {
     // Octal
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> Octal for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> Octal for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
             self.with_big_cow(|cow| Octal::fmt(cow.as_ref(), f))
         }
@@ -433,14 +433,14 @@ pub mod mod_name {
     // RefUnwindSafe
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> RefUnwindSafe for GenericBigNumType<'a, E> {}
+    impl<'a, E: Encoding<'a, Big = ImplType>> RefUnwindSafe for GenericBigNumType<'a, E> {}
 
     //
     // Serialize
     //
 
     #[cfg(any(test, feature = "serde"))]
-    impl<'a, E: Encoding<'a, Big = RawType>> Serialize for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> Serialize for GenericBigNumType<'a, E> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
@@ -453,7 +453,7 @@ pub mod mod_name {
     // UpperHex
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> UpperHex for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> UpperHex for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
             self.with_big_cow(|cow| UpperHex::fmt(cow.as_ref(), f))
         }
@@ -463,7 +463,7 @@ pub mod mod_name {
     // Zero
     //
 
-    impl<'a, E: Encoding<'a, Big = RawType>> Zero for GenericBigNumType<'a, E> {
+    impl<'a, E: Encoding<'a, Big = ImplType>> Zero for GenericBigNumType<'a, E> {
         fn zero() -> Self {
             Self::from_small(E::Small::zero())
         }

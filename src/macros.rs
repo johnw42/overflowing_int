@@ -3,7 +3,7 @@ macro_rules! duplicate_generic_bignum_types {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                signedness  RawType     bignum_tag          EncodedType;
+                signedness  ImplType    bignum_tag          EncodedType;
                 [signed]    [BigInt]    [cow_signed]        [$crate::CowBigInt::<'static>];
                 [unsigned]  [BigUint]   [cow_unsigned]      [$crate::CowBigUint::<'static>];
                 [signed]    [BigInt]    [rc_signed]         [$crate::RcBigInt];
@@ -22,7 +22,7 @@ macro_rules! duplicate_generic_bignum {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                signedness EncodedType    RawType;
+                signedness EncodedType    ImplType;
                 [signed]   [Int]          [BigInt];
                 [unsigned] [Uint]         [BigUint];
             ]
@@ -36,7 +36,7 @@ macro_rules! duplicate_arith_ops {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                op_type op_trait op_fn op_test_pred;
+                op_type OpTrait  op_fn op_test_pred;
                 [arith] [Add]    [add] [always];
                 [arith] [Sub]    [sub] [can_subtract];
                 [arith] [Mul]    [mul] [always];
@@ -53,7 +53,7 @@ macro_rules! duplicate_shift_ops {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                op_type op_trait op_fn op_test_pred inverse_op_fn;
+                op_type OpTrait  op_fn op_test_pred inverse_op_fn;
                 [shift] [Shl]    [shl] [always]     [shr];
                 [shift] [Shr]    [shr] [always]     [shl];
             ]
@@ -67,7 +67,7 @@ macro_rules! duplicate_bit_ops {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                op_type op_trait op_fn    op_test_pred;
+                op_type OpTrait  op_fn    op_test_pred;
                 [bit]   [BitAnd] [bitand] [always];
                 [bit]   [BitOr]  [bitor]  [always];
                 [bit]   [BitXor] [bitxor] [always]

@@ -49,7 +49,7 @@ impl<T> Error for TryFromBigIntError<T> where T: Debug {}
 duplicate_generic_bignum! {
     impl<'a, E> ToBigInt for EncodedType<'a, E>
     where
-        E: Encoding<'a, Big = RawType>,
+        E: Encoding<'a, Big = ImplType>,
     {
         fn to_bigint(&self) -> Option<BigInt> {
             Some(BigInt::from(self))
@@ -58,7 +58,7 @@ duplicate_generic_bignum! {
 
     impl<'a, E> ToBigUint for EncodedType<'a, E>
     where
-        E: Encoding<'a, Big = RawType>,
+        E: Encoding<'a, Big = ImplType>,
     {
         fn to_biguint(&self) -> Option<BigUint> {
             #[allow(clippy::unnecessary_fallible_conversions)]
