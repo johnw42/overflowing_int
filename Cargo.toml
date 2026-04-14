@@ -8,29 +8,28 @@ authors.workspace = true
 
 [features]
 default = [
-  # "quickcheck",
-  # "arbitrary",
-  # "serde",
-  # "rand",
-]
-debug_structure = [
-]
-quickcheck = [
-  "dep:quickcheck",
-  "num-bigint/quickcheck",
+  "arbitrary",
+  "quickcheck",
+  "rand",
+  "serde",
 ]
 arbitrary = [
   "dep:arbitrary",
   "num-bigint/arbitrary",
 ]
-serde = [
-  "dep:serde",
-  "num-bigint/serde",
+quickcheck = [
+  "dep:quickcheck",
+  "num-bigint/quickcheck",
 ]
 rand = [
   "dep:rand",
   "num-bigint/rand",
 ]
+serde = [
+  "dep:serde",
+  "num-bigint/serde",
+]
+
 
 [dependencies]
 num-bigint = "^0.4.6"

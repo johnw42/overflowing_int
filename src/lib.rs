@@ -3,8 +3,8 @@ pub use num_bigint::{
 };
 
 use crate::{
-    box_encoding::BoxEncoding, cow_encoding::CowEncoding, identity_encoding::TrivialEncoding,
-    rc_encoding::RcEncoding, signed::Int, unsigned::Uint,
+    box_encoding::BoxEncoding, cow_encoding::CowEncoding, rc_encoding::RcEncoding, signed::Int,
+    unsigned::Uint,
 };
 
 pub mod big_number;
@@ -32,5 +32,12 @@ pub type RcBigIsize = Int<'static, RcEncoding<isize>>;
 pub type RcBigUsize = Uint<'static, RcEncoding<usize>>;
 pub type BoxBigInt = Int<'static, BoxEncoding<i128>>;
 pub type BoxBigUint = Uint<'static, BoxEncoding<u128>>;
-pub type IdentityBigInt = Int<'static, TrivialEncoding<isize>>;
-pub type IdentityBigUint = Uint<'static, TrivialEncoding<usize>>;
+
+// Only for benchmarking, not for general use.
+pub mod bench {
+    use super::*;
+    use crate::identity_encoding::IdentityEncoding;
+
+    pub type IdentityBigInt = Int<'static, IdentityEncoding<isize>>;
+    pub type IdentityBigUint = Uint<'static, IdentityEncoding<usize>>;
+}

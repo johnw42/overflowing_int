@@ -4,11 +4,11 @@ use std::hash::Hash;
 use std::{borrow::Cow, fmt::Debug};
 
 #[derive(Clone, Hash, PartialEq, Eq)]
-pub struct TrivialEncoding<S>(S::Big)
+pub struct IdentityEncoding<S>(S::Big)
 where
     S: SmallNumber;
 
-impl<S> Decode<'static, S> for TrivialEncoding<S>
+impl<S> Decode<'static, S> for IdentityEncoding<S>
 where
     S: SmallNumber,
 {
@@ -48,7 +48,7 @@ where
     }
 }
 
-impl<S> Encode<'static, S> for TrivialEncoding<S>
+impl<S> Encode<'static, S> for IdentityEncoding<S>
 where
     S: SmallNumber,
 {
@@ -76,14 +76,14 @@ where
     }
 }
 
-impl<S> Encoding<'static> for TrivialEncoding<S>
+impl<S> Encoding<'static> for IdentityEncoding<S>
 where
     S: SmallNumber,
 {
     type Small = S;
     type Big = S::Big;
-    type Unsigned = TrivialEncoding<S::Unsigned>;
-    type Static = TrivialEncoding<S>;
+    type Unsigned = IdentityEncoding<S::Unsigned>;
+    type Static = IdentityEncoding<S>;
 
     #[inline]
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<S> Debug for TrivialEncoding<S>
+impl<S> Debug for IdentityEncoding<S>
 where
     S: SmallNumber,
 {
@@ -111,14 +111,14 @@ where
 }
 
 #[cfg(any(test, feature = "quickcheck"))]
-impl<S: SmallNumber> quickcheck::Arbitrary for TrivialEncoding<S> {
+impl<S: SmallNumber> quickcheck::Arbitrary for IdentityEncoding<S> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         Self(S::Big::arbitrary(g))
     }
 }
 
 #[cfg(feature = "arbitrary")]
-impl<S: SmallNumber> arbitrary::Arbitrary<'_> for TrivialEncoding<S> {
+impl<S: SmallNumber> arbitrary::Arbitrary<'_> for IdentityEncoding<S> {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         Ok(Self(S::Big::arbitrary(u)?))
     }
