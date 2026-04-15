@@ -207,6 +207,8 @@ where
         lhs.checked_div(&rhs).map(Self::from_big)
     }
 
+    // TODO: Add `checked_rem` and `checked_pow` when those methods are added to `BigNumber`.
+
     fn pow(&self, exponent: u32) -> Self {
         if let Some(a) = self.small()
             && let (a, false) = a.overflowing_pow(exponent)

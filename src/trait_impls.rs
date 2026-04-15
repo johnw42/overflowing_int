@@ -242,16 +242,6 @@ pub mod mod_name {
             Self::from_big(lhs.lcm(rhs.as_ref()))
         }
 
-        fn divides(&self, other: &Self) -> bool {
-            if let Some(lhs) = self.small()
-                && let Some(rhs) = other.small()
-            {
-                return lhs.is_multiple_of(&rhs);
-            }
-            let (lhs, rhs) = Self::big_cows(self, other);
-            lhs.is_multiple_of(rhs.as_ref())
-        }
-
         fn is_multiple_of(&self, other: &Self) -> bool {
             if let Some(lhs) = self.small()
                 && let Some(rhs) = other.small()
