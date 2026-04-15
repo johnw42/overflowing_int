@@ -58,6 +58,16 @@ class RevisionData:
                         self.data[(function, size)] = None
 
 
+def system(cmd):
+    print(f"$ {cmd}")
+    return os.system(cmd)
+
+
+def popen(cmd):
+    print(f"$ {cmd}")
+    return os.popen(cmd)
+
+
 def main():
     os.chdir(TOP_DIR)
 
@@ -70,38 +80,53 @@ def main():
     p.add_argument(
         "--function",
         "-f",
-        default=".*",
         help="Regex to filter which functions to benchmark.",
     )
     p.add_argument(
         "--size",
         "-s",
-        default=".*",
         help="Regex to filter which input sizes to benchmark.",
     )
-    p.add_argument("--baseline", "-b", help="Revision to use as baseline.")
+    p.add_argument(
+        "--baseline",
+        "-b",
+        default=DEFAULT_BASELINE,
+        help="Revision to use as baseline.",
+    )
+    p.add_argument(
+        "--save-baseline",
+        default=current_revision()[:3],
+        help="Revision to save benchmark results under.",
+    )
+    p.add_argument(
+        "--bench",
+        "-B",
+        default="pi",
+        help="Name of the benchmark to run (default: 'pi').",
+    )
 
     opts = p.parse_args()
-    baseline = opts.baseline if opts.baseline else DEFAULT_BASELINE
+
+    bench_pattern = f"[^/]+/({opts.function or '[^/]+'})/({opts.size or '[^/]+'})"
 
     match opts.command:
         case "all":
             try:
-                os.system("jj workspace add target/bench-workspace")
+                system("jj workspace add target/bench-workspace")
                 for rev in REVISIONS:
                     print(f"Testing revision {rev}...")
-                    os.system(f"jj edit {rev}")
+                    system(f"jj edit {rev}")
                     cargo(
-                        f"bench -p compact_bigint --bench=pi -- --save-baseline={rev} 'Pi/({opts.function})/({opts.size})'"
+                        f"bench -p compact_bigint --bench={opts.bench} -- --save-baseline={rev} '{bench_pattern}'"
                     )
             finally:
                 os.chdir(TOP_DIR)
-                os.system("jj workspace forget target/bench-workspace")
+                system("jj workspace forget target/bench-workspace")
                 shutil.rmtree("target/bench-workspace", ignore_errors=True)
         case "summary":
             print("Printing summary of benchmark results...")
             rev_data = {rev: RevisionData(rev) for rev in REVISIONS}
-            baseline_data = rev_data[baseline]
+            baseline_data = rev_data[opts.baseline]
             for function in FUNCTIONS:
                 for size in SIZES:
                     print(f"{function}({size}):")
@@ -123,14 +148,14 @@ def main():
                 "cargo bench --no-run --message-format=json | jq -r 'select(.executable != null) | .executable'"
             ).read()
             m = re.search(
-                r"(?m)^(?:/\S+)*/target/release/deps/pi-[0-9a-f]+$",
+                rf"(?m)^(?:/\S+)*/target/release/deps/{opts.bench}-[0-9a-f]+$",
                 jq_output,
             )
             print(repr(jq_output))
             assert m, jq_output
             executable = m.group(0)
-            os.system(
-                f"perf record --call-graph dwarf -- {executable} --bench --profile-time 5 'Pi/({opts.function})/({opts.size})'"
+            system(
+                f"perf record --call-graph dwarf -- {executable} --bench --profile-time 5 '{bench_pattern}'"
             )
             data_path = f"perf.{current_revision()[:3]}.data"
             try:
@@ -139,15 +164,10 @@ def main():
                 pass
             os.rename("perf.data", data_path)
             print(f"Saved profile data to {data_path}")
-        case "run":
-            if opts.baseline:
-                os.system(
-                    f"cargo bench -p compact_bigint --bench=pi -- --save-baseline={opts.baseline} 'Pi/({opts.function})/({opts.size})'"
-                )
-            else:
-                os.system(
-                    f"cargo bench -p compact_bigint --bench=pi -- --save-baseline={current_revision()[:3]} 'Pi/({opts.function})/({opts.size})'"
-                )
+        case "run" | None:
+            system(
+                f"cargo bench -p compact_bigint --bench={opts.bench} -- --save-baseline={opts.save_baseline} '{bench_pattern}'"
+            )
 
 
 main()
