@@ -124,15 +124,14 @@ where
     type Error = TryFromBigIntError<Int<'a, E1>>;
 
     fn try_from(value: Int<'a, E1>) -> Result<Self, Self::Error> {
-        value
-            .with_decoded(|decoded| match decoded {
-                Decoded::Small(s) => match E2::Small::try_from(s) {
-                    Ok(u) => Some(Self::from_small(u)),
-                    Err(_) => s.to_biguint().map(Self::from_big),
-                },
-                Decoded::Big(b) => b.to_biguint().map(Self::from_big),
-            })
-            .ok_or_else(|| TryFromBigIntError::new(value))
+        match value.decode() {
+            Decoded::Small(s) => match E2::Small::try_from(s) {
+                Ok(u) => Some(Self::from_small(u)),
+                Err(_) => s.to_biguint().map(Self::from_big),
+            },
+            Decoded::Big(b) => b.to_biguint().map(Self::from_big),
+        }
+        .ok_or_else(|| TryFromBigIntError::new(value))
     }
 }
 
@@ -191,13 +190,13 @@ where
     E2::Small: TryFrom<E1::Small>,
 {
     fn from(value: Uint<'a, E1>) -> Self {
-        value.with_decoded(|decoded| match decoded {
+        match value.decode() {
             Decoded::Small(s) => match E2::Small::try_from(s) {
                 Ok(small) => Self::from_small(small),
                 Err(_) => Self::from_big(s.to_bigint()),
             },
             Decoded::Big(b) => Self::from_big(b.into_owned().into()),
-        })
+        }
     }
 }
 
@@ -286,10 +285,10 @@ pub mod tag {
                     type Error = TryFromBigIntError<EncodedType<'a, E>>;
 
                     fn try_from(value: EncodedType<'a, E>) -> Result<Self, Self::Error> {
-                        value.0.with_decoded(|decoded| match decoded {
+                        match value.decode() {
                             Decoded::Small(n) => n.[<to_ prim>](),
                             Decoded::Big(n) => n.[<to_ prim>](),
-                        }).ok_or_else(|| TryFromBigIntError::new(value))
+                        }.ok_or_else(|| TryFromBigIntError::new(value))
                     }
                 }
 
@@ -297,10 +296,10 @@ pub mod tag {
                 type Error = TryFromBigIntError<()>;
 
                 fn try_from(value: &'b EncodedType<'a, E>) -> Result<Self, Self::Error> {
-                    value.0.with_decoded(|decoded| match decoded {
+                    match value.decode() {
                         Decoded::Small(n) => n.[<to_ prim>](),
                         Decoded::Big(n) => n.[<to_ prim>](),
-                    }).ok_or(TryFromBigIntError::new(()))
+                    }.ok_or(TryFromBigIntError::new(()))
                 }
             }
         }

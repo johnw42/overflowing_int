@@ -6,7 +6,7 @@ import json
 
 TOP_DIR = os.path.dirname(__file__)
 
-BASELINE = "pxr"
+DEFAULT_BASELINE = "uny"
 
 REVISIONS = [
     "lmu",
@@ -82,7 +82,7 @@ def main():
     p.add_argument("--baseline", "-b", help="Revision to use as baseline.")
 
     opts = p.parse_args()
-    baseline = opts.baseline if opts.baseline else BASELINE
+    baseline = opts.baseline if opts.baseline else DEFAULT_BASELINE
 
     match opts.command:
         case "all":

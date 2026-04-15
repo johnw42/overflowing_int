@@ -2,7 +2,6 @@ use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encode;
 use crate::encoding::Encoding;
-use crate::encoding::EncodingKind;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -30,43 +29,22 @@ impl<'a, S> Decode<'a, S> for CowEncoding<'a, S>
 where
     S: SmallNumber,
 {
-    fn kind() -> EncodingKind {
-        EncodingKind::Cow
-    }
-
-    fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
+    fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>> {
         self.0
     }
 
-    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
         match &self.0 {
             Decoded::Small(s) => Decoded::Small(*s),
             Decoded::Big(b) => Decoded::Big(Cow::Borrowed(b.as_ref())),
         }
     }
 
-    fn into_big_cow(self) -> Cow<'a, S::Big> {
-        match self.0 {
-            Decoded::Small(s) => Cow::Owned(s.to_big()),
-            Decoded::Big(b) => b,
-        }
-    }
-
-    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
+    fn big_cow<'b>(&'b self) -> Cow<'b, <S as SmallNumber>::Big> {
         match &self.0 {
-            Decoded::Small(s) => f(Decoded::Small(*s)),
-            Decoded::Big(b) => f(Decoded::Big(Cow::Borrowed(b.as_ref()))),
+            Decoded::Small(s) => Cow::Owned(S::to_big(*s)),
+            Decoded::Big(b) => Cow::Borrowed(b.as_ref()),
         }
-    }
-
-    fn owns_bignum(&self) -> bool {
-        self.with_decoded(|decoded| match decoded {
-            Decoded::Small(_) => false,
-            Decoded::Big(b) => match b {
-                Cow::Borrowed(_) => false,
-                Cow::Owned(_) => true,
-            },
-        })
     }
 }
 

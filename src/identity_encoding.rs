@@ -1,4 +1,4 @@
-use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingKind};
+use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
 use num_traits::ConstZero as _;
 use std::hash::Hash;
@@ -15,28 +15,13 @@ where
     S: SmallNumber,
 {
     #[inline]
-    fn kind() -> EncodingKind {
-        EncodingKind::Cow
-    }
-
-    #[inline]
-    fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
+    fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>> {
         Decoded::Big(Cow::Owned(self.0.into_owned()))
     }
 
     #[inline]
-    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
         Decoded::Big(Cow::Borrowed(self.0.as_ref()))
-    }
-
-    #[inline]
-    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
-        f(Decoded::Big(Cow::Borrowed(&self.0)))
-    }
-
-    #[inline]
-    fn owns_bignum(&self) -> bool {
-        true
     }
 
     #[inline]
@@ -50,8 +35,8 @@ where
     }
 
     #[inline]
-    fn with_big_cow<T>(&self, f: impl FnOnce(Cow<<S as SmallNumber>::Big>) -> T) -> T {
-        f(Cow::Borrowed(&self.0))
+    fn big_cow<'b>(&'b self) -> Cow<'b, <S as SmallNumber>::Big> {
+        Cow::Borrowed(self.0.as_ref())
     }
 }
 

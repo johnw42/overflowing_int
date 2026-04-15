@@ -1,7 +1,8 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingKind};
+use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
 use num_bigint::BigUint;
+use num_traits::PrimInt as _;
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
@@ -23,7 +24,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// if possible.  If the encoding does not support borrowing, this will
     /// simply clone self.
     pub fn borrow<'b>(&'b self) -> Uint<'b, E::WithLifetime<'b>> {
-        <Self as Encoding>::WithLifetime::from_decoded(self.decode_ref())
+        <Self as Encoding>::WithLifetime::from_decoded(self.decode())
     }
 
     /// A constant bigint with value 0, useful for static initialization.
@@ -167,7 +168,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// ```
     #[inline]
     pub fn to_bytes_be(&self) -> Vec<u8> {
-        self.0.with_big_cow(|big| big.as_ref().to_bytes_be())
+        self.big_cow().to_bytes_be()
     }
 
     /// Returns the byte representation of the [`Uint`] in little-endian byte order.
@@ -182,7 +183,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// ```
     #[inline]
     pub fn to_bytes_le(&self) -> Vec<u8> {
-        self.0.with_big_cow(|big| big.as_ref().to_bytes_le())
+        self.big_cow().to_bytes_le()
     }
 
     /// Returns the `u32` digits representation of the [`Uint`] ordered least significant digit
@@ -200,7 +201,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// ```
     #[inline]
     pub fn to_u32_digits(&self) -> Vec<u32> {
-        self.0.with_big_cow(|big| big.as_ref().to_u32_digits())
+        self.big_cow().to_u32_digits()
     }
 
     /// Returns the `u64` digits representation of the [`Uint`] ordered least significant digit
@@ -219,7 +220,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// ```
     #[inline]
     pub fn to_u64_digits(&self) -> Vec<u64> {
-        self.0.with_big_cow(|big| big.as_ref().to_u64_digits())
+        self.big_cow().to_u64_digits()
     }
 
     /// Returns an iterator of `u32` digits representation of the [`Uint`] ordered least
@@ -291,7 +292,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// ```
     #[inline]
     pub fn to_radix_be(&self, radix: u32) -> Vec<u8> {
-        self.0.with_big_cow(|big| big.as_ref().to_radix_be(radix))
+        self.big_cow().to_radix_be(radix)
     }
 
     /// Returns the integer in the requested base in little-endian digit order.
@@ -310,7 +311,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// ```
     #[inline]
     pub fn to_radix_le(&self, radix: u32) -> Vec<u8> {
-        self.0.with_big_cow(|big| big.as_ref().to_radix_le(radix))
+        self.big_cow().to_radix_le(radix)
     }
 
     /// Determines the fewest bits necessary to express the [`Uint`].
@@ -385,12 +386,18 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
 
     /// Returns the number of least-significant bits that are ones.
     pub fn trailing_ones(&self) -> u64 {
-        self.0.with_big_cow(|cow| cow.as_ref().trailing_ones())
+        match self.decode() {
+            Decoded::Small(s) => s.trailing_ones() as u64,
+            Decoded::Big(b) => b.as_ref().trailing_ones(),
+        }
     }
 
     /// Returns the number of one bits.
     pub fn count_ones(&self) -> u64 {
-        self.0.with_big_cow(|cow| cow.as_ref().count_ones())
+        match self.decode() {
+            Decoded::Small(s) => s.count_ones() as u64,
+            Decoded::Big(b) => b.as_ref().count_ones(),
+        }
     }
 
     /// Returns whether the bit in the given position is set
@@ -408,47 +415,22 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
 }
 
 impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for Uint<'a, E> {
-    fn kind() -> EncodingKind {
-        E::kind()
+    fn into_decoded(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+        self.0.into_decoded()
     }
 
-    fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+    fn decode<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
         self.0.decode()
-    }
-
-    fn decode_ref<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
-        self.0.decode_ref()
-    }
-
-    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<E::Small, Cow<'b, E::Big>>) -> T) -> T {
-        self.0.with_decoded(f)
-    }
-
-    fn owns_bignum(&self) -> bool {
-        self.0.owns_bignum()
     }
 }
 
 impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &Uint<'a, E> {
-    fn kind() -> EncodingKind {
-        E::kind()
+    fn into_decoded(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+        self.0.clone().into_decoded()
     }
 
-    fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
-        // TODO Can we do this without cloning?
-        self.0.clone().decode()
-    }
-
-    fn decode_ref<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
-        self.0.decode_ref()
-    }
-
-    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<E::Small, Cow<'b, E::Big>>) -> T) -> T {
-        self.0.with_decoded(f)
-    }
-
-    fn owns_bignum(&self) -> bool {
-        false
+    fn decode<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
+        self.0.decode()
     }
 }
 

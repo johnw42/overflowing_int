@@ -35,16 +35,16 @@ macro_rules! duplicate_bigint_types {
 duplicate_bigint_types! {
     paste! {
         fn [<calc_pi_atan_ label:lower>](digits: u32) -> BigInt(['static]) {
-            fn pi_atan_rc(k: BigInt(['static]), n: BigInt(['static])) -> BigInt(['static]) {
+            fn pi_atan_rc<'a>(k: BigInt(['a]), n: BigInt(['a])) -> BigInt(['static]) {
                 let mut a = BigInt(['static])::zero();
                 let mut w = n * k.borrow();
-                let k2 = k.borrow() * k.borrow();
+                let k2 = &k * &k;
                 let mut i = -1;
                 while !w.is_zero() {
-                    w /= k2.borrow();
+                    w /= &k2;
                     i += 2;
                     a += &w / i;
-                    w /= k2.borrow();
+                    w /= &k2;
                     i += 2;
                     a -= &w / i;
                 }

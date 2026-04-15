@@ -1,4 +1,4 @@
-use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingKind};
+use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
@@ -36,11 +36,7 @@ impl<'a, S> Decode<'a, S> for BoxEncoding<'a, S>
 where
     S: SmallNumber,
 {
-    fn kind() -> EncodingKind {
-        EncodingKind::Box
-    }
-
-    fn decode(mut self) -> Decoded<S, Cow<'static, S::Big>> {
+    fn into_decoded(mut self) -> Decoded<S, Cow<'static, S::Big>> {
         unsafe {
             if let Some(s) = self.0.small.validate() {
                 Decoded::Small(s)
@@ -53,7 +49,7 @@ where
         }
     }
 
-    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
         unsafe {
             if let Some(s) = self.0.small.validate() {
                 Decoded::Small(s)
@@ -61,23 +57,6 @@ where
                 Decoded::Big(Cow::Borrowed(Box::as_ref(&self.0.big)))
             }
         }
-    }
-
-    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
-        unsafe {
-            if let Some(s) = self.0.small.validate() {
-                f(Decoded::Small(s))
-            } else {
-                f(Decoded::Big(Cow::Borrowed(Box::as_ref(&self.0.big))))
-            }
-        }
-    }
-
-    fn owns_bignum(&self) -> bool {
-        self.with_decoded(|decoded| match decoded {
-            Decoded::Small(_) => false,
-            Decoded::Big(_) => true,
-        })
     }
 }
 
@@ -217,10 +196,10 @@ where
     S: SmallNumber,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.with_decoded(|decoded| match decoded {
+        match self.decode() {
             Decoded::Small(s) => write!(f, "Small({})", s),
             Decoded::Big(b) => write!(f, "Big({})", b.as_ref()),
-        })
+        }
     }
 }
 
@@ -229,10 +208,10 @@ where
     S: SmallNumber,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.with_decoded(|decoded| match decoded {
+        match self.decode() {
             Decoded::Small(s) => s.hash(state),
             Decoded::Big(b) => b.hash(state),
-        });
+        }
     }
 }
 
@@ -241,13 +220,11 @@ where
     S: SmallNumber,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.with_decoded(|lhs| {
-            other.with_decoded(|rhs| match (lhs, rhs) {
-                (Decoded::Small(s1), Decoded::Small(s2)) => s1 == s2,
-                (Decoded::Big(b1), Decoded::Big(b2)) => b1 == b2,
-                _ => false,
-            })
-        })
+        match (self.decode(), other.decode()) {
+            (Decoded::Small(s1), Decoded::Small(s2)) => s1 == s2,
+            (Decoded::Big(b1), Decoded::Big(b2)) => b1 == b2,
+            _ => false,
+        }
     }
 }
 

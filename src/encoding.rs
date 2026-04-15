@@ -14,14 +14,6 @@ pub enum Decoded<S, B> {
     Big(B),
 }
 
-pub enum EncodingKind {
-    Box,
-    Rc,
-    Cow,
-    Trivial,
-    Primitive,
-}
-
 /// A type that can be decoded into a small or big value.  This this applies to
 /// encoded big numbers, but it also applies to types that can be trivially
 /// decoded, such as integer types and bignum types.
@@ -29,21 +21,15 @@ pub trait Decode<'a, S>: Sized + Clone
 where
     S: SmallNumber,
 {
-    fn kind() -> EncodingKind;
-
     /// The main method of this trait, which decodes the value into either a
-    /// small or big value without ever cloning a big value.  This method is
-    /// preferable to [`Self::decode`] in most cases, but if `f` needs to
-    /// clone the big value, using `decode` may avoid cloning.
-    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T;
-
-    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, S::Big>>;
+    /// small or big value without ever cloning a big value.
+    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, S::Big>>;
 
     /// Decodes the value, consuming self.
-    fn decode(self) -> Decoded<S, Cow<'a, S::Big>>;
+    fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>>;
 
     /// Gets the big value as a `Cow`, creating a bignum if necessary.
-    fn into_big_cow(self) -> Cow<'a, S::Big> {
+    fn big_cow<'b>(&'b self) -> Cow<'b, S::Big> {
         match self.decode() {
             Decoded::Small(s) => Cow::Owned(s.to_big()),
             Decoded::Big(b) => b,
@@ -54,7 +40,7 @@ where
     /// [`Self::big`], using this method may allow for more efficient code when
     /// the encoding is big, since it can avoid an extra clone of the big value.
     fn into_big(self) -> S::Big {
-        self.into_big_cow().into_owned()
+        self.big_cow().into_owned()
     }
 
     fn into_bigint(self) -> BigInt {
@@ -63,22 +49,19 @@ where
 
     /// Gets the small value if it the encoding is small, or `None` if it is big.
     fn small(&self) -> Option<S> {
-        self.with_decoded(|decoded| match decoded {
+        match self.decode() {
             Decoded::Small(s) => Some(s),
             Decoded::Big(_) => None,
-        })
+        }
     }
 
-    /// Tests whether this encoding owns its value as a bignum.
-    fn owns_bignum(&self) -> bool;
-
-    /// Gets the big value as a `Cow`, creating a bignum if necessary, and passes it to the provided function.
-    fn with_big_cow<T>(&self, f: impl FnOnce(Cow<S::Big>) -> T) -> T {
-        self.with_decoded(|decoded| match decoded {
-            Decoded::Small(s) => f(Cow::Owned(s.to_big())),
-            Decoded::Big(b) => f(b),
-        })
-    }
+    // /// Gets the big value as a `Cow`, creating a bignum if necessary, and passes it to the provided function.
+    // fn with_big_cow<T>(&self, f: impl FnOnce(Cow<S::Big>) -> T) -> T {
+    //     match self.decode() {
+    //         Decoded::Small(s) => f(Cow::Owned(s.to_big())),
+    //         Decoded::Big(b) => f(b),
+    //     }
+    // }
 
     /// A helper method for working with two decoded values at the same time.
     /// This calls [`Self::with_big_cow`] for both `self` and `other`, and
@@ -90,7 +73,7 @@ where
         other: &impl Decode<'a, S>,
         f: impl FnOnce(Cow<S::Big>, Cow<S::Big>) -> T,
     ) -> T {
-        self.with_big_cow(|lhs| other.with_big_cow(|rhs| f(lhs, rhs)))
+        f(self.big_cow(), other.big_cow())
     }
 
     /// A helper method for working with two decoded values at the same time,
@@ -105,21 +88,13 @@ where
         other: &impl Decode<'a, S>,
         f: impl FnOnce(Decoded<(S, S), (Cow<S::Big>, Cow<S::Big>)>) -> T,
     ) -> T {
-        self.with_decoded(|lhs| {
-            other.with_decoded(|rhs| {
-                let enc = match (lhs, rhs) {
-                    (Decoded::Small(s1), Decoded::Small(s2)) => Decoded::Small((s1, s2)),
-                    (Decoded::Small(s1), Decoded::Big(b2)) => {
-                        Decoded::Big((Cow::Owned(s1.to_big()), b2))
-                    }
-                    (Decoded::Big(b1), Decoded::Small(s2)) => {
-                        Decoded::Big((b1, Cow::Owned(s2.to_big())))
-                    }
-                    (Decoded::Big(b1), Decoded::Big(b2)) => Decoded::Big((b1, b2)),
-                };
-                f(enc)
-            })
-        })
+        let enc = match (self.decode(), other.decode()) {
+            (Decoded::Small(s1), Decoded::Small(s2)) => Decoded::Small((s1, s2)),
+            (Decoded::Small(s1), Decoded::Big(b2)) => Decoded::Big((Cow::Owned(s1.to_big()), b2)),
+            (Decoded::Big(b1), Decoded::Small(s2)) => Decoded::Big((b1, Cow::Owned(s2.to_big()))),
+            (Decoded::Big(b1), Decoded::Big(b2)) => Decoded::Big((b1, b2)),
+        };
+        f(enc)
     }
 }
 
@@ -185,7 +160,7 @@ where
         Self: 'b,
         'a: 'b,
     {
-        Self::WithLifetime::from_decoded(self.decode_ref())
+        Self::WithLifetime::from_decoded(self.decode())
     }
 
     /// Updates the encoding in place using the provided function.
@@ -199,11 +174,11 @@ where
     }
 
     fn to_str_radix(&self, radix: u32) -> String {
-        self.with_big_cow(|cow| cow.to_str_radix(radix))
+        self.big_cow().to_str_radix(radix)
     }
 
     fn bit(&self, bit: u64) -> bool {
-        self.with_decoded(|encoded| match encoded {
+        match self.decode() {
             Decoded::Small(small) => {
                 if bit < Self::Small::BITS as u64 {
                     (small >> (bit as u32)) & Self::Small::one() == Self::Small::one()
@@ -212,11 +187,11 @@ where
                 }
             }
             Decoded::Big(big) => big.bit(bit),
-        })
+        }
     }
 
     fn bits(&self) -> u64 {
-        self.with_decoded(|encoded| match encoded {
+        match self.decode() {
             Decoded::Small(n) => {
                 if n >= Self::Small::zero() {
                     Self::Small::BITS - n.leading_zeros()
@@ -226,7 +201,7 @@ where
             }
             .into(),
             Decoded::Big(n) => n.bits(),
-        })
+        }
     }
 
     fn checked_add(&self, v: &Self) -> Option<Self> {
@@ -249,48 +224,58 @@ where
         if let Some(a) = self.small()
             && let (a, false) = a.overflowing_pow(exponent)
         {
-            return Self::from_small(a);
+            Self::from_small(a)
+        } else {
+            Self::from_big(self.big_cow().pow(exponent))
         }
-        self.with_big_cow(|big| Self::from_big(big.pow(exponent)))
     }
 
     fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         self.with_big_cows(exponent, |lhs, rhs| {
-            modulus.with_big_cow(|modulus| Self::from_big(lhs.modpow(&rhs, &modulus)))
+            Self::from_big(lhs.modpow(&rhs, modulus.big_cow().as_ref()))
         })
     }
 
     fn sqrt(&self) -> Self {
-        self.with_decoded(|encoded| match encoded {
+        match self.decode() {
             Decoded::Small(n) => Self::from_small(n.sqrt()),
             Decoded::Big(n) => Self::from_big(Roots::sqrt(&n)),
-        })
+        }
     }
 
     fn cbrt(&self) -> Self {
-        self.with_decoded(|encoded| match encoded {
+        match self.decode() {
             Decoded::Small(n) => Self::from_small(n.cbrt()),
             Decoded::Big(n) => Self::from_big(Roots::cbrt(&n)),
-        })
+        }
     }
 
     fn nth_root(&self, n: u32) -> Self {
-        self.with_decoded(|encoded| match encoded {
+        match self.decode() {
             Decoded::Small(x) => Self::from_small(x.nth_root(n)),
             Decoded::Big(x) => Self::from_big(Roots::nth_root(&x, n)),
-        })
+        }
     }
 
     fn trailing_zeros(&self) -> Option<u64> {
-        self.with_big_cow(|cow| cow.trailing_zeros())
+        match self.decode() {
+            Decoded::Small(n) => Some(n.trailing_zeros() as u64),
+            Decoded::Big(n) => n.trailing_zeros(),
+        }
     }
 
     fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
-        self.with_big_cow(|cow| cow.iter_u32_digits().collect::<Vec<_>>().into_iter())
+        self.big_cow()
+            .iter_u32_digits()
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
-        self.with_big_cow(|cow| cow.iter_u64_digits().collect::<Vec<_>>().into_iter())
+        self.big_cow()
+            .iter_u64_digits()
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     fn modinv(&self, modulus: &Self) -> Option<Self> {
@@ -325,31 +310,16 @@ impl<'a, S> Decode<'a, S> for Cow<'a, S::Big>
 where
     S: SmallNumber,
 {
-    fn kind() -> EncodingKind {
-        EncodingKind::Cow
-    }
-
-    fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
+    fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>> {
         Decoded::Big(self)
     }
 
-    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, S::Big>> {
+    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, S::Big>> {
         Decoded::Big(Cow::Borrowed(self.as_ref()))
     }
 
-    fn into_big_cow(self) -> Cow<'a, S::Big> {
-        self
-    }
-
-    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
-        f(Decoded::Big(Cow::Borrowed(self.as_ref())))
-    }
-
-    fn owns_bignum(&self) -> bool {
-        match self {
-            Cow::Borrowed(_) => false,
-            Cow::Owned(_) => true,
-        }
+    fn big_cow<'b>(&'b self) -> Cow<'b, S::Big> {
+        Cow::Borrowed(self.as_ref())
     }
 }
 
@@ -357,31 +327,16 @@ impl<'a, S> Decode<'a, S> for Rc<S::Big>
 where
     S: SmallNumber,
 {
-    fn kind() -> EncodingKind {
-        EncodingKind::Rc
-    }
-
-    fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
+    fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>> {
         Decoded::Big(Cow::Owned((*self).clone()))
     }
 
-    fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
         Decoded::Big(Cow::Borrowed(self.as_ref()))
     }
 
-    fn into_big_cow(self) -> Cow<'a, S::Big> {
-        match Rc::try_unwrap(self) {
-            Ok(b) => Cow::Owned(b),
-            Err(rc) => Cow::Owned((*rc).clone()),
-        }
-    }
-
-    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
-        f(Decoded::Big(Cow::Borrowed(self.as_ref())))
-    }
-
-    fn owns_bignum(&self) -> bool {
-        true
+    fn big_cow<'b>(&'b self) -> Cow<'b, <S as SmallNumber>::Big> {
+        Cow::Borrowed(self.as_ref())
     }
 }
 
@@ -391,11 +346,7 @@ duplicate_prims! {
         S: SmallNumber,
         S::Big: BigNumber + From<prim>
     {
-        fn kind() -> EncodingKind {
-            EncodingKind::Primitive
-        }
-
-        fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
+        fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>> {
             #[allow(irrefutable_let_patterns)]
             #[allow(clippy::unnecessary_fallible_conversions)]
             if let Ok(small) = S::try_from(self) {
@@ -405,7 +356,7 @@ duplicate_prims! {
             }
         }
 
-        fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+        fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
             #[allow(irrefutable_let_patterns)]
             #[allow(clippy::unnecessary_fallible_conversions)]
             if let Ok(small) = S::try_from(*self) {
@@ -413,18 +364,6 @@ duplicate_prims! {
             } else {
                 Decoded::Big(Cow::Owned(S::Big::from(*self)))
             }
-        }
-
-        fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
-            #[allow(clippy::unnecessary_fallible_conversions)]
-            match S::try_from(*self) {
-                Ok(small) => f(Decoded::Small(small)),
-                Err(_) => f(Decoded::Big(Cow::Owned(S::Big::from(*self)))),
-            }
-        }
-
-        fn owns_bignum(&self) -> bool {
-            false
         }
     }
 
@@ -433,11 +372,7 @@ duplicate_prims! {
         S::Big: From<prim>,
         S: TryFrom<prim>
     {
-        fn kind() -> EncodingKind {
-            EncodingKind::Primitive
-        }
-
-        fn decode(self) -> Decoded<S, Cow<'a, S::Big>> {
+        fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>> {
             #[allow(irrefutable_let_patterns)]
             #[allow(clippy::unnecessary_fallible_conversions)]
             if let Ok(small) = S::try_from(*self) {
@@ -447,7 +382,7 @@ duplicate_prims! {
             }
         }
 
-        fn decode_ref<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+        fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
             #[allow(irrefutable_let_patterns)]
             #[allow(clippy::unnecessary_fallible_conversions)]
             if let Ok(small) = S::try_from(**self) {
@@ -455,18 +390,6 @@ duplicate_prims! {
             } else {
                 Decoded::Big(Cow::Owned(S::Big::from(**self)))
             }
-        }
-
-        fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<S, Cow<'b, S::Big>>) -> T) -> T {
-            #[allow(clippy::unnecessary_fallible_conversions)]
-            match S::try_from(**self) {
-                Ok(small) => f(Decoded::Small(small)),
-                Err(_) => f(Decoded::Big(Cow::Owned(S::Big::from(**self)))),
-            }
-        }
-
-        fn owns_bignum(&self) -> bool {
-            false
         }
     }
 }

@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 use crate::big_number::{BigNumber, BigSigned};
-use crate::encoding::{Decode, Decoded, Encoding, EncodingKind};
+use crate::encoding::{Decode, Decoded, Encoding};
 use crate::signed::Int;
 use crate::small_num::SmallNumber as _;
 use crate::unsigned::Uint;
@@ -36,63 +36,23 @@ trait ArithOp<'e, E: Encoding<'e>> {
         L: Decode<'e, E::Small>,
         R: Decode<'e, E::Small>,
     {
-        match E::kind() {
-            // EncodingKind::Cow => match (lhs.decode(), rhs.decode()) {
-            //     (Decoded::Small(lhs), Decoded::Small(rhs)) => {
-            //         if let Ok(out) = Self::on_small(lhs, rhs) {
-            //             E::from_small(out)
-            //         } else {
-            //             E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
-            //         }
-            //     }
-            //     (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
-            //         E::from_big(Self::on_small_big(small_lhs, big_rhs))
-            //     }
-            //     (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
-            //         E::from_big(Self::on_big_small(big_lhs, small_rhs))
-            //     }
-            //     (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
-            //         E::from_big(Self::on_big(big_lhs, big_rhs))
-            //     }
-            // },
-            _ => match (lhs.decode_ref(), rhs.decode_ref()) {
-                (Decoded::Small(lhs), Decoded::Small(rhs)) => {
-                    if let Ok(out) = Self::on_small(lhs, rhs) {
-                        E::from_small(out)
-                    } else {
-                        E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
-                    }
+        match (lhs.decode(), rhs.decode()) {
+            (Decoded::Small(lhs), Decoded::Small(rhs)) => {
+                if let Ok(out) = Self::on_small(lhs, rhs) {
+                    E::from_small(out)
+                } else {
+                    E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
                 }
-                (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
-                    E::from_big(Self::on_small_big(small_lhs, big_rhs))
-                }
-                (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
-                    E::from_big(Self::on_big_small(big_lhs, small_rhs))
-                }
-                (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
-                    E::from_big(Self::on_big(big_lhs, big_rhs))
-                }
-            },
-            // _ => lhs.with_decoded(|lhs| {
-            //     rhs.with_decoded(|rhs| match (lhs, rhs) {
-            //         (Decoded::Small(lhs), Decoded::Small(rhs)) => {
-            //             if let Ok(out) = Self::on_small(lhs, rhs) {
-            //                 E::from_small(out)
-            //             } else {
-            //                 E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
-            //             }
-            //         }
-            //         (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
-            //             E::from_big(Self::on_small_big(small_lhs, big_rhs))
-            //         }
-            //         (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
-            //             E::from_big(Self::on_big_small(big_lhs, small_rhs))
-            //         }
-            //         (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
-            //             E::from_big(Self::on_big(big_lhs, big_rhs))
-            //         }
-            //     })
-            // }),
+            }
+            (Decoded::Small(small_lhs), Decoded::Big(big_rhs)) => {
+                E::from_big(Self::on_small_big(small_lhs, big_rhs))
+            }
+            (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
+                E::from_big(Self::on_big_small(big_lhs, small_rhs))
+            }
+            (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
+                E::from_big(Self::on_big(big_lhs, big_rhs))
+            }
         }
     }
 
@@ -148,11 +108,11 @@ trait BitOp<'e, E: Encoding<'e>> {
             Decoded::Small(small_lhs) => {
                 *encoding = Decoded::Big(Cow::Owned(Self::on_big(
                     Cow::Owned(small_lhs.to_big()),
-                    rhs.into_big_cow(),
+                    rhs.big_cow(),
                 )));
             }
             Decoded::Big(big_lhs) => {
-                Self::update_big(big_lhs.to_mut(), rhs.into_big_cow());
+                Self::update_big(big_lhs.to_mut(), rhs.big_cow());
             }
         });
     }
@@ -167,7 +127,7 @@ trait ShiftOp<'e, E: Encoding<'e>> {
             where
                 L: Decode<'a, E::Small>,
             {
-                E::from_big(Self::[<on_big_ prim>](lhs.into_big_cow(), rhs))
+                E::from_big(Self::[<on_big_ prim>](lhs.big_cow(), rhs))
             }
 
             #[inline]
@@ -202,30 +162,28 @@ trait PowOpTrait<'e, E: Encoding<'e>> {
         L: Decode<'e, E::Small>,
         R: Decode<'e, <E::Unsigned as Encoding<'e>>::Small>,
     {
-        lhs.with_decoded(|lhs| {
-            rhs.with_decoded(|rhs| match (lhs, rhs) {
-                (Decoded::Small(lhs), Decoded::Small(rhs)) => {
-                    if let Ok(out) = Self::on_small(lhs, rhs) {
-                        E::from_small(out)
-                    } else {
-                        E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
-                    }
+        match (lhs.decode(), rhs.decode()) {
+            (Decoded::Small(lhs), Decoded::Small(rhs)) => {
+                if let Ok(out) = Self::on_small(lhs, rhs) {
+                    E::from_small(out)
+                } else {
+                    E::from_big(Self::on_big_small(Cow::Owned(lhs.to_big()), rhs))
                 }
-                (Decoded::Small(small_lhs), Decoded::Big(_)) => {
-                    if small_lhs.is_one() {
-                        E::from_small(E::Small::one())
-                    } else {
-                        panic!("Exponentiation would overflow memory")
-                    }
+            }
+            (Decoded::Small(small_lhs), Decoded::Big(_)) => {
+                if small_lhs.is_one() {
+                    E::from_small(E::Small::one())
+                } else {
+                    panic!("Exponentiation would overflow memory")
                 }
-                (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
-                    E::from_big(Self::on_big_small(big_lhs, small_rhs))
-                }
-                (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
-                    E::from_big(Self::on_big(big_lhs, big_rhs))
-                }
-            })
-        })
+            }
+            (Decoded::Big(big_lhs), Decoded::Small(small_rhs)) => {
+                E::from_big(Self::on_big_small(big_lhs, small_rhs))
+            }
+            (Decoded::Big(big_lhs), Decoded::Big(big_rhs)) => {
+                E::from_big(Self::on_big(big_lhs, big_rhs))
+            }
+        }
     }
 }
 

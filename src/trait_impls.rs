@@ -63,12 +63,10 @@ pub mod mod_name {
         }
 
         fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-            self.with_decoded(|decoded| -> Box<dyn Iterator<Item = Self>> {
-                match decoded {
-                    Decoded::Small(small) => Box::new(small.shrink().map(Self::from_small)),
-                    Decoded::Big(big) => Box::new(big.shrink().map(Self::from_big)),
-                }
-            })
+            match self.decode() {
+                Decoded::Small(small) => Box::new(small.shrink().map(Self::from_small)),
+                Decoded::Big(big) => Box::new(big.shrink().map(Self::from_big)),
+            }
         }
     }
 
@@ -92,7 +90,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = ImplType>> Binary for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_big_cow(|cow| Binary::fmt(cow.as_ref(), f))
+            Binary::fmt(self.big_cow().as_ref(), f)
         }
     }
 
@@ -150,7 +148,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = ImplType>> Debug for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_decoded(|encoded| Debug::fmt(&encoded, f))
+            Debug::fmt(&self.decode(), f)
         }
     }
 
@@ -174,7 +172,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = ImplType>> Display for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_big_cow(|cow| Display::fmt(cow.as_ref(), f))
+            Display::fmt(self.big_cow().as_ref(), f)
         }
     }
 
@@ -259,17 +257,17 @@ pub mod mod_name {
         }
 
         fn is_even(&self) -> bool {
-            self.with_decoded(|decoded| match decoded {
+            match self.decode() {
                 Decoded::Small(n) => n.is_even(),
                 Decoded::Big(n) => n.is_even(),
-            })
+            }
         }
 
         fn is_odd(&self) -> bool {
-            self.with_decoded(|decoded| match decoded {
+            match self.decode() {
                 Decoded::Small(n) => n.is_odd(),
                 Decoded::Big(n) => n.is_odd(),
-            })
+            }
         }
 
         fn div_rem(&self, other: &Self) -> (Self, Self) {
@@ -307,10 +305,10 @@ pub mod mod_name {
         }
 
         fn is_one(&self) -> bool {
-            self.with_decoded(|decoded| match decoded {
+            match self.decode() {
                 Decoded::Small(n) => n.is_one(),
                 Decoded::Big(n) => n.is_one(),
-            })
+            }
         }
     }
 
@@ -330,10 +328,10 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = ImplType>> Roots for GenericBigNumType<'a, E> {
         fn nth_root(&self, n: u32) -> Self {
-            self.with_decoded(|encoded| match encoded {
+            match self.decode() {
                 Decoded::Small(a) => Self::from_small(a.nth_root(n)),
                 Decoded::Big(a) => Self::from_big(a.nth_root(n)),
-            })
+            }
         }
     }
 
@@ -394,11 +392,11 @@ pub mod mod_name {
         type Bytes = Vec<u8>;
 
         fn to_be_bytes(&self) -> Self::Bytes {
-            self.with_big_cow(|cow| cow.to_be_bytes())
+            self.big_cow().to_be_bytes()
         }
 
         fn to_le_bytes(&self) -> Self::Bytes {
-            self.with_big_cow(|cow| cow.to_le_bytes())
+            self.big_cow().to_le_bytes()
         }
     }
 
@@ -410,10 +408,10 @@ pub mod mod_name {
         duplicate_prims! {
             paste! {
                 fn [< to_ prim >](&self) -> Option<prim> {
-                    self.with_decoded(|encoded| match encoded {
+                    match self.decode() {
                         Decoded::Small(value) => value.[< to_ prim >](),
                         Decoded::Big(value) => value.[< to_ prim >](),
-                    })
+                    }
                 }
             }
         }
@@ -425,7 +423,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = ImplType>> LowerHex for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_big_cow(|cow| LowerHex::fmt(cow.as_ref(), f))
+            LowerHex::fmt(self.big_cow().as_ref(), f)
         }
     }
 
@@ -435,7 +433,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = ImplType>> Octal for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_big_cow(|cow| Octal::fmt(cow.as_ref(), f))
+            Octal::fmt(self.big_cow().as_ref(), f)
         }
     }
 
@@ -455,7 +453,7 @@ pub mod mod_name {
         where
             S: serde::Serializer,
         {
-            self.with_big_cow(|big| big.serialize(serializer))
+            self.big_cow().serialize(serializer)
         }
     }
 
@@ -465,7 +463,7 @@ pub mod mod_name {
 
     impl<'a, E: Encoding<'a, Big = ImplType>> UpperHex for GenericBigNumType<'a, E> {
         fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-            self.with_big_cow(|cow| UpperHex::fmt(cow.as_ref(), f))
+            UpperHex::fmt(self.big_cow().as_ref(), f)
         }
     }
 
@@ -479,10 +477,10 @@ pub mod mod_name {
         }
 
         fn is_zero(&self) -> bool {
-            self.with_decoded(|decoded| match decoded {
+            match self.decode() {
                 Decoded::Small(n) => n.is_zero(),
                 Decoded::Big(n) => n.is_zero(),
-            })
+            }
         }
     }
 }
@@ -587,12 +585,15 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Neg for Int<'a, E> {
     type Output = Int<'a, E>;
 
     fn neg(self) -> Self::Output {
-        if let Some(a) = self.small()
-            && let (b, false) = a.overflowing_neg()
-        {
-            Self::Output::from_small(b)
-        } else {
-            self.with_big_cow(|big| big.as_ref().neg()).into()
+        match self.into_decoded() {
+            Decoded::Small(s) => {
+                if let (neg, false) = s.overflowing_neg() {
+                    Self::Output::from_small(neg)
+                } else {
+                    Self::from_small(s).neg().into()
+                }
+            }
+            Decoded::Big(b) => b.into_owned().neg().into(),
         }
     }
 }
@@ -601,12 +602,15 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Neg for &Int<'a, E> {
     type Output = Int<'a, E>;
 
     fn neg(self) -> Self::Output {
-        if let Some(a) = self.small()
-            && let (b, false) = a.overflowing_neg()
-        {
-            Self::Output::from_small(b)
-        } else {
-            self.with_big_cow(|big| big.as_ref().neg()).into()
+        match self.decode() {
+            Decoded::Small(s) => {
+                if let (neg, false) = s.overflowing_neg() {
+                    Self::Output::from_small(neg)
+                } else {
+                    Int::from_small(s).neg().into()
+                }
+            }
+            Decoded::Big(b) => b.into_owned().neg().into(),
         }
     }
 }
@@ -619,10 +623,10 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Not for Int<'a, E> {
     type Output = Int<'a, E>;
 
     fn not(self) -> Self::Output {
-        self.with_decoded(|encoded| match encoded {
+        match self.into_decoded() {
             Decoded::Small(n) => Self::from_small(n.not()),
-            Decoded::Big(n) => Self::from_big(n.as_ref().not()),
-        })
+            Decoded::Big(n) => Self::from_big(n.into_owned().not()),
+        }
     }
 }
 
@@ -630,10 +634,10 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Not for &Int<'a, E> {
     type Output = Int<'a, E>;
 
     fn not(self) -> Self::Output {
-        self.with_decoded(|encoded| match encoded {
+        match self.decode() {
             Decoded::Small(n) => Int::from_small(n.not()),
-            Decoded::Big(n) => Int::from_big(n.as_ref().not()),
-        })
+            Decoded::Big(n) => Int::from_big(n.into_owned().not()),
+        }
     }
 }
 
@@ -647,26 +651,24 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Ord for Int<'a, E> {
         use Ordering::*;
         use Sign::*;
 
-        self.with_decoded(|lhs| {
-            other.with_decoded(|rhs| match (lhs, rhs) {
-                (Small(a), Small(b)) => a.cmp(&b),
-                (Small(a), Big(b)) => match (a.cmp(&E::Small::zero()), b.sign()) {
-                    (_, Minus) => Greater,
-                    (_, Plus) => Less,
-                    (Equal, NoSign) => Equal,
-                    (Less, NoSign) => Less,
-                    (Greater, NoSign) => Greater,
-                },
-                (Big(a), Small(b)) => match (a.sign(), b.cmp(&E::Small::zero())) {
-                    (Plus, _) => Greater,
-                    (Minus, _) => Less,
-                    (NoSign, Less) => Greater,
-                    (NoSign, Equal) => Equal,
-                    (NoSign, Greater) => Less,
-                },
-                (Big(a), Big(b)) => a.as_ref().cmp(b.as_ref()),
-            })
-        })
+        match (self.decode(), other.decode()) {
+            (Small(a), Small(b)) => a.cmp(&b),
+            (Small(a), Big(b)) => match (a.cmp(&E::Small::zero()), b.sign()) {
+                (_, Minus) => Greater,
+                (_, Plus) => Less,
+                (Equal, NoSign) => Equal,
+                (Less, NoSign) => Less,
+                (Greater, NoSign) => Greater,
+            },
+            (Big(a), Small(b)) => match (a.sign(), b.cmp(&E::Small::zero())) {
+                (Plus, _) => Greater,
+                (Minus, _) => Less,
+                (NoSign, Less) => Greater,
+                (NoSign, Equal) => Equal,
+                (NoSign, Greater) => Less,
+            },
+            (Big(a), Big(b)) => a.as_ref().cmp(b.as_ref()),
+        }
     }
 }
 
@@ -675,14 +677,12 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Ord for Uint<'a, E> {
         use Decoded::*;
         use Ordering::*;
 
-        self.with_decoded(|lhs| {
-            other.with_decoded(|rhs| match (lhs, rhs) {
-                (Small(a), Small(b)) => a.cmp(&b),
-                (Small(_), Big(_)) => Less,
-                (Big(_), Small(_)) => Greater,
-                (Big(a), Big(b)) => a.as_ref().cmp(b.as_ref()),
-            })
-        })
+        match (self.decode(), other.decode()) {
+            (Small(a), Small(b)) => a.cmp(&b),
+            (Small(_), Big(_)) => Less,
+            (Big(_), Small(_)) => Greater,
+            (Big(a), Big(b)) => a.as_ref().cmp(b.as_ref()),
+        }
     }
 }
 
@@ -692,16 +692,16 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Ord for Uint<'a, E> {
 
 impl<'a, E: Encoding<'a, Big = BigInt>> Signed for Int<'a, E> {
     fn abs(&self) -> Self {
-        self.with_decoded(|decoded| match decoded {
+        match self.decode() {
             Decoded::Small(a) => {
                 if let (b, false) = a.overflowing_abs() {
                     Self::from_small(b)
                 } else {
-                    self.with_big_cow(|big| big.as_ref().abs()).into()
+                    self.big_cow().abs().into()
                 }
             }
-            Decoded::Big(a) => a.as_ref().abs().into(),
-        })
+            Decoded::Big(a) => a.abs().into(),
+        }
     }
 
     fn abs_sub(&self, other: &Self) -> Self {
@@ -709,24 +709,24 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Signed for Int<'a, E> {
     }
 
     fn signum(&self) -> Self {
-        self.with_decoded(|decoded| match decoded {
+        match self.decode() {
             Decoded::Small(n) => Self::from_small(n.signum()),
             Decoded::Big(n) => Self::from_big(n.signum()),
-        })
+        }
     }
 
     fn is_positive(&self) -> bool {
-        self.with_decoded(|decoded| match decoded {
+        match self.decode() {
             Decoded::Small(n) => n.signum() > E::Small::zero(),
             Decoded::Big(n) => n.is_positive(),
-        })
+        }
     }
 
     fn is_negative(&self) -> bool {
-        self.with_decoded(|decoded| match decoded {
+        match self.decode() {
             Decoded::Small(n) => n.signum() < E::Small::zero(),
             Decoded::Big(n) => n.is_negative(),
-        })
+        }
     }
 }
 

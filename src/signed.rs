@@ -1,5 +1,5 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingKind};
+use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
 use crate::unsigned::Uint;
 use num_bigint::{BigInt, BigUint, Sign};
@@ -27,7 +27,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// if possible.  If the encoding does not support borrowing, this will
     /// simply clone self.
     pub fn borrow<'b>(&'b self) -> Int<'b, E::WithLifetime<'b>> {
-        <Self as Encoding>::WithLifetime::from_decoded(self.decode_ref())
+        <Self as Encoding>::WithLifetime::from_decoded(self.decode())
     }
 
     /// A constant bigint with value 0, useful for static initialization.
@@ -215,7 +215,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// ```
     #[inline]
     pub fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
-        self.0.with_big_cow(|big| big.as_ref().to_bytes_be())
+        self.big_cow().to_bytes_be()
     }
 
     /// Returns the sign and the byte representation of the bigint in little-endian byte order.
@@ -230,7 +230,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// ```
     #[inline]
     pub fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
-        self.0.with_big_cow(|big| big.as_ref().to_bytes_le())
+        self.big_cow().to_bytes_le()
     }
 
     /// Returns the sign and the `u32` digits representation of the bigint ordered least
@@ -249,7 +249,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// ```
     #[inline]
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
-        self.0.with_big_cow(|big| big.as_ref().to_u32_digits())
+        self.big_cow().to_u32_digits()
     }
 
     /// Returns the sign and the `u64` digits representation of the [`BigInt`] ordered least
@@ -269,7 +269,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// ```
     #[inline]
     pub fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
-        self.0.with_big_cow(|big| big.as_ref().to_u64_digits())
+        self.big_cow().to_u64_digits()
     }
 
     /// Returns an iterator of `u32` digits representation of the bigint ordered least
@@ -323,7 +323,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// ```
     #[inline]
     pub fn to_signed_bytes_be(&self) -> Vec<u8> {
-        self.0.with_big_cow(|big| big.as_ref().to_signed_bytes_be())
+        self.big_cow().to_signed_bytes_be()
     }
 
     /// Returns the two's-complement byte representation of the bigint in little-endian byte order.
@@ -338,7 +338,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// ```
     #[inline]
     pub fn to_signed_bytes_le(&self) -> Vec<u8> {
-        self.0.with_big_cow(|big| big.as_ref().to_signed_bytes_le())
+        self.big_cow().to_signed_bytes_le()
     }
 
     /// Returns the integer formatted as a string in the given radix.
@@ -373,7 +373,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// ```
     #[inline]
     pub fn to_radix_be(&self, radix: u32) -> (Sign, Vec<u8>) {
-        self.0.with_big_cow(|big| big.as_ref().to_radix_be(radix))
+        self.big_cow().to_radix_be(radix)
     }
 
     /// Returns the integer in the requested base in little-endian digit order.
@@ -392,7 +392,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// ```
     #[inline]
     pub fn to_radix_le(&self, radix: u32) -> (Sign, Vec<u8>) {
-        self.0.with_big_cow(|big| big.as_ref().to_radix_le(radix))
+        self.big_cow().to_radix_le(radix)
     }
 
     /// Returns the magnitude of the bigint as an unsigned bigint.
@@ -415,14 +415,14 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     // Returns the sign of the [`Int`] as a Sign.
     #[inline]
     pub fn sign(&self) -> Sign {
-        self.0.with_decoded(|encoded| match encoded {
+        match self.decode() {
             Decoded::Small(n) => match n.cmp(&E::Small::zero()) {
                 Ordering::Equal => Sign::NoSign,
                 Ordering::Greater => Sign::Plus,
                 Ordering::Less => Sign::Minus,
             },
             Decoded::Big(n) => n.sign(),
-        })
+        }
     }
 
     /// Convert this bigint into its [`Sign`] and unsigned bigint magnitude,
@@ -440,7 +440,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// ```
     #[inline]
     pub fn into_parts(self) -> (Sign, BigUint) {
-        self.0.into_bigint().into_parts()
+        self.into_big().into_parts()
     }
 
     /// Determines the fewest bits necessary to express the bigint,
@@ -598,47 +598,22 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
 }
 
 impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for Int<'a, E> {
-    fn kind() -> EncodingKind {
-        E::kind()
+    fn into_decoded(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+        self.0.into_decoded()
     }
 
-    fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+    fn decode<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
         self.0.decode()
-    }
-
-    fn decode_ref<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
-        self.0.decode_ref()
-    }
-
-    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<E::Small, Cow<'b, E::Big>>) -> T) -> T {
-        self.0.with_decoded(f)
-    }
-
-    fn owns_bignum(&self) -> bool {
-        self.0.owns_bignum()
     }
 }
 
 impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for &Int<'a, E> {
-    fn kind() -> EncodingKind {
-        E::kind()
+    fn into_decoded(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+        self.0.clone().into_decoded()
     }
 
-    fn decode(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
-        // TODO Can we do this without cloning?
-        self.0.clone().decode()
-    }
-
-    fn decode_ref<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
-        self.0.decode_ref()
-    }
-
-    fn with_decoded<'b, T>(&'b self, f: impl FnOnce(Decoded<E::Small, Cow<'b, E::Big>>) -> T) -> T {
-        self.0.with_decoded(f)
-    }
-
-    fn owns_bignum(&self) -> bool {
-        false
+    fn decode<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
+        self.0.decode()
     }
 }
 
