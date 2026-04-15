@@ -97,7 +97,8 @@ trait BitOp<'e, E: Encoding<'e>> {
         L: Decode<'e, E::Small>,
         R: Decode<'e, E::Small>,
     {
-        E::from_big(lhs.with_big_cows(&rhs, |lhs, rhs| Self::on_big(lhs, rhs)))
+        let (lhs, rhs) = E::big_cows(&lhs, &rhs);
+        E::from_big(Self::on_big(lhs, rhs))
     }
 
     fn call_update<'a, 'c, R>(lhs: &'a mut E, rhs: R)

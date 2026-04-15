@@ -55,46 +55,29 @@ where
         }
     }
 
-    // /// Gets the big value as a `Cow`, creating a bignum if necessary, and passes it to the provided function.
-    // fn with_big_cow<T>(&self, f: impl FnOnce(Cow<S::Big>) -> T) -> T {
-    //     match self.decode() {
-    //         Decoded::Small(s) => f(Cow::Owned(s.to_big())),
-    //         Decoded::Big(b) => f(b),
-    //     }
-    // }
-
-    /// A helper method for working with two decoded values at the same time.
-    /// This calls [`Self::with_big_cow`] for both `self` and `other`, and
-    /// passes the resulting big `Cow`s to the provided function.  This is useful
-    /// for implementing binary operations on big numbers, since it allows us to
-    /// avoid cloning the big values when both encodings are big.
-    fn with_big_cows<T>(
-        &self,
-        other: &impl Decode<'a, S>,
-        f: impl FnOnce(Cow<S::Big>, Cow<S::Big>) -> T,
-    ) -> T {
-        f(self.big_cow(), other.big_cow())
+    /// A helper method for working with two decoded values at the same time,
+    /// where the big values need to be passed as `Cow`s.
+    // TODO: Audit use of this function and see where it would be more efficient to use `matching_size` instead, which can avoid cloning big values when both encodings are small.
+    fn big_cows<'b>(
+        lhs: &'b impl Decode<'a, S>,
+        rhs: &'b impl Decode<'a, S>,
+    ) -> (Cow<'b, S::Big>, Cow<'b, S::Big>) {
+        (lhs.big_cow(), rhs.big_cow())
     }
 
     /// A helper method for working with two decoded values at the same time,
-    /// where the values need to both be small or both be big.  This calls
-    /// [`Self::with_decoded`] for both `self` and `other`, and passes the
-    /// resulting decoded values to the provided function.  This is useful for
-    /// implementing binary operations on big numbers, since it allows us to
-    /// avoid cloning the big values when both encodings are big, while still
-    /// allowing us to work with the small values when both encodings are small.
-    fn with_matching_size<T>(
-        &self,
-        other: &impl Decode<'a, S>,
-        f: impl FnOnce(Decoded<(S, S), (Cow<S::Big>, Cow<S::Big>)>) -> T,
-    ) -> T {
-        let enc = match (self.decode(), other.decode()) {
+    /// where the big values need to be passed as `Cow`s, and if both values are
+    /// small, they can be passed as smalls without converting to bigs.
+    fn matching_size<'b>(
+        lhs: &'b impl Decode<'a, S>,
+        rhs: &'b impl Decode<'a, S>,
+    ) -> Decoded<(S, S), (Cow<'b, S::Big>, Cow<'b, S::Big>)> {
+        match (lhs.decode(), rhs.decode()) {
             (Decoded::Small(s1), Decoded::Small(s2)) => Decoded::Small((s1, s2)),
             (Decoded::Small(s1), Decoded::Big(b2)) => Decoded::Big((Cow::Owned(s1.to_big()), b2)),
             (Decoded::Big(b1), Decoded::Small(s2)) => Decoded::Big((b1, Cow::Owned(s2.to_big()))),
             (Decoded::Big(b1), Decoded::Big(b2)) => Decoded::Big((b1, b2)),
-        };
-        f(enc)
+        }
     }
 }
 
@@ -205,19 +188,23 @@ where
     }
 
     fn checked_add(&self, v: &Self) -> Option<Self> {
-        self.with_big_cows(v, |lhs, rhs| lhs.checked_add(&rhs).map(Self::from_big))
+        let (lhs, rhs) = Self::big_cows(self, v);
+        lhs.checked_add(&rhs).map(Self::from_big)
     }
 
     fn checked_sub(&self, v: &Self) -> Option<Self> {
-        self.with_big_cows(v, |lhs, rhs| lhs.checked_sub(&rhs).map(Self::from_big))
+        let (lhs, rhs) = Self::big_cows(self, v);
+        lhs.checked_sub(&rhs).map(Self::from_big)
     }
 
     fn checked_mul(&self, v: &Self) -> Option<Self> {
-        self.with_big_cows(v, |lhs, rhs| lhs.checked_mul(&rhs).map(Self::from_big))
+        let (lhs, rhs) = Self::big_cows(self, v);
+        lhs.checked_mul(&rhs).map(Self::from_big)
     }
 
     fn checked_div(&self, v: &Self) -> Option<Self> {
-        self.with_big_cows(v, |lhs, rhs| lhs.checked_div(&rhs).map(Self::from_big))
+        let (lhs, rhs) = Self::big_cows(self, v);
+        lhs.checked_div(&rhs).map(Self::from_big)
     }
 
     fn pow(&self, exponent: u32) -> Self {
@@ -231,9 +218,8 @@ where
     }
 
     fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-        self.with_big_cows(exponent, |lhs, rhs| {
-            Self::from_big(lhs.modpow(&rhs, modulus.big_cow().as_ref()))
-        })
+        let (lhs, rhs) = Self::big_cows(self, exponent);
+        Self::from_big(lhs.modpow(&rhs, modulus.big_cow().as_ref()))
     }
 
     fn sqrt(&self) -> Self {
@@ -279,7 +265,8 @@ where
     }
 
     fn modinv(&self, modulus: &Self) -> Option<Self> {
-        self.with_big_cows(modulus, |lhs, rhs| lhs.modinv(&rhs).map(Self::from_big))
+        let (lhs, rhs) = Self::big_cows(self, modulus);
+        lhs.modinv(&rhs).map(Self::from_big)
     }
 
     fn set_bit(&mut self, bit: u64, value: bool) {

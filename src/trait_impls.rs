@@ -211,7 +211,8 @@ pub mod mod_name {
             {
                 return Self::from_small(Integer::div_floor(&lhs, &rhs));
             }
-            self.with_big_cows(other, |lhs, rhs| lhs.div_floor(rhs.as_ref()).into())
+            let (lhs, rhs) = Self::big_cows(self, other);
+            Self::from_big(lhs.div_floor(rhs.as_ref()))
         }
 
         fn mod_floor(&self, other: &Self) -> Self {
@@ -221,7 +222,8 @@ pub mod mod_name {
             {
                 return Self::from_small(Integer::mod_floor(&lhs, &rhs));
             }
-            self.with_big_cows(other, |lhs, rhs| lhs.mod_floor(rhs.as_ref()).into())
+            let (lhs, rhs) = Self::big_cows(self, other);
+            Self::from_big(lhs.mod_floor(rhs.as_ref()))
         }
 
         fn gcd(&self, other: &Self) -> Self {
@@ -230,12 +232,14 @@ pub mod mod_name {
             {
                 return Self::from_small(lhs.gcd(&rhs));
             }
-            self.with_big_cows(other, |lhs, rhs| lhs.gcd(rhs.as_ref()).into())
+            let (lhs, rhs) = Self::big_cows(self, other);
+            Self::from_big(lhs.gcd(rhs.as_ref()))
         }
 
         fn lcm(&self, other: &Self) -> Self {
             // We don't bother doing the LCM computation in the small case, since it can easily overflow.
-            self.with_big_cows(other, |lhs, rhs| lhs.lcm(rhs.as_ref()).into())
+            let (lhs, rhs) = Self::big_cows(self, other);
+            Self::from_big(lhs.lcm(rhs.as_ref()))
         }
 
         fn divides(&self, other: &Self) -> bool {
@@ -244,7 +248,8 @@ pub mod mod_name {
             {
                 return lhs.is_multiple_of(&rhs);
             }
-            self.with_big_cows(other, |lhs, rhs| lhs.is_multiple_of(rhs.as_ref()))
+            let (lhs, rhs) = Self::big_cows(self, other);
+            lhs.is_multiple_of(rhs.as_ref())
         }
 
         fn is_multiple_of(&self, other: &Self) -> bool {
@@ -253,7 +258,8 @@ pub mod mod_name {
             {
                 return lhs.is_multiple_of(&rhs);
             }
-            self.with_big_cows(other, |lhs, rhs| lhs.is_multiple_of(rhs.as_ref()))
+            let (lhs, rhs) = Self::big_cows(self, other);
+            lhs.is_multiple_of(rhs.as_ref())
         }
 
         fn is_even(&self) -> bool {
@@ -278,8 +284,11 @@ pub mod mod_name {
                 let (q, r) = lhs.div_rem(&rhs);
                 return (Self::from_small(q), Self::from_small(r));
             }
-            let (q, r) = self.with_big_cows(other, |lhs, rhs| lhs.div_rem(rhs.as_ref()));
-            (Self::from_big(q), Self::from_big(r))
+            let (q, r) = E::big_cows(self, other);
+            (
+                Self::from_big(q.div_rem(r.as_ref()).0),
+                Self::from_big(q.div_rem(r.as_ref()).1),
+            )
         }
     }
 
@@ -357,12 +366,11 @@ pub mod mod_name {
                 B1: SampleBorrow<Self::X> + Sized,
                 B2: SampleBorrow<Self::X> + Sized,
             {
-                low.borrow().with_big_cows(high.borrow(), |low, high| {
-                        Self([<Uniform ImplType>]::new(
-                            low.as_ref(),
-                            high.as_ref(),
-                        ), PhantomData)
-                })
+                let (low, high) = Self::X::big_cows(low.borrow(), high.borrow());
+                Self([<Uniform ImplType>]::new(
+                    low.as_ref(),
+                    high.as_ref(),
+                ), PhantomData)
             }
 
             fn new_inclusive<B1, B2>(low: B1, high: B2) -> Self
@@ -370,12 +378,11 @@ pub mod mod_name {
                 B1: SampleBorrow<Self::X> + Sized,
                 B2: SampleBorrow<Self::X> + Sized,
             {
-                low.borrow().with_big_cows(high.borrow(), |low, high| {
-                    Self([<Uniform ImplType>]::new_inclusive(
-                        low.as_ref(),
-                        high.as_ref(),
-                    ), PhantomData)
-                })
+                let (low, high) = Self::X::big_cows(low.borrow(), high.borrow());
+                Self([<Uniform ImplType>]::new_inclusive(
+                    low.as_ref(),
+                    high.as_ref(),
+                ), PhantomData)
             }
 
             fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Self::X {
@@ -491,15 +498,13 @@ pub mod mod_name {
 
 impl<'a, E: Encoding<'a, Big = BigInt>> CheckedEuclid for Int<'a, E> {
     fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
-        self.with_big_cows(v, |lhs, rhs| {
-            lhs.checked_rem_euclid(rhs.as_ref()).map(Into::into)
-        })
+        let (lhs, rhs) = Self::big_cows(self, v);
+        lhs.checked_rem_euclid(rhs.as_ref()).map(Self::from_big)
     }
 
     fn checked_div_euclid(&self, v: &Self) -> Option<Self> {
-        self.with_big_cows(v, |lhs, rhs| {
-            lhs.checked_div_euclid(rhs.as_ref()).map(Into::into)
-        })
+        let (lhs, rhs) = Self::big_cows(self, v);
+        lhs.checked_div_euclid(rhs.as_ref()).map(Self::from_big)
     }
 }
 
@@ -509,11 +514,13 @@ impl<'a, E: Encoding<'a, Big = BigInt>> CheckedEuclid for Int<'a, E> {
 
 impl<'a, E: Encoding<'a, Big = BigInt>> Euclid for Int<'a, E> {
     fn rem_euclid(&self, v: &Self) -> Self {
-        self.with_big_cows(v, |lhs, rhs| lhs.rem_euclid(rhs.as_ref()).into())
+        let (lhs, rhs) = Self::big_cows(self, v);
+        Self::from_big(lhs.rem_euclid(rhs.as_ref()))
     }
 
     fn div_euclid(&self, v: &Self) -> Self {
-        self.with_big_cows(v, |lhs, rhs| lhs.div_euclid(rhs.as_ref()).into())
+        let (lhs, rhs) = Self::big_cows(self, v);
+        Self::from_big(lhs.div_euclid(rhs.as_ref()))
     }
 }
 
