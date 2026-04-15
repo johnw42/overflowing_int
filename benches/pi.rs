@@ -1,6 +1,8 @@
 // Adapted from https://github.com/scymtym/sb-benchmarks/blob/master/cl-bench.bignum.benchmark.lisp
 // Original code from Bruno Haible <haible@ilog.fr>
 
+use std::time::Duration;
+
 use criterion::{
     AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group, criterion_main,
 };
@@ -19,12 +21,12 @@ macro_rules! duplicate_bigint_types {
             [
                 label         BigInt(lifetime);
                 [Arc]         [ArcBigInt];
-                [ArcIsize]    [ArcBigIsize];
+                [ArcSize]     [ArcBigIsize];
                 [Box]         [BoxBigInt];
                 [Cow]         [CowBigInt::<lifetime>];
                 [Identity]    [IdentityBigInt::<lifetime>];
                 [Rc]          [RcBigInt];
-                [RcIsize]     [RcBigIsize];
+                [RcSize]      [RcBigIsize];
                 [Control]     [BigInt];
             ]
             $($body)*
@@ -81,5 +83,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, criterion_benchmark);
+criterion_group!(
+    name = benches;
+    config = Criterion::default()
+        .warm_up_time(Duration::from_millis(100))
+        .measurement_time(Duration::from_secs(1));
+    targets = criterion_benchmark
+);
 criterion_main!(benches);

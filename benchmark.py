@@ -1,5 +1,6 @@
 import os
 import argparse
+import shlex
 import shutil
 import re
 import json
@@ -78,9 +79,14 @@ def main():
     s.add_parser("profile", help="Profile the benchmarks.")
     s.add_parser("run", help="Run benchmarks for the current revision.")
     p.add_argument(
-        "--function",
-        "-f",
-        help="Regex to filter which functions to benchmark.",
+        "--group",
+        "-g",
+        help="Regex to filter which groups to benchmark.",
+    )
+    p.add_argument(
+        "--encoding",
+        "-e",
+        help="Regex to filter which encodings to benchmark.",
     )
     p.add_argument(
         "--size",
@@ -107,7 +113,9 @@ def main():
 
     opts = p.parse_args()
 
-    bench_pattern = f"[^/]+/({opts.function or '[^/]+'})/({opts.size or '[^/]+'})"
+    bench_pattern = shlex.quote(
+        f"({opts.group or '[^/]+'})/({opts.encoding or '[^/]+'})/({opts.size or '[^/]+'})"
+    )
 
     match opts.command:
         case "all":
@@ -117,7 +125,7 @@ def main():
                     print(f"Testing revision {rev}...")
                     system(f"jj edit {rev}")
                     cargo(
-                        f"bench -p compact_bigint --bench={opts.bench} -- --save-baseline={rev} '{bench_pattern}'"
+                        f"bench -p compact_bigint --bench={opts.bench} -- --save-baseline={rev} {bench_pattern}"
                     )
             finally:
                 os.chdir(TOP_DIR)
@@ -155,7 +163,7 @@ def main():
             assert m, jq_output
             executable = m.group(0)
             system(
-                f"perf record --call-graph dwarf -- {executable} --bench --profile-time 5 '{bench_pattern}'"
+                f"perf record --call-graph dwarf -- {executable} --bench --profile-time 5 {bench_pattern}"
             )
             data_path = f"perf.{current_revision()[:3]}.data"
             try:
@@ -166,7 +174,7 @@ def main():
             print(f"Saved profile data to {data_path}")
         case "run" | None:
             system(
-                f"cargo bench -p compact_bigint --bench={opts.bench} -- --save-baseline={opts.save_baseline} '{bench_pattern}'"
+                f"cargo bench -p compact_bigint --bench={opts.bench} -- --save-baseline={opts.save_baseline} {bench_pattern}"
             )
 
 

@@ -3,7 +3,7 @@ use crate::small_num::SmallNumber;
 use crate::{big_number::BigNumber, duplicate_prims};
 use num_bigint::{BigInt, BigUint};
 use num_integer::Roots;
-use num_traits::{One, PrimInt, Zero};
+use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, One, PrimInt, Zero};
 use std::{borrow::Cow, hash::Hash, rc::Rc};
 
 /// A decoded big number, which may be either small or big.  Also used to
@@ -29,6 +29,7 @@ where
     fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>>;
 
     /// Gets the big value as a `Cow`, creating a bignum if necessary.
+    #[inline(always)]
     fn big_cow<'b>(&'b self) -> Cow<'b, S::Big> {
         match self.decode() {
             Decoded::Small(s) => Cow::Owned(s.to_big()),
@@ -39,15 +40,18 @@ where
     /// Gets the big value as an owned value while consuming self.  Compared to
     /// [`Self::big`], using this method may allow for more efficient code when
     /// the encoding is big, since it can avoid an extra clone of the big value.
+    #[inline(always)]
     fn into_big(self) -> S::Big {
         self.big_cow().into_owned()
     }
 
+    #[inline(always)]
     fn into_bigint(self) -> BigInt {
         self.into_big().into()
     }
 
     /// Gets the small value if it the encoding is small, or `None` if it is big.
+    #[inline(always)]
     fn small(&self) -> Option<S> {
         match self.decode() {
             Decoded::Small(s) => Some(s),
@@ -57,7 +61,7 @@ where
 
     /// A helper method for working with two decoded values at the same time,
     /// where the big values need to be passed as `Cow`s.
-    // TODO: Audit use of this function and see where it would be more efficient to use `matching_size` instead, which can avoid cloning big values when both encodings are small.
+    #[inline(always)]
     fn big_cows<'b>(
         lhs: &'b impl Decode<'a, S>,
         rhs: &'b impl Decode<'a, S>,
@@ -68,6 +72,7 @@ where
     /// A helper method for working with two decoded values at the same time,
     /// where the big values need to be passed as `Cow`s, and if both values are
     /// small, they can be passed as smalls without converting to bigs.
+    #[inline(always)]
     fn matching_size<'b>(
         lhs: &'b impl Decode<'a, S>,
         rhs: &'b impl Decode<'a, S>,
@@ -78,6 +83,26 @@ where
             (Decoded::Big(b1), Decoded::Small(s2)) => Decoded::Big((b1, Cow::Owned(s2.to_big()))),
             (Decoded::Big(b1), Decoded::Big(b2)) => Decoded::Big((b1, b2)),
         }
+    }
+}
+
+#[inline(always)]
+fn checked_op<'a, 'b, S, E>(
+    lhs: &'b impl Decode<'a, S>,
+    rhs: &'b impl Decode<'a, S>,
+    f_small: impl FnOnce(&S, &S) -> Option<S>,
+    f_big: impl FnOnce(&S::Big, &S::Big) -> Option<S::Big>,
+) -> Option<E>
+where
+    S: SmallNumber,
+    E: Encoding<'a, Small = S, Big = S::Big>,
+{
+    match E::matching_size(lhs, rhs) {
+        Decoded::Small((s1, s2)) => match f_small(&s1, &s2) {
+            Some(result) => Some(E::from_small(result)),
+            None => f_big(&s1.to_big(), &s2.to_big()).map(E::from_big),
+        },
+        Decoded::Big((b1, b2)) => f_big(b1.as_ref(), b2.as_ref()).map(E::from_big),
     }
 }
 
@@ -188,23 +213,19 @@ where
     }
 
     fn checked_add(&self, v: &Self) -> Option<Self> {
-        let (lhs, rhs) = Self::big_cows(self, v);
-        lhs.checked_add(&rhs).map(Self::from_big)
+        checked_op(self, v, CheckedAdd::checked_add, CheckedAdd::checked_add)
     }
 
     fn checked_sub(&self, v: &Self) -> Option<Self> {
-        let (lhs, rhs) = Self::big_cows(self, v);
-        lhs.checked_sub(&rhs).map(Self::from_big)
+        checked_op(self, v, CheckedSub::checked_sub, CheckedSub::checked_sub)
     }
 
     fn checked_mul(&self, v: &Self) -> Option<Self> {
-        let (lhs, rhs) = Self::big_cows(self, v);
-        lhs.checked_mul(&rhs).map(Self::from_big)
+        checked_op(self, v, CheckedMul::checked_mul, CheckedMul::checked_mul)
     }
 
     fn checked_div(&self, v: &Self) -> Option<Self> {
-        let (lhs, rhs) = Self::big_cows(self, v);
-        lhs.checked_div(&rhs).map(Self::from_big)
+        checked_op(self, v, CheckedDiv::checked_div, CheckedDiv::checked_div)
     }
 
     // TODO: Add `checked_rem` and `checked_pow` when those methods are added to `BigNumber`.

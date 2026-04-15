@@ -3,7 +3,7 @@ use crate::small_num::SmallNumber;
 // A number that is stored shifted left by one bit, with the least significant
 // bit set to 1.  This allows us to distinguish between small numbers (which
 // have the least significant bit set to 1) and pointers to big numbers (which
-// have the least significant bit set to 0).  This is used in `RcEncoded` to
+// have the least significant bit set to 0).  This is used in `RcEndcoding` to
 // store small numbers without heap allocation, while still allowing us to store
 // big numbers on the heap and reference them with a pointer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
