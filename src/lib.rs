@@ -59,11 +59,11 @@ mod macros;
 mod num_ops;
 pub mod rc_encoding;
 mod shifted;
-mod signed;
+pub mod signed;
 mod small_num;
 mod trait_impl_tests;
 mod trait_impls;
-mod unsigned;
+pub mod unsigned;
 
 pub type CowBigInt<'a> = Int<'a, CowEncoding<'a, i128>>;
 pub type CowBigUint<'a> = Uint<'a, CowEncoding<'a, u128>>;
@@ -81,10 +81,11 @@ pub type BoxBigIsize = Int<'static, BoxEncoding<'static, isize>>;
 pub type BoxBigUsize = Uint<'static, BoxEncoding<'static, usize>>;
 
 // Only for benchmarking, not for general use.
+#[doc(hidden)]
 pub mod bench {
     use super::*;
     use crate::identity_encoding::IdentityEncoding;
 
-    pub type IdentityBigInt<'a> = Int<'static, IdentityEncoding<'a, isize>>;
-    pub type IdentityBigUint<'a> = Uint<'static, IdentityEncoding<'a, usize>>;
+    pub type IdentityBigInt<'a> = Int<'a, IdentityEncoding<'a, isize>>;
+    pub type IdentityBigUint<'a> = Uint<'a, IdentityEncoding<'a, usize>>;
 }
