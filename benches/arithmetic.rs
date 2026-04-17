@@ -1,15 +1,14 @@
 use criterion::{
-    AxisScale, BatchSize, BenchmarkId, Criterion, PlotConfiguration, criterion_group,
-    criterion_main,
+    BatchSize, BenchmarkId, Criterion, PlotConfiguration, criterion_group, criterion_main,
 };
 use num_integer::Integer;
 use num_traits::{CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, Euclid, Pow};
 use paste::paste;
-use rand::distributions::uniform::SampleUniform;
-use rand::distributions::uniform::UniformSampler;
-use rand::thread_rng;
+use rand::rngs::ThreadRng;
+use rand::{Rng, thread_rng};
 use std::hint::black_box;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub};
+use std::time::Duration;
 
 use compact_bigint::bench::*;
 use compact_bigint::*;
@@ -20,12 +19,12 @@ macro_rules! duplicate_bigint_types {
             [
                 label         Encoded;
                 [Arc]         [ArcBigInt];
-                [ArcIsize]    [ArcBigIsize];
+                [ArcSize]     [ArcBigIsize];
                 [Box]         [BoxBigInt];
                 [Cow]         [CowBigInt::<'static>];
                 [Identity]    [IdentityBigInt::<'static>];
                 [Rc]          [RcBigInt];
-                [RcIsize]     [RcBigIsize];
+                [RcSize]      [RcBigIsize];
                 [Control]     [BigInt];
             ]
             $($body)*
@@ -81,84 +80,82 @@ macro_rules! duplicate_shift_operators {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
+    let plot_config = PlotConfiguration::default();
     let rng = &mut thread_rng();
 
-    for bit_size in [63, 64, 65, 127, 128, 129] {
-        let limit: BigInt = BigInt::from(1) << (bit_size - 2);
-        let big_sampler = <BigInt as SampleUniform>::Sampler::new(-limit.clone(), limit.clone());
-        let shift_sampler = <u32 as SampleUniform>::Sampler::new(0, 64);
-        duplicate_binary_operators! {
-            {
-                let mut group = c.benchmark_group(stringify!(op_fn));
-                group.plot_config(plot_config.clone());
+    fn sample_big(rng: &mut ThreadRng, bit_size: u32) -> BigInt {
+        let limit: BigInt = BigInt::from(1) << (bit_size - 1);
+        rng.gen_range(-limit.clone()..=limit.clone())
+    }
 
-                duplicate_bigint_types! {
-                    paste! {
-                        group.bench_function(
-                            BenchmarkId::new(stringify!(label), bit_size),
-                            |b| {
-                                b.iter_batched_ref(
-                                    || (Encoded::from(big_sampler.sample(rng)), Encoded::from(big_sampler.sample(rng))),
-                                    |(r1, r2)| {
-                                        black_box(OpTrait::op_fn(&*r1, &*r2));
-                                    },
-                                    BatchSize::SmallInput,
-                                );
-                            },
-                        );
-                    }
-                }
-            }
-        }
+    fn sample_small(rng: &mut ThreadRng) -> u32 {
+        rng.gen_range(0u32..=64u32)
+    }
 
-        duplicate_shift_operators! {
-            {
-                let mut group = c.benchmark_group(stringify!(op_fn));
-                group.plot_config(plot_config.clone());
-
-                duplicate_bigint_types! {
-                    paste! {
-                        group.bench_function(
-                            BenchmarkId::new(stringify!(label), bit_size),
-                            |b| {
-                                b.iter_batched_ref(
-                                    || (Encoded::from(big_sampler.sample(rng)), shift_sampler.sample(rng)),
-                                    |(r1, r2)| {
-                                        black_box(OpTrait::op_fn(&*r1, *r2));
-                                    },
-                                    BatchSize::SmallInput,
-                                );
-                            },
-                        );
-                    }
-                }
-            }
-        }
-
-        {
-            let mut group = c.benchmark_group(stringify!(op_fn));
+    macro_rules! group {
+        ($op_fn:ident, $bit_size:ident, $args:pat_param, $arg_values:expr, $to_bench:expr) => {{
+            let mut group = c.benchmark_group(stringify!($op_fn));
             group.plot_config(plot_config.clone());
 
-            duplicate_bigint_types! {
-                paste! {
+            for $bit_size in [126, 127, 128, 129, 130] {
+                duplicate_bigint_types! { paste! {
                     group.bench_function(
-                        BenchmarkId::new(stringify!(label), bit_size),
+                        BenchmarkId::new(stringify!(label), $bit_size),
                         |b| {
                             b.iter_batched_ref(
-                                || (Encoded::from(big_sampler.sample(rng)), shift_sampler.sample(rng)),
-                                |(r1, r2)| {
-                                    black_box(Pow::pow(&*r1, *r2));
+                                || $arg_values,
+                                |$args| {
+                                    black_box($to_bench);
                                 },
                                 BatchSize::SmallInput,
                             );
                         },
                     );
-                }
+                } }
             }
-        }
+        }};
     }
+
+    duplicate_binary_operators! {
+        group!(
+            op_fn,
+            bit_size,
+            (r1, r2),
+            (
+                Encoded::from(sample_big(rng, bit_size)),
+                Encoded::from(sample_big(rng, bit_size))
+            ),
+            OpTrait::op_fn(&*r1, &*r2)
+        );
+    }
+
+    duplicate_shift_operators! {
+        group!(
+            op_fn,
+            bit_size,
+            (r1, r2),
+            (
+                Encoded::from(sample_big(rng, bit_size)),
+                sample_small(rng)
+            ),
+            OpTrait::op_fn(&*r1, *r2)
+        );
+    }
+
+    group!(
+        pow,
+        bit_size,
+        (r1, r2),
+        (Encoded::from(sample_big(rng, bit_size)), sample_small(rng)),
+        Pow::pow(&*r1, *r2)
+    );
 }
 
-criterion_group!(benches, criterion_benchmark);
+criterion_group!(
+    name = benches;
+    config = Criterion::default()
+        .warm_up_time(Duration::from_millis(100))
+        .measurement_time(Duration::from_secs(1));
+    targets = criterion_benchmark
+);
 criterion_main!(benches);
