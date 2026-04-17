@@ -230,16 +230,6 @@ where
 
     // TODO: Add `checked_rem` and `checked_pow` when those methods are added to `BigNumber`.
 
-    fn pow(&self, exponent: u32) -> Self {
-        if let Some(a) = self.small()
-            && let (a, false) = a.overflowing_pow(exponent)
-        {
-            Self::from_small(a)
-        } else {
-            Self::from_big(self.big_cow().pow(exponent))
-        }
-    }
-
     fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         let (lhs, rhs) = Self::big_cows(self, exponent);
         Self::from_big(lhs.modpow(&rhs, modulus.big_cow().as_ref()))
@@ -268,6 +258,7 @@ where
 
     fn trailing_zeros(&self) -> Option<u64> {
         match self.decode() {
+            Decoded::Small(n) if n.is_zero() => None,
             Decoded::Small(n) => Some(n.trailing_zeros() as u64),
             Decoded::Big(n) => n.trailing_zeros(),
         }

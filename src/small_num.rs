@@ -84,33 +84,9 @@ pub trait SmallNumber:
         Self::try_from(u).ok()
     }
 
-    fn try_from_big(b: &Self::Big) -> Option<Self>;
-
     fn to_big(self) -> Self::Big {
         self.into()
     }
-
-    fn to_bigint(self) -> BigInt {
-        self.into()
-    }
-
-    fn try_to_unsigned(self) -> Option<Self::Unsigned>;
-
-    /// Calls the primitive's `unsigned_abs` method, which returns the unsigned
-    /// absolute value of the number.  For unsigned types, this is just the
-    /// identity function.
-    fn unsigned_abs(self) -> Self::Unsigned;
-
-    /// Calls the primitive's `overflowing_abs` method.
-    fn overflowing_abs(self) -> (Self, bool);
-
-    /// Calls the primitive's `overflowing_pow` method.
-    fn overflowing_pow(self, exp: u32) -> (Self, bool);
-
-    /// Calls the primitive's `overflowing_neg` method.
-    fn overflowing_neg(self) -> (Self, bool);
-
-    fn signum(self) -> Self;
 
     fn from_bytes_be(bytes: &[u8]) -> Option<Self> {
         // Ideally this would be implemented using `from_be_bytes` on the
@@ -141,6 +117,25 @@ pub trait SmallNumber:
         }
         Self::try_from(result).ok()
     }
+
+    fn try_to_unsigned(self) -> Option<Self::Unsigned>;
+
+    /// Calls the primitive's `unsigned_abs` method, which returns the unsigned
+    /// absolute value of the number.  For unsigned types, this is just the
+    /// identity function.
+    fn unsigned_abs(self) -> Self::Unsigned;
+
+    /// Computes the absolute value of the number if it can be represented.
+    fn try_abs(self) -> Option<Self>;
+
+    /// Computes self to the power of `exp`, if it can be represented.
+    fn try_pow(self, exp: u32) -> Option<Self>;
+
+    /// Computes the negation of the number if it can be represented.
+    fn try_neg(self) -> Option<Self>;
+
+    /// Returns 0, 1, or -1, whichever has the same sign as `self`.
+    fn signum(self) -> Self;
 
     duplicate_arith_ops!(paste! {
         fn [<op_fn _small_big>](lhs: Self, rhs: Self::Big) -> Self::Big;
@@ -190,26 +185,32 @@ macro_rules! impl_small_num {
                 self.unsigned_abs()
             }
 
-            fn overflowing_abs(self) -> (Self, bool) {
-                self.overflowing_abs()
+            fn try_abs(self) -> Option<Self> {
+                if let (abs, false) = self.overflowing_abs() {
+                    Some(abs)
+                } else {
+                    None
+                }
             }
 
-            fn overflowing_neg(self) -> (Self, bool) {
-                self.overflowing_neg()
+            fn try_neg(self) -> Option<Self> {
+                if let (neg, false) = self.overflowing_neg() {
+                    Some(neg)
+                } else {
+                    None
+                }
             }
 
-            fn overflowing_pow(self, exp: u32) -> (Self, bool) {
-                self.overflowing_pow(exp)
+            fn try_pow(self, exp: u32) -> Option<Self> {
+                if let (pow, false) = self.overflowing_pow(exp) {
+                    Some(pow)
+                } else {
+                    None
+                }
             }
 
             fn signum(self) -> Self {
                 self.signum()
-            }
-
-            fn try_from_big(b: &Self::Big) -> Option<Self> {
-                paste! {
-                    b.[<to_ $signed>]()
-                }
             }
 
             impl_binary_ops!();
@@ -230,26 +231,24 @@ macro_rules! impl_small_num {
                 self
             }
 
-            fn overflowing_abs(self) -> (Self, bool) {
-                (self, false)
+            fn try_abs(self) -> Option<Self> {
+                Some(self)
             }
 
-            fn overflowing_neg(self) -> (Self, bool) {
-                (0, self == 0)
+            fn try_neg(self) -> Option<Self> {
+                if self == 0 { Some(0) } else { None }
             }
 
-            fn overflowing_pow(self, exp: u32) -> (Self, bool) {
-                self.overflowing_pow(exp)
+            fn try_pow(self, exp: u32) -> Option<Self> {
+                if let (pow, false) = self.overflowing_pow(exp) {
+                    Some(pow)
+                } else {
+                    None
+                }
             }
 
             fn signum(self) -> Self {
                 if self == 0 { 0 } else { 1 }
-            }
-
-            fn try_from_big(b: &Self::Big) -> Option<Self> {
-                paste! {
-                    b.[<to_ $unsigned>]()
-                }
             }
 
             impl_binary_ops!();

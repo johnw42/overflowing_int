@@ -3,7 +3,7 @@ use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
 use crate::unsigned::Uint;
 use num_bigint::{BigInt, BigUint, Sign};
-use num_traits::Zero;
+use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Pow, Zero};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::marker::PhantomData;
@@ -461,29 +461,28 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
 
     #[inline]
     pub fn checked_add(&self, v: &Self) -> Option<Self> {
-        self.0.checked_add(&v.0).map(Self::from_encoding)
+        CheckedAdd::checked_add(self, v)
     }
 
     #[inline]
     pub fn checked_sub(&self, v: &Self) -> Option<Self> {
-        self.0.checked_sub(&v.0).map(Self::from_encoding)
+        CheckedSub::checked_sub(self, v)
     }
 
     #[inline]
     pub fn checked_mul(&self, v: &Self) -> Option<Self> {
-        self.0.checked_mul(&v.0).map(Self::from_encoding)
+        CheckedMul::checked_mul(self, v)
     }
 
     #[inline]
     pub fn checked_div(&self, v: &Self) -> Option<Self> {
-        self.0.checked_div(&v.0).map(Self::from_encoding)
+        CheckedDiv::checked_div(self, v)
     }
 
     /// Returns `self ^ exponent`.
     #[inline]
     pub fn pow(&self, exponent: u32) -> Self {
-        #[allow(clippy::needless_borrow)]
-        Self::from_encoding((&self.0).pow(exponent))
+        Pow::pow(self, exponent)
     }
 
     /// Returns `(self ^ exponent) mod modulus`
@@ -597,6 +596,12 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     }
 }
 
+impl<'a, E: Encoding<'a, Big = BigInt>> Default for Int<'a, E> {
+    fn default() -> Self {
+        Self::ZERO
+    }
+}
+
 impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for Int<'a, E> {
     fn into_decoded(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
         self.0.into_decoded()
@@ -630,7 +635,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Encode<'a, E::Small> for Int<'a, E> {
 impl<'a, E: Encoding<'a, Big = BigInt>> Encoding<'a> for Int<'a, E> {
     type Small = E::Small;
     type Big = E::Big;
-    type Unsigned = E::Unsigned;
+    type Unsigned = Uint<'a, E::Unsigned>;
     type Static = Int<'static, E::Static>;
     type WithLifetime<'b>
         = Int<'b, E::WithLifetime<'b>>

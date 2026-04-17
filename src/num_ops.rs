@@ -315,7 +315,7 @@ impl<'e, E: Encoding<'e>> PowOpTrait<'e, E> for PowOp {
 
     fn on_small(lhs: E::Small, rhs: <E::Unsigned as Encoding<'e>>::Small) -> Result<E::Small, ()> {
         if let Some(rhs) = rhs.to_u32()
-            && let (result, false) = lhs.overflowing_pow(rhs)
+            && let Some(result) = lhs.try_pow(rhs)
         {
             Ok(result)
         } else {

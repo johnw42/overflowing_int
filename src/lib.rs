@@ -57,6 +57,7 @@ mod encoding;
 pub mod identity_encoding;
 mod macros;
 mod num_ops;
+mod num_tests;
 pub mod rc_encoding;
 mod shifted;
 pub mod signed;

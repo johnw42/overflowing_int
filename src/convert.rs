@@ -193,7 +193,7 @@ where
         match value.decode() {
             Decoded::Small(s) => match E2::Small::try_from(s) {
                 Ok(small) => Self::from_small(small),
-                Err(_) => Self::from_big(s.to_bigint()),
+                Err(_) => Self::from_big(s.to_big().into()),
             },
             Decoded::Big(b) => Self::from_big(b.into_owned().into()),
         }

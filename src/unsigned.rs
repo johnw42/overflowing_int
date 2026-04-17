@@ -2,7 +2,7 @@ use crate::big_number::BigNumberDigits;
 use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::small_num::SmallNumber;
 use num_bigint::BigUint;
-use num_traits::PrimInt as _;
+use num_traits::{Pow, PrimInt as _};
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
@@ -322,8 +322,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
 
     /// Returns `self ^ exponent`.
     pub fn pow(&self, exponent: u32) -> Self {
-        #[allow(clippy::needless_borrow)]
-        Self::from_encoding((&self.0).pow(exponent))
+        Pow::pow(self, exponent)
     }
 
     /// Returns `(self ^ exponent) % modulus`.
@@ -414,6 +413,12 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     }
 }
 
+impl<'a, E: Encoding<'a, Big = BigUint>> Default for Uint<'a, E> {
+    fn default() -> Self {
+        Self::ZERO
+    }
+}
+
 impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for Uint<'a, E> {
     fn into_decoded(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
         self.0.into_decoded()
@@ -447,7 +452,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Encode<'a, E::Small> for Uint<'a, E> {
 impl<'a, E: Encoding<'a, Big = BigUint>> Encoding<'a> for Uint<'a, E> {
     type Small = E::Small;
     type Big = E::Big;
-    type Unsigned = E::Unsigned;
+    type Unsigned = Uint<'a, E::Unsigned>;
     type Static = Uint<'static, E::Static>;
     type WithLifetime<'b>
         = Uint<'b, E::WithLifetime<'b>>
@@ -472,37 +477,4 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Encoding<'a> for Uint<'a, E> {
     fn into_static(self) -> Self::Static {
         Uint::from_encoding(self.0.into_static())
     }
-}
-
-#[test]
-fn test_into_static() {
-    use crate::CowBigUint;
-    use num_traits::Zero;
-
-    struct CowTest<'a> {
-        value: CowBigUint<'a>,
-    }
-
-    impl<'a> CowTest<'a> {
-        fn test(self) {
-            // Prove that we can change the lifetime to a shorter one.
-            Self::wants_borrowed(self.value.borrow());
-
-            // Prove that we can change the lifetime to 'static.
-            Self::wants_static(self.value.clone().into_static());
-        }
-
-        fn wants_static(_x: CowBigUint<'static>) {}
-
-        fn wants_borrowed<'b>(_x: CowBigUint<'b>)
-        where
-            'a: 'b,
-        {
-        }
-    }
-
-    CowTest {
-        value: CowBigUint::zero(),
-    }
-    .test();
 }

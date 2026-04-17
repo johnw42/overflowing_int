@@ -607,10 +607,10 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Neg for Int<'a, E> {
     fn neg(self) -> Self::Output {
         match self.into_decoded() {
             Decoded::Small(s) => {
-                if let (neg, false) = s.overflowing_neg() {
+                if let Some(neg) = s.try_neg() {
                     Self::Output::from_small(neg)
                 } else {
-                    Self::from_small(s).neg().into()
+                    s.to_big().neg().into()
                 }
             }
             Decoded::Big(b) => b.into_owned().neg().into(),
@@ -624,10 +624,10 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Neg for &Int<'a, E> {
     fn neg(self) -> Self::Output {
         match self.decode() {
             Decoded::Small(s) => {
-                if let (neg, false) = s.overflowing_neg() {
+                if let Some(neg) = s.try_neg() {
                     Self::Output::from_small(neg)
                 } else {
-                    Int::from_small(s).neg().into()
+                    s.to_big().neg().into()
                 }
             }
             Decoded::Big(b) => b.into_owned().neg().into(),
@@ -713,14 +713,14 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Ord for Uint<'a, E> {
 impl<'a, E: Encoding<'a, Big = BigInt>> Signed for Int<'a, E> {
     fn abs(&self) -> Self {
         match self.decode() {
-            Decoded::Small(a) => {
-                if let (b, false) = a.overflowing_abs() {
-                    Self::from_small(b)
+            Decoded::Small(s) => {
+                if let Some(s) = s.try_abs() {
+                    Self::from_small(s)
                 } else {
-                    self.big_cow().abs().into()
+                    s.to_big().abs().into()
                 }
             }
-            Decoded::Big(a) => a.abs().into(),
+            Decoded::Big(b) => b.abs().into(),
         }
     }
 
