@@ -53,7 +53,9 @@ macro_rules! duplicate_binary_operators {
                 [Integer]    [mod_floor];
                 [Integer]    [gcd];
                 [Integer]    [lcm];
-                [Integer]    [div_rem];
+                [Integer]    [gcd];
+                [Integer]    [lcm];
+                [Integer]    [is_multiple_of];
                 [Euclid]     [div_euclid];
                 [Euclid]     [rem_euclid];
                 [Euclid]     [div_rem_euclid];

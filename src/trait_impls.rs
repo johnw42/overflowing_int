@@ -237,7 +237,13 @@ pub mod mod_name {
         }
 
         fn lcm(&self, other: &Self) -> Self {
-            // We don't bother doing the LCM computation in the small case, since it can easily overflow.
+            if let Some(lhs) = self.small()
+                && let Some(rhs) = other.small()
+                // See note in gcd_lcm about this check.
+                && lhs.checked_mul(&rhs).is_some()
+            {
+                return Self::from_small(lhs.lcm(&rhs));
+            }
             let (lhs, rhs) = Self::big_cows(self, other);
             Self::from_big(lhs.lcm(rhs.as_ref()))
         }
@@ -279,6 +285,23 @@ pub mod mod_name {
                 Self::from_big(q.div_rem(r.as_ref()).0),
                 Self::from_big(q.div_rem(r.as_ref()).1),
             )
+        }
+
+        fn gcd_lcm(&self, other: &Self) -> (Self, Self) {
+            if let Some(lhs) = self.small()
+                && let Some(rhs) = other.small()
+                // This check ensures computing the LCM won't overflow the small
+                // type, which happens particularly when the arguments are
+                // relatively prime. This would cause an incorrect result and a
+                // potential panic in debug mode .
+                && lhs.checked_mul(&rhs).is_some()
+            {
+                let (gcd, lcm) = lhs.gcd_lcm(&rhs);
+                return (Self::from_small(gcd), Self::from_small(lcm));
+            }
+            let (lhs, rhs) = Self::big_cows(self, other);
+            let (gcd, lcm) = lhs.gcd_lcm(rhs.as_ref());
+            (Self::from_big(gcd), Self::from_big(lcm))
         }
     }
 

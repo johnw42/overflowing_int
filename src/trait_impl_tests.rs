@@ -185,18 +185,19 @@ duplicate_encoded_types! { mod encoding_tag {
         if a.is_zero() || b.is_zero() {
             return TestResult::discard();
         }
-        TestResult::eq(
-            &Integer::gcd(&a, &b),
-            &Integer::gcd(&EncodedType::from(a), &EncodedType::from(b)).into(),
-        )
+        assert_eq!(
+            Integer::gcd(&a, &b),
+            Integer::gcd(&EncodedType::from(a), &EncodedType::from(b)).into(),
+        );
+        TestResult::passed()
     }
 
     #[quickcheck]
-    fn test_lcm(a: ImplType, b: ImplType) -> TestResult {
-        TestResult::eq(
-            &Integer::lcm(&a, &b),
-            &Integer::lcm(&EncodedType::from(a), &EncodedType::from(b)).into(),
-        )
+    fn test_lcm(a: ImplType, b: ImplType) {
+        assert_eq!(
+            Integer::lcm(&a, &b),
+            Integer::lcm(&EncodedType::from(a), &EncodedType::from(b)).into(),
+        );
     }
 
     #[quickcheck]
@@ -204,20 +205,21 @@ duplicate_encoded_types! { mod encoding_tag {
         if b.is_zero() {
             return TestResult::discard();
         }
-        TestResult::eq(
-            &Integer::is_multiple_of(&a, &b),
-            &Integer::is_multiple_of(&EncodedType::from(a), &EncodedType::from(b)),
-        )
+        assert_eq!(
+            Integer::is_multiple_of(&a, &b),
+            Integer::is_multiple_of(&EncodedType::from(a), &EncodedType::from(b)),
+        );
+        TestResult::passed()
     }
 
     #[quickcheck]
-    fn test_is_even(n: ImplType) -> TestResult {
-        TestResult::eq(&n.is_even(), &EncodedType::from(n).is_even())
+    fn test_is_even(n: ImplType) {
+        assert_eq!(n.is_even(), EncodedType::from(n).is_even());
     }
 
     #[quickcheck]
-    fn test_is_odd(n: ImplType) -> TestResult {
-        TestResult::eq(&n.is_odd(), &EncodedType::from(n).is_odd())
+    fn test_is_odd(n: ImplType) {
+        assert_eq!(n.is_odd(), EncodedType::from(n).is_odd());
     }
 
     #[quickcheck]
@@ -228,6 +230,17 @@ duplicate_encoded_types! { mod encoding_tag {
         let (q, r) = Integer::div_rem(&a, &b);
         let (eq, er) = Integer::div_rem(&EncodedType::from(a), &EncodedType::from(b));
         TestResult::from_bool(q == eq.into() && r == er.into())
+    }
+
+
+    #[quickcheck]
+    fn test_gcd_lcm(a: ImplType, b: ImplType)  {
+        let (gcd, lcm) = Integer::gcd_lcm(&a, &b);
+        let (actual_gcd, actual_lcm) = Integer::gcd_lcm(&EncodedType::from(a), &EncodedType::from(b));
+        assert_eq!(
+            (gcd, lcm),
+            (actual_gcd.into(), actual_lcm.into()),
+        );
     }
 
     //
@@ -284,10 +297,10 @@ duplicate_encoded_types! { mod encoding_tag {
     //
 
     #[quickcheck]
-    fn test_serialize(n: ImplType) -> TestResult {
-        TestResult::eq(
-            &serde_json::to_string(&EncodedType::from(n.clone())).ok(),
-            &serde_json::to_string(&n).ok(),
+    fn test_serialize(n: ImplType) {
+        assert_eq!(
+            serde_json::to_string(&EncodedType::from(n.clone())).ok(),
+            serde_json::to_string(&n).ok(),
         )
     }
 
@@ -296,19 +309,19 @@ duplicate_encoded_types! { mod encoding_tag {
     //
 
     #[quickcheck]
-    fn test_to_be_bytes(n: ImplType) -> TestResult {
-        TestResult::eq(
-            &ToBytes::to_be_bytes(&n),
-            &ToBytes::to_be_bytes(&EncodedType::from(n)),
-        )
+    fn test_to_be_bytes(n: ImplType) {
+        assert_eq!(
+            ToBytes::to_be_bytes(&n),
+            ToBytes::to_be_bytes(&EncodedType::from(n)),
+        );
     }
 
     #[quickcheck]
-    fn test_to_le_bytes(n: ImplType) -> TestResult {
-        TestResult::eq(
-            &ToBytes::to_le_bytes(&n),
-            &ToBytes::to_le_bytes(&EncodedType::from(n)),
-        )
+    fn test_to_le_bytes(n: ImplType) {
+        assert_eq!(
+            ToBytes::to_le_bytes(&n),
+            ToBytes::to_le_bytes(&EncodedType::from(n)),
+        );
     }
 
     //
@@ -316,19 +329,19 @@ duplicate_encoded_types! { mod encoding_tag {
     //
 
     #[quickcheck]
-    fn test_from_be_bytes(bytes: Vec<u8>) -> TestResult {
-        TestResult::eq(
+    fn test_from_be_bytes(bytes: Vec<u8>) {
+        assert_eq!(
             &ImplType::from_be_bytes(&bytes),
             &ImplType::from(EncodedType::from_be_bytes(&bytes)),
-        )
+        );
     }
 
     #[quickcheck]
-    fn test_from_le_bytes(bytes: Vec<u8>) -> TestResult {
-        TestResult::eq(
+    fn test_from_le_bytes(bytes: Vec<u8>) {
+        assert_eq!(
             &ImplType::from_le_bytes(&bytes),
             &ImplType::from(EncodedType::from_le_bytes(&bytes)),
-        )
+        );
     }
 
     //
@@ -336,8 +349,8 @@ duplicate_encoded_types! { mod encoding_tag {
     //
 
     #[quickcheck]
-    fn test_cmp(a: ImplType, b: ImplType) -> TestResult {
-        TestResult::eq(&a.cmp(&b), &EncodedType::from(a).cmp(&EncodedType::from(b)))
+    fn test_cmp(a: ImplType, b: ImplType) {
+        assert_eq!(a.cmp(&b), EncodedType::from(a).cmp(&EncodedType::from(b)));
     }
 
     //
@@ -346,11 +359,11 @@ duplicate_encoded_types! { mod encoding_tag {
 
     duplicate_prims! { paste! {
         #[quickcheck]
-        fn [<test_from_ prim>](n: prim) -> TestResult {
-            TestResult::eq(
+        fn [<test_from_ prim>](n: prim) {
+            assert_eq!(
                 &EncodedType::[<from_ prim>](n).map(ImplType::from),
                 &ImplType::[<from_ prim>](n),
-            )
+            );
         }
     } }
 
@@ -360,11 +373,11 @@ duplicate_encoded_types! { mod encoding_tag {
 
     duplicate_prims! { paste! {
         #[quickcheck]
-        fn [<test_to_ prim>](n: ImplType) -> TestResult {
-            TestResult::eq(
+        fn [<test_to_ prim>](n: ImplType) {
+            assert_eq!(
                 &ToPrimitive::[<to_ prim>](&n),
                 &ToPrimitive::[<to_ prim>](&EncodedType::from(n)),
-            )
+            );
         }
     } }
 } }
