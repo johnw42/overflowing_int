@@ -3,7 +3,6 @@ use crate::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::{borrow::Cow, fmt::Debug};
 
@@ -18,21 +17,21 @@ const _: () = {
 /// set to 1 for small values.  This encoding is used for `BoxBigInt` and
 /// `BoxBigUint`.
 #[derive(Clone)]
-pub struct BoxEncoding<'a, S>(BoxEncodedRepr<S>, PhantomData<&'a ()>)
+pub struct BoxEncoding<S>(BoxEncodedRepr<S>)
 where
     S: SmallNumber;
 
-impl<'a, S> BoxEncoding<'a, S>
+impl<S> BoxEncoding<S>
 where
     S: SmallNumber,
 {
     #[allow(unused)]
     fn from_shifted(shifted: Shifted<S>) -> Self {
-        Self(BoxEncodedRepr { small: shifted }, PhantomData)
+        Self(BoxEncodedRepr { small: shifted })
     }
 }
 
-impl<'a, S> Decode<'a, S> for BoxEncoding<'a, S>
+impl<'enc, S> Decode<'enc, S> for BoxEncoding<S>
 where
     S: SmallNumber,
 {
@@ -49,7 +48,7 @@ where
         }
     }
 
-    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+    fn decode<'a>(&'a self) -> Decoded<S, Cow<'a, <S as SmallNumber>::Big>> {
         unsafe {
             if let Some(s) = self.0.small.validate() {
                 Decoded::Small(s)
@@ -60,13 +59,13 @@ where
     }
 }
 
-impl<'a, S> Encode<'a, S> for BoxEncoding<'a, S>
+impl<'enc, S> Encode<'enc, S> for BoxEncoding<S>
 where
     S: SmallNumber,
 {
     fn from_small(s: S) -> Self {
         if let Some(shifted) = Shifted::try_new(s) {
-            Self(BoxEncodedRepr { small: shifted }, PhantomData)
+            Self(BoxEncodedRepr { small: shifted })
         } else {
             let r = Self::from_big(s.to_big());
             unsafe {
@@ -76,7 +75,7 @@ where
         }
     }
 
-    fn from_big_cow(b: Cow<'a, S::Big>) -> Self {
+    fn from_big_cow(b: Cow<'enc, S::Big>) -> Self {
         Self(
             if let Some(small) = S::try_from(b.as_ref()).ok()
                 && let Some(shifted) = Shifted::try_new(small)
@@ -87,51 +86,41 @@ where
                     big: ManuallyDrop::new(Box::new(b.into_owned())),
                 }
             },
-            PhantomData,
         )
     }
 }
 
-impl<'a, S> Encoding<'a> for BoxEncoding<'a, S>
+impl<'enc, S> Encoding<'enc> for BoxEncoding<S>
 where
     S: SmallNumber,
 {
     type Small = S;
     type Big = S::Big;
-    type Unsigned = BoxEncoding<'a, S::Unsigned>;
-    type Static = BoxEncoding<'static, S>;
-    type WithLifetime<'b>
-        = BoxEncoding<'b, S>
+    type Unsigned = BoxEncoding<S::Unsigned>;
+    type Static = BoxEncoding<S>;
+    type WithLifetime<'a>
+        = BoxEncoding<S>
     where
-        'a: 'b;
+        'enc: 'a;
 
-    const ZERO: Self = Self(
-        BoxEncodedRepr {
-            small: Shifted::ZERO,
-        },
-        PhantomData,
-    );
+    const ZERO: Self = Self(BoxEncodedRepr {
+        small: Shifted::ZERO,
+    });
 
-    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
     where
-        Self: 'b,
-        'a: 'b,
+        Self: 'a,
+        'enc: 'a,
     {
         unsafe {
             if self.0.small.validate().is_some() {
-                BoxEncoding(
-                    BoxEncodedRepr {
-                        small: self.0.small,
-                    },
-                    PhantomData,
-                )
+                BoxEncoding(BoxEncodedRepr {
+                    small: self.0.small,
+                })
             } else {
-                BoxEncoding(
-                    BoxEncodedRepr {
-                        big: ManuallyDrop::new(Box::clone(&self.0.big)),
-                    },
-                    PhantomData,
-                )
+                BoxEncoding(BoxEncodedRepr {
+                    big: ManuallyDrop::new(Box::clone(&self.0.big)),
+                })
             }
         }
     }
@@ -152,7 +141,7 @@ where
     }
 
     fn into_static(self) -> Self::Static {
-        BoxEncoding(self.0, PhantomData)
+        self
     }
 }
 
@@ -191,7 +180,7 @@ where
     }
 }
 
-impl<'a, S> Debug for BoxEncoding<'a, S>
+impl<S> Debug for BoxEncoding<S>
 where
     S: SmallNumber,
 {
@@ -203,7 +192,7 @@ where
     }
 }
 
-impl<'a, S> Hash for BoxEncoding<'a, S>
+impl<S> Hash for BoxEncoding<S>
 where
     S: SmallNumber,
 {
@@ -215,7 +204,7 @@ where
     }
 }
 
-impl<'a, S> PartialEq for BoxEncoding<'a, S>
+impl<S> PartialEq for BoxEncoding<S>
 where
     S: SmallNumber,
 {
@@ -228,10 +217,13 @@ where
     }
 }
 
-impl<'a, S> Eq for BoxEncoding<'a, S> where S: SmallNumber {}
+impl<S> Eq for BoxEncoding<S> where S: SmallNumber {}
 
 #[cfg(any(test, feature = "quickcheck"))]
-impl<S: SmallNumber> quickcheck::Arbitrary for BoxEncoding<'static, S> {
+impl<S> quickcheck::Arbitrary for BoxEncoding<S>
+where
+    S: SmallNumber,
+{
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         if bool::arbitrary(g) {
             Self::from_shifted(Shifted::<S>::arbitrary(g))
@@ -242,7 +234,10 @@ impl<S: SmallNumber> quickcheck::Arbitrary for BoxEncoding<'static, S> {
 }
 
 #[cfg(feature = "arbitrary")]
-impl<'a, S: SmallNumber> arbitrary::Arbitrary<'a> for BoxEncoding<'a, S> {
+impl<'enc, S> arbitrary::Arbitrary<'enc> for BoxEncoding<S>
+where
+    S: SmallNumber,
+{
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         Ok(if bool::arbitrary(u)? {
             Self::from_shifted(Shifted::<S>::arbitrary(u)?)

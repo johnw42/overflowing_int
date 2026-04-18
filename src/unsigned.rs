@@ -8,9 +8,14 @@ use std::marker::PhantomData;
 
 /// An unsigned big integer type that can be used with any encoding that implements `Encoding` with `Big = BigUint`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Uint<'a, E: Encoding<'a>>(pub(crate) E, PhantomData<&'a ()>);
+pub struct Uint<'enc, E>(pub(crate) E, PhantomData<&'enc ()>)
+where
+    E: Encoding<'enc>;
 
-impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
+impl<'enc, E> Uint<'enc, E>
+where
+    E: Encoding<'enc, Big = BigUint>,
+{
     const fn from_encoding(encoding: E) -> Self {
         Self(encoding, PhantomData)
     }
@@ -23,7 +28,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// Converts this big integer to into one that borrows from this one's data,
     /// if possible.  If the encoding does not support borrowing, this will
     /// simply clone self.
-    pub fn borrow<'b>(&'b self) -> Uint<'b, E::WithLifetime<'b>> {
+    pub fn borrow<'a>(&'a self) -> Uint<'a, E::WithLifetime<'a>> {
         <Self as Encoding>::WithLifetime::from_decoded(self.decode())
     }
 
@@ -34,7 +39,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn new(digits: Vec<u32>) -> Uint<'a, E> {
+    pub fn new(digits: Vec<u32>) -> Uint<'enc, E> {
         Self::from_encoding(E::from_big(E::Big::new(digits)))
     }
 
@@ -42,7 +47,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn from_slice(slice: &[u32]) -> Uint<'a, E> {
+    pub fn from_slice(slice: &[u32]) -> Uint<'enc, E> {
         Self::from_encoding(E::from_big(E::Big::from_slice(slice)))
     }
 
@@ -73,7 +78,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     ///            EnumBigUint::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     #[inline]
-    pub fn from_bytes_be(bytes: &[u8]) -> Uint<'a, E> {
+    pub fn from_bytes_be(bytes: &[u8]) -> Uint<'enc, E> {
         Self::from_encoding(
             if let Some(from_bytes) = SmallNumber::from_bytes_be(bytes) {
                 E::from_small(from_bytes)
@@ -87,7 +92,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     ///
     /// The bytes are in little-endian byte order.
     #[inline]
-    pub fn from_bytes_le(bytes: &[u8]) -> Uint<'a, E> {
+    pub fn from_bytes_le(bytes: &[u8]) -> Uint<'enc, E> {
         Self::from_encoding(E::from_big(E::Big::from_bytes_le(bytes)))
     }
 
@@ -150,7 +155,7 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// let a = EnumBigUint::from_radix_le(inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_le(190), inbase190);
     /// ```
-    pub fn from_radix_le(buf: &[u8], radix: u32) -> Option<Uint<'a, E>> {
+    pub fn from_radix_le(buf: &[u8], radix: u32) -> Option<Uint<'enc, E>> {
         E::Big::from_radix_le(buf, radix)
             .map(E::from_big)
             .map(Self::from_encoding)
@@ -413,59 +418,74 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigUint>> Default for Uint<'a, E> {
+impl<'enc, E> Default for Uint<'enc, E>
+where
+    E: Encoding<'enc, Big = BigUint>,
+{
     fn default() -> Self {
         Self::ZERO
     }
 }
 
-impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for Uint<'a, E> {
-    fn into_decoded(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+impl<'enc, E> Decode<'enc, E::Small> for Uint<'enc, E>
+where
+    E: Encoding<'enc>,
+{
+    fn into_decoded(self) -> Decoded<E::Small, Cow<'enc, E::Big>> {
         self.0.into_decoded()
     }
 
-    fn decode<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
+    fn decode<'a>(&'a self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
         self.0.decode()
     }
 }
 
-impl<'a, E: Encoding<'a>> Decode<'a, E::Small> for &Uint<'a, E> {
-    fn into_decoded(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+impl<'enc, E> Decode<'enc, E::Small> for &Uint<'enc, E>
+where
+    E: Encoding<'enc>,
+{
+    fn into_decoded(self) -> Decoded<E::Small, Cow<'enc, E::Big>> {
         self.0.clone().into_decoded()
     }
 
-    fn decode<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
+    fn decode<'a>(&'a self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
         self.0.decode()
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigUint>> Encode<'a, E::Small> for Uint<'a, E> {
+impl<'enc, E> Encode<'enc, E::Small> for Uint<'enc, E>
+where
+    E: Encoding<'enc, Big = BigUint>,
+{
     fn from_small(s: E::Small) -> Self {
         Self::from_encoding(E::from_small(s))
     }
 
-    fn from_big_cow(b: Cow<'a, E::Big>) -> Self {
+    fn from_big_cow(b: Cow<'enc, E::Big>) -> Self {
         Self::from_encoding(E::from_big_cow(b))
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigUint>> Encoding<'a> for Uint<'a, E> {
+impl<'enc, E> Encoding<'enc> for Uint<'enc, E>
+where
+    E: Encoding<'enc, Big = BigUint>,
+{
     type Small = E::Small;
     type Big = E::Big;
-    type Unsigned = Uint<'a, E::Unsigned>;
+    type Unsigned = Uint<'enc, E::Unsigned>;
     type Static = Uint<'static, E::Static>;
-    type WithLifetime<'b>
-        = Uint<'b, E::WithLifetime<'b>>
+    type WithLifetime<'a>
+        = Uint<'a, E::WithLifetime<'a>>
     where
-        Self: 'b,
-        'a: 'b;
+        Self: 'a,
+        'enc: 'a;
 
     const ZERO: Self = Self::ZERO;
 
-    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
     where
-        Self: 'b,
-        'a: 'b,
+        Self: 'a,
+        'enc: 'a,
     {
         Uint::from_encoding(self.0.borrow())
     }

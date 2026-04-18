@@ -3,7 +3,6 @@ use crate::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::sync::Arc;
 use std::{borrow::Cow, fmt::Debug};
@@ -19,21 +18,21 @@ const _: () = {
 /// set to 1 for small values.  This encoding is used for `ArcBigInt` and
 /// `ArcBigUint`.
 #[derive(Clone)]
-pub struct ArcEncoding<'a, S>(ArcEncodedRepr<S>, PhantomData<&'a ()>)
+pub struct ArcEncoding<S>(ArcEncodedRepr<S>)
 where
     S: SmallNumber;
 
-impl<'a, S> ArcEncoding<'a, S>
+impl<S> ArcEncoding<S>
 where
     S: SmallNumber,
 {
     #[allow(unused)]
     fn from_shifted(shifted: Shifted<S>) -> Self {
-        Self(ArcEncodedRepr { small: shifted }, PhantomData)
+        Self(ArcEncodedRepr { small: shifted })
     }
 }
 
-impl<'a, S> Decode<'a, S> for ArcEncoding<'a, S>
+impl<'enc, S> Decode<'enc, S> for ArcEncoding<S>
 where
     S: SmallNumber,
 {
@@ -50,7 +49,7 @@ where
         }
     }
 
-    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+    fn decode<'a>(&'a self) -> Decoded<S, Cow<'a, <S as SmallNumber>::Big>> {
         unsafe {
             if let Some(s) = self.0.small.validate() {
                 Decoded::Small(s)
@@ -61,13 +60,13 @@ where
     }
 }
 
-impl<'a, S> Encode<'a, S> for ArcEncoding<'a, S>
+impl<'enc, S> Encode<'enc, S> for ArcEncoding<S>
 where
     S: SmallNumber,
 {
     fn from_small(s: S) -> Self {
         if let Some(shifted) = Shifted::try_new(s) {
-            Self(ArcEncodedRepr { small: shifted }, PhantomData)
+            Self(ArcEncodedRepr { small: shifted })
         } else {
             let r = Self::from_big(s.to_big());
             unsafe {
@@ -77,7 +76,7 @@ where
         }
     }
 
-    fn from_big_cow(b: Cow<'a, S::Big>) -> Self {
+    fn from_big_cow(b: Cow<'enc, S::Big>) -> Self {
         Self(
             if let Some(small) = S::try_from(b.as_ref()).ok()
                 && let Some(shifted) = Shifted::try_new(small)
@@ -88,52 +87,42 @@ where
                     big: ManuallyDrop::new(Arc::new(b.into_owned())),
                 }
             },
-            PhantomData,
         )
     }
 }
 
-impl<'a, S> Encoding<'a> for ArcEncoding<'a, S>
+impl<'enc, S> Encoding<'enc> for ArcEncoding<S>
 where
     S: SmallNumber,
 {
     type Small = S;
     type Big = S::Big;
-    type Unsigned = ArcEncoding<'a, S::Unsigned>;
-    type Static = ArcEncoding<'static, S>;
-    type WithLifetime<'b>
-        = ArcEncoding<'b, S>
+    type Unsigned = ArcEncoding<S::Unsigned>;
+    type Static = ArcEncoding<S>;
+    type WithLifetime<'a>
+        = ArcEncoding<S>
     where
-        Self: 'b,
-        'a: 'b;
+        Self: 'a,
+        'enc: 'a;
 
-    const ZERO: Self = Self(
-        ArcEncodedRepr {
-            small: Shifted::ZERO,
-        },
-        PhantomData,
-    );
+    const ZERO: Self = Self(ArcEncodedRepr {
+        small: Shifted::ZERO,
+    });
 
-    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
     where
-        Self: 'b,
-        'a: 'b,
+        Self: 'a,
+        'enc: 'a,
     {
         unsafe {
             if self.0.small.validate().is_some() {
-                ArcEncoding(
-                    ArcEncodedRepr {
-                        small: self.0.small,
-                    },
-                    PhantomData,
-                )
+                ArcEncoding(ArcEncodedRepr {
+                    small: self.0.small,
+                })
             } else {
-                ArcEncoding(
-                    ArcEncodedRepr {
-                        big: ManuallyDrop::new(Arc::clone(&self.0.big)),
-                    },
-                    PhantomData,
-                )
+                ArcEncoding(ArcEncodedRepr {
+                    big: ManuallyDrop::new(Arc::clone(&self.0.big)),
+                })
             }
         }
     }
@@ -154,7 +143,7 @@ where
     }
 
     fn into_static(self) -> Self::Static {
-        ArcEncoding(self.0, PhantomData)
+        ArcEncoding(self.0)
     }
 }
 
@@ -193,7 +182,7 @@ where
     }
 }
 
-impl<'a, S> Debug for ArcEncoding<'a, S>
+impl<S> Debug for ArcEncoding<S>
 where
     S: SmallNumber,
 {
@@ -205,7 +194,7 @@ where
     }
 }
 
-impl<'a, S> Hash for ArcEncoding<'a, S>
+impl<S> Hash for ArcEncoding<S>
 where
     S: SmallNumber,
 {
@@ -217,7 +206,7 @@ where
     }
 }
 
-impl<'a, S> PartialEq for ArcEncoding<'a, S>
+impl<S> PartialEq for ArcEncoding<S>
 where
     S: SmallNumber,
 {
@@ -230,10 +219,13 @@ where
     }
 }
 
-impl<'a, S> Eq for ArcEncoding<'a, S> where S: SmallNumber {}
+impl<S> Eq for ArcEncoding<S> where S: SmallNumber {}
 
 #[cfg(any(test, feature = "quickcheck"))]
-impl<S: SmallNumber> quickcheck::Arbitrary for ArcEncoding<'static, S> {
+impl<S> quickcheck::Arbitrary for ArcEncoding<S>
+where
+    S: SmallNumber,
+{
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         if bool::arbitrary(g) {
             Self::from_shifted(Shifted::<S>::arbitrary(g))
@@ -244,7 +236,10 @@ impl<S: SmallNumber> quickcheck::Arbitrary for ArcEncoding<'static, S> {
 }
 
 #[cfg(feature = "arbitrary")]
-impl<'a, S: SmallNumber> arbitrary::Arbitrary<'a> for ArcEncoding<'a, S> {
+impl<'enc, S> arbitrary::Arbitrary<'enc> for ArcEncoding<S>
+where
+    S: SmallNumber,
+{
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         Ok(if bool::arbitrary(u)? {
             Self::from_shifted(Shifted::<S>::arbitrary(u)?)

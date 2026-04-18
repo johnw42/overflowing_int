@@ -6,21 +6,21 @@ use std::marker::PhantomData;
 use std::{borrow::Cow, fmt::Debug};
 
 #[derive(Clone, Hash, PartialEq, Eq)]
-pub struct IdentityEncoding<'a, S>(Cow<'a, S::Big>, PhantomData<&'a ()>)
+pub struct IdentityEncoding<'enc, S>(Cow<'enc, S::Big>, PhantomData<&'enc ()>)
 where
     S: SmallNumber;
 
-impl<'a, S> Decode<'a, S> for IdentityEncoding<'a, S>
+impl<'enc, S> Decode<'enc, S> for IdentityEncoding<'enc, S>
 where
     S: SmallNumber,
 {
     #[inline]
-    fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>> {
+    fn into_decoded(self) -> Decoded<S, Cow<'enc, S::Big>> {
         Decoded::Big(Cow::Owned(self.0.into_owned()))
     }
 
     #[inline]
-    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+    fn decode<'a>(&'a self) -> Decoded<S, Cow<'a, <S as SmallNumber>::Big>> {
         Decoded::Big(Cow::Borrowed(self.0.as_ref()))
     }
 
@@ -35,12 +35,12 @@ where
     }
 
     #[inline]
-    fn big_cow<'b>(&'b self) -> Cow<'b, <S as SmallNumber>::Big> {
+    fn big_cow<'a>(&'a self) -> Cow<'a, <S as SmallNumber>::Big> {
         Cow::Borrowed(self.0.as_ref())
     }
 }
 
-impl<'a, S> Encode<'a, S> for IdentityEncoding<'a, S>
+impl<'enc, S> Encode<'enc, S> for IdentityEncoding<'enc, S>
 where
     S: SmallNumber,
 {
@@ -50,7 +50,7 @@ where
     }
 
     #[inline]
-    fn from_big_cow(b: Cow<'a, S::Big>) -> Self {
+    fn from_big_cow(b: Cow<'enc, S::Big>) -> Self {
         Self(b, PhantomData)
     }
 
@@ -60,7 +60,7 @@ where
     }
 
     #[inline]
-    fn from_decoded(enc: Decoded<S, Cow<'a, <S as SmallNumber>::Big>>) -> Self {
+    fn from_decoded(enc: Decoded<S, Cow<'enc, <S as SmallNumber>::Big>>) -> Self {
         match enc {
             Decoded::Small(_) => unreachable!(),
             Decoded::Big(b) => Self::from_big_cow(b),
@@ -68,27 +68,27 @@ where
     }
 }
 
-impl<'a, S> Encoding<'a> for IdentityEncoding<'a, S>
+impl<'enc, S> Encoding<'enc> for IdentityEncoding<'enc, S>
 where
     S: SmallNumber,
 {
     type Small = S;
     type Big = S::Big;
-    type Unsigned = IdentityEncoding<'a, S::Unsigned>;
+    type Unsigned = IdentityEncoding<'enc, S::Unsigned>;
     type Static = IdentityEncoding<'static, S>;
-    type WithLifetime<'b>
-        = IdentityEncoding<'b, S>
+    type WithLifetime<'a>
+        = IdentityEncoding<'a, S>
     where
-        Self: 'b,
-        'a: 'b;
+        Self: 'a,
+        'enc: 'a;
 
     const ZERO: Self = Self(Cow::Owned(S::Big::ZERO), PhantomData);
 
     #[inline]
-    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
     where
-        Self: 'b,
-        'a: 'b,
+        Self: 'a,
+        'enc: 'a,
     {
         Self(self.0.clone(), PhantomData)
     }
@@ -109,7 +109,7 @@ where
     }
 }
 
-impl<'a, S> Debug for IdentityEncoding<'a, S>
+impl<'enc, S> Debug for IdentityEncoding<'enc, S>
 where
     S: SmallNumber,
 {
@@ -119,14 +119,20 @@ where
 }
 
 #[cfg(any(test, feature = "quickcheck"))]
-impl<S: SmallNumber> quickcheck::Arbitrary for IdentityEncoding<'static, S> {
+impl<S> quickcheck::Arbitrary for IdentityEncoding<'static, S>
+where
+    S: SmallNumber,
+{
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         Self(Cow::Owned(S::Big::arbitrary(g)), PhantomData)
     }
 }
 
 #[cfg(feature = "arbitrary")]
-impl<'a, S: SmallNumber> arbitrary::Arbitrary<'a> for IdentityEncoding<'a, S> {
+impl<'enc, S> arbitrary::Arbitrary<'enc> for IdentityEncoding<'enc, S>
+where
+    S: SmallNumber,
+{
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         Ok(Self(Cow::Owned(S::Big::arbitrary(u)?), PhantomData))
     }

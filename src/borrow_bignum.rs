@@ -17,7 +17,7 @@ impl<'a> BorrowBignum for BigInt {
     type Borrowed<'b>
         = &'b BigInt
     where
-        Self: 'b;
+        Self: 'a;
     type Static = Self;
 
     #[inline]
@@ -35,7 +35,7 @@ impl<'a> BorrowBignum for BigUint {
     type Borrowed<'b>
         = &'b BigUint
     where
-        Self: 'b;
+        Self: 'a;
     type Static = Self;
 
     #[inline]
@@ -49,19 +49,19 @@ impl<'a> BorrowBignum for BigUint {
     }
 }
 
-impl<'a, S, E> BorrowBignum for Int<'a, E>
+impl<'enc, S, E> BorrowBignum for Int<'enc, E>
 where
-    E: Encoding<'a, Small = S, Big = BigInt>,
+    E: Encoding<'enc, Small = S, Big = BigInt>,
     S: SmallNumber,
 {
-    type Borrowed<'b>
-        = <Self as Encoding<'a>>::WithLifetime<'b>
+    type Borrowed<'a>
+        = <Self as Encoding<'enc>>::WithLifetime<'a>
     where
-        Self: 'b;
+        Self: 'a;
     type Static = Int<'static, E::Static>;
 
     #[inline]
-    fn borrow<'b>(&'b self) -> Self::Borrowed<'b> {
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         Int::borrow(self)
     }
 
@@ -71,19 +71,19 @@ where
     }
 }
 
-impl<'a, S, E> BorrowBignum for Uint<'a, E>
+impl<'enc, S, E> BorrowBignum for Uint<'enc, E>
 where
-    E: Encoding<'a, Small = S, Big = BigUint>,
+    E: Encoding<'enc, Small = S, Big = BigUint>,
     S: SmallNumber,
 {
-    type Borrowed<'b>
-        = <Self as Encoding<'a>>::WithLifetime<'b>
+    type Borrowed<'a>
+        = <Self as Encoding<'enc>>::WithLifetime<'a>
     where
-        Self: 'b;
+        Self: 'a;
     type Static = Uint<'static, E::Static>;
 
     #[inline]
-    fn borrow<'b>(&'b self) -> Self::Borrowed<'b> {
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         Uint::borrow(self)
     }
 

@@ -11,9 +11,12 @@ use std::ops::Neg;
 
 /// A signed big integer type that can be used with any encoding that implements `Encoding` with `Big = BigInt`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Int<'a, E>(pub(crate) E, PhantomData<&'a ()>);
+pub struct Int<'enc, E>(pub(crate) E, PhantomData<&'enc ()>);
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
+impl<'enc, E> Int<'enc, E>
+where
+    E: Encoding<'enc, Big = BigInt>,
+{
     const fn from_encoding(encoding: E) -> Self {
         Self(encoding, PhantomData)
     }
@@ -26,7 +29,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// Converts this big integer to into one that borrows from this one's data,
     /// if possible.  If the encoding does not support borrowing, this will
     /// simply clone self.
-    pub fn borrow<'b>(&'b self) -> Int<'b, E::WithLifetime<'b>> {
+    pub fn borrow<'a>(&'a self) -> Int<'a, E::WithLifetime<'a>> {
         <Self as Encoding>::WithLifetime::from_decoded(self.decode())
     }
 
@@ -49,7 +52,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn from_biguint(sign: Sign, data: Uint<'a, E::Unsigned>) -> Self {
+    pub fn from_biguint(sign: Sign, data: Uint<'enc, E::Unsigned>) -> Self {
         Self::from(BigInt::from_biguint(sign, BigUint::from(data)))
     }
 
@@ -408,7 +411,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     /// assert!(EnumBigInt::ZERO.clone().magnitude().is_zero());
     /// ```
     #[inline]
-    pub fn magnitude(self) -> Uint<'a, E::Unsigned> {
+    pub fn magnitude(self) -> Uint<'enc, E::Unsigned> {
         Uint::from(self.into_parts().1)
     }
 
@@ -452,7 +455,7 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
 
     /// Converts this bigint into a an unsigned bigint, if it's not negative.
     #[inline]
-    pub fn to_biguint(&self) -> Option<Uint<'a, E::Unsigned>> {
+    pub fn to_biguint(&self) -> Option<Uint<'enc, E::Unsigned>> {
         match self.sign() {
             Sign::Minus => None,
             _ => Some(self.clone().magnitude()),
@@ -596,59 +599,74 @@ impl<'a, E: Encoding<'a, Big = BigInt>> Int<'a, E> {
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Default for Int<'a, E> {
+impl<'enc, E> Default for Int<'enc, E>
+where
+    E: Encoding<'enc, Big = BigInt>,
+{
     fn default() -> Self {
         Self::ZERO
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for Int<'a, E> {
-    fn into_decoded(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+impl<'enc, E> Decode<'enc, E::Small> for Int<'enc, E>
+where
+    E: Encoding<'enc, Big = BigInt>,
+{
+    fn into_decoded(self) -> Decoded<E::Small, Cow<'enc, E::Big>> {
         self.0.into_decoded()
     }
 
-    fn decode<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
+    fn decode<'a>(&'a self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
         self.0.decode()
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Decode<'a, E::Small> for &Int<'a, E> {
-    fn into_decoded(self) -> Decoded<E::Small, Cow<'a, E::Big>> {
+impl<'enc, E> Decode<'enc, E::Small> for &Int<'enc, E>
+where
+    E: Encoding<'enc, Big = BigInt>,
+{
+    fn into_decoded(self) -> Decoded<E::Small, Cow<'enc, E::Big>> {
         self.0.clone().into_decoded()
     }
 
-    fn decode<'b>(&'b self) -> Decoded<E::Small, Cow<'b, <E::Small as SmallNumber>::Big>> {
+    fn decode<'a>(&'a self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
         self.0.decode()
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Encode<'a, E::Small> for Int<'a, E> {
+impl<'enc, E> Encode<'enc, E::Small> for Int<'enc, E>
+where
+    E: Encoding<'enc, Big = BigInt>,
+{
     fn from_small(s: E::Small) -> Self {
         Self::from_encoding(E::from_small(s))
     }
 
-    fn from_big_cow(b: Cow<'a, E::Big>) -> Self {
+    fn from_big_cow(b: Cow<'enc, E::Big>) -> Self {
         Self::from_encoding(E::from_big_cow(b))
     }
 }
 
-impl<'a, E: Encoding<'a, Big = BigInt>> Encoding<'a> for Int<'a, E> {
+impl<'enc, E> Encoding<'enc> for Int<'enc, E>
+where
+    E: Encoding<'enc, Big = BigInt>,
+{
     type Small = E::Small;
     type Big = E::Big;
-    type Unsigned = Uint<'a, E::Unsigned>;
+    type Unsigned = Uint<'enc, E::Unsigned>;
     type Static = Int<'static, E::Static>;
-    type WithLifetime<'b>
-        = Int<'b, E::WithLifetime<'b>>
+    type WithLifetime<'a>
+        = Int<'a, E::WithLifetime<'a>>
     where
-        Self: 'b,
-        'a: 'b;
+        Self: 'a,
+        'enc: 'a;
 
     const ZERO: Self = Self::ZERO;
 
-    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
     where
-        Self: 'b,
-        'a: 'b,
+        Self: 'a,
+        'enc: 'a,
     {
         Int::from_encoding(self.0.borrow())
     }

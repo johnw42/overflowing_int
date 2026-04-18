@@ -13,9 +13,14 @@ use std::fmt::Debug;
 /// content of `CBigInt` and `CBigUint`, which implement high-level operations
 /// and traits.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CowEncoding<'a, S: SmallNumber>(Decoded<S, Cow<'a, S::Big>>);
+pub struct CowEncoding<'enc, S>(Decoded<S, Cow<'enc, S::Big>>)
+where
+    S: SmallNumber;
 
-impl<'a, S: SmallNumber> CowEncoding<'a, S> {
+impl<'enc, S> CowEncoding<'enc, S>
+where
+    S: SmallNumber,
+{
     fn normalize(&mut self) {
         if let Decoded::Big(big) = &self.0
             && let Some(small) = S::try_from(big.as_ref()).ok()
@@ -25,22 +30,22 @@ impl<'a, S: SmallNumber> CowEncoding<'a, S> {
     }
 }
 
-impl<'a, S> Decode<'a, S> for CowEncoding<'a, S>
+impl<'enc, S> Decode<'enc, S> for CowEncoding<'enc, S>
 where
     S: SmallNumber,
 {
-    fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>> {
+    fn into_decoded(self) -> Decoded<S, Cow<'enc, S::Big>> {
         self.0
     }
 
-    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+    fn decode<'a>(&'a self) -> Decoded<S, Cow<'a, <S as SmallNumber>::Big>> {
         match &self.0 {
             Decoded::Small(s) => Decoded::Small(*s),
             Decoded::Big(b) => Decoded::Big(Cow::Borrowed(b.as_ref())),
         }
     }
 
-    fn big_cow<'b>(&'b self) -> Cow<'b, <S as SmallNumber>::Big> {
+    fn big_cow<'a>(&'a self) -> Cow<'a, <S as SmallNumber>::Big> {
         match &self.0 {
             Decoded::Small(s) => Cow::Owned(S::to_big(*s)),
             Decoded::Big(b) => Cow::Borrowed(b.as_ref()),
@@ -48,7 +53,7 @@ where
     }
 }
 
-impl<'a, S> Encode<'a, S> for CowEncoding<'a, S>
+impl<'enc, S> Encode<'enc, S> for CowEncoding<'enc, S>
 where
     S: SmallNumber,
 {
@@ -56,28 +61,31 @@ where
         Self(Decoded::Small(s))
     }
 
-    fn from_big_cow(b: Cow<'a, S::Big>) -> Self {
+    fn from_big_cow(b: Cow<'enc, S::Big>) -> Self {
         let mut r = Self(Decoded::Big(b));
         r.normalize();
         r
     }
 }
 
-impl<'a, S: SmallNumber> Encoding<'a> for CowEncoding<'a, S> {
+impl<'enc, S> Encoding<'enc> for CowEncoding<'enc, S>
+where
+    S: SmallNumber,
+{
     type Small = S;
     type Big = S::Big;
-    type Unsigned = CowEncoding<'a, S::Unsigned>;
+    type Unsigned = CowEncoding<'enc, S::Unsigned>;
     type Static = CowEncoding<'static, S>;
-    type WithLifetime<'b>
-        = CowEncoding<'b, S>
+    type WithLifetime<'a>
+        = CowEncoding<'a, S>
     where
-        'a: 'b;
+        'enc: 'a;
 
     const ZERO: Self = Self(Decoded::Small(S::ZERO));
 
-    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
     where
-        'a: 'b,
+        'enc: 'a,
     {
         match &self.0 {
             Decoded::Small(s) => CowEncoding(Decoded::Small(*s)),
@@ -85,7 +93,7 @@ impl<'a, S: SmallNumber> Encoding<'a> for CowEncoding<'a, S> {
         }
     }
 
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<'a, Self::Big>>)) {
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<'enc, Self::Big>>)) {
         f(&mut self.0);
         self.normalize();
     }
@@ -99,7 +107,10 @@ impl<'a, S: SmallNumber> Encoding<'a> for CowEncoding<'a, S> {
 }
 
 #[cfg(any(test, feature = "quickcheck"))]
-impl<S: SmallNumber> quickcheck::Arbitrary for CowEncoding<'static, S> {
+impl<S> quickcheck::Arbitrary for CowEncoding<'static, S>
+where
+    S: SmallNumber,
+{
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         if bool::arbitrary(g) {
             Self(Decoded::Small(<S as quickcheck::Arbitrary>::arbitrary(g)))
@@ -112,7 +123,10 @@ impl<S: SmallNumber> quickcheck::Arbitrary for CowEncoding<'static, S> {
 }
 
 #[cfg(feature = "arbitrary")]
-impl<S: SmallNumber> arbitrary::Arbitrary<'_> for CowEncoding<'static, S> {
+impl<S> arbitrary::Arbitrary<'_> for CowEncoding<'static, S>
+where
+    S: SmallNumber,
+{
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         if bool::arbitrary(u)? {
             Ok(Self(Decoded::Small(

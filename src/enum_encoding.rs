@@ -5,7 +5,6 @@ use crate::encoding::Encoding;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
-use std::marker::PhantomData;
 
 /// A wrapper type around `Encoding` that maintains the the invariant that
 /// values that can be represented as `SmallInt` or `SmallUint` are always
@@ -14,9 +13,14 @@ use std::marker::PhantomData;
 /// content of `CBigInt` and `CBigUint`, which implement high-level operations
 /// and traits.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct EnumEncoding<'a, S: SmallNumber>(Decoded<S, S::Big>, PhantomData<&'a ()>);
+pub struct EnumEncoding<S>(Decoded<S, S::Big>)
+where
+    S: SmallNumber;
 
-impl<'a, S: SmallNumber> EnumEncoding<'a, S> {
+impl<S> EnumEncoding<S>
+where
+    S: SmallNumber,
+{
     fn normalize(&mut self) {
         if let Decoded::Big(big) = &self.0
             && let Some(small) = S::try_from(big).ok()
@@ -26,25 +30,25 @@ impl<'a, S: SmallNumber> EnumEncoding<'a, S> {
     }
 }
 
-impl<'a, S> Decode<'a, S> for EnumEncoding<'a, S>
+impl<'enc, S> Decode<'enc, S> for EnumEncoding<S>
 where
     S: SmallNumber,
 {
-    fn into_decoded(self) -> Decoded<S, Cow<'a, S::Big>> {
+    fn into_decoded(self) -> Decoded<S, Cow<'enc, S::Big>> {
         match self.0 {
             Decoded::Small(s) => Decoded::Small(s),
             Decoded::Big(b) => Decoded::Big(Cow::Owned(b)),
         }
     }
 
-    fn decode<'b>(&'b self) -> Decoded<S, Cow<'b, <S as SmallNumber>::Big>> {
+    fn decode<'a>(&'a self) -> Decoded<S, Cow<'a, <S as SmallNumber>::Big>> {
         match &self.0 {
             Decoded::Small(s) => Decoded::Small(*s),
             Decoded::Big(b) => Decoded::Big(Cow::Borrowed(b)),
         }
     }
 
-    fn big_cow<'b>(&'b self) -> Cow<'b, <S as SmallNumber>::Big> {
+    fn big_cow<'a>(&'a self) -> Cow<'a, <S as SmallNumber>::Big> {
         match &self.0 {
             Decoded::Small(s) => Cow::Owned(S::to_big(*s)),
             Decoded::Big(b) => Cow::Borrowed(b),
@@ -52,40 +56,43 @@ where
     }
 }
 
-impl<'a, S> Encode<'a, S> for EnumEncoding<'a, S>
+impl<'enc, S> Encode<'enc, S> for EnumEncoding<S>
 where
     S: SmallNumber,
 {
     fn from_small(s: S) -> Self {
-        Self(Decoded::Small(s), PhantomData)
+        Self(Decoded::Small(s))
     }
 
-    fn from_big_cow(b: Cow<'a, S::Big>) -> Self {
-        let mut r = Self(Decoded::Big(b.into_owned()), PhantomData);
+    fn from_big_cow(b: Cow<'enc, S::Big>) -> Self {
+        let mut r = Self(Decoded::Big(b.into_owned()));
         r.normalize();
         r
     }
 }
 
-impl<'a, S: SmallNumber> Encoding<'a> for EnumEncoding<'a, S> {
+impl<'enc, S> Encoding<'enc> for EnumEncoding<S>
+where
+    S: SmallNumber,
+{
     type Small = S;
     type Big = S::Big;
-    type Unsigned = EnumEncoding<'a, S::Unsigned>;
-    type Static = EnumEncoding<'static, S>;
-    type WithLifetime<'b>
-        = EnumEncoding<'b, S>
+    type Unsigned = EnumEncoding<S::Unsigned>;
+    type Static = EnumEncoding<S>;
+    type WithLifetime<'a>
+        = EnumEncoding<S>
     where
-        'a: 'b;
+        'enc: 'a;
 
-    const ZERO: Self = Self(Decoded::Small(S::ZERO), PhantomData);
+    const ZERO: Self = Self(Decoded::Small(S::ZERO));
 
-    fn borrow<'b>(&'b self) -> Self::WithLifetime<'b>
+    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
     where
-        'a: 'b,
+        'enc: 'a,
     {
         match &self.0 {
-            Decoded::Small(s) => EnumEncoding(Decoded::Small(*s), PhantomData),
-            Decoded::Big(b) => EnumEncoding(Decoded::Big(b.clone()), PhantomData),
+            Decoded::Small(s) => EnumEncoding(Decoded::Small(*s)),
+            Decoded::Big(b) => EnumEncoding(Decoded::Big(b.clone())),
         }
     }
 
@@ -105,43 +112,40 @@ impl<'a, S: SmallNumber> Encoding<'a> for EnumEncoding<'a, S> {
     }
 
     fn into_static(self) -> Self::Static {
-        match self.0 {
-            Decoded::Small(s) => EnumEncoding(Decoded::Small(s), PhantomData),
-            Decoded::Big(b) => EnumEncoding(Decoded::Big(b), PhantomData),
-        }
+        self
     }
 }
 
 #[cfg(any(test, feature = "quickcheck"))]
-impl<S: SmallNumber> quickcheck::Arbitrary for EnumEncoding<'static, S> {
+impl<S> quickcheck::Arbitrary for EnumEncoding<S>
+where
+    S: SmallNumber,
+{
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         if bool::arbitrary(g) {
-            Self(
-                Decoded::Small(<S as quickcheck::Arbitrary>::arbitrary(g)),
-                PhantomData,
-            )
+            Self(Decoded::Small(<S as quickcheck::Arbitrary>::arbitrary(g)))
         } else {
-            Self(
-                Decoded::Big(<S::Big as quickcheck::Arbitrary>::arbitrary(g)),
-                PhantomData,
-            )
+            Self(Decoded::Big(<S::Big as quickcheck::Arbitrary>::arbitrary(
+                g,
+            )))
         }
     }
 }
 
 #[cfg(feature = "arbitrary")]
-impl<S: SmallNumber> arbitrary::Arbitrary<'_> for EnumEncoding<'static, S> {
+impl<S> arbitrary::Arbitrary<'_> for EnumEncoding<S>
+where
+    S: SmallNumber,
+{
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         if bool::arbitrary(u)? {
-            Ok(Self(
-                Decoded::Small(<S as arbitrary::Arbitrary>::arbitrary(u)?),
-                PhantomData,
-            ))
+            Ok(Self(Decoded::Small(
+                <S as arbitrary::Arbitrary>::arbitrary(u)?,
+            )))
         } else {
-            Ok(Self(
-                Decoded::Big(<S::Big as arbitrary::Arbitrary>::arbitrary(u)?),
-                PhantomData,
-            ))
+            Ok(Self(Decoded::Big(
+                <S::Big as arbitrary::Arbitrary>::arbitrary(u)?,
+            )))
         }
     }
 }

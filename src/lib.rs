@@ -67,20 +67,20 @@ mod trait_impl_tests;
 mod trait_impls;
 pub mod unsigned;
 
-pub type ArcBigInt = Int<'static, ArcEncoding<'static, i128>>;
-pub type ArcBigUint = Uint<'static, ArcEncoding<'static, u128>>;
-pub type ArcBigIsize = Int<'static, ArcEncoding<'static, isize>>;
-pub type ArcBigUsize = Uint<'static, ArcEncoding<'static, usize>>;
-pub type BoxBigInt = Int<'static, BoxEncoding<'static, isize>>;
-pub type BoxBigUint = Uint<'static, BoxEncoding<'static, usize>>;
+pub type ArcBigInt = Int<'static, ArcEncoding<i128>>;
+pub type ArcBigUint = Uint<'static, ArcEncoding<u128>>;
+pub type ArcBigIsize = Int<'static, ArcEncoding<isize>>;
+pub type ArcBigUsize = Uint<'static, ArcEncoding<usize>>;
+pub type BoxBigInt = Int<'static, BoxEncoding<isize>>;
+pub type BoxBigUint = Uint<'static, BoxEncoding<usize>>;
 pub type CowBigInt<'a> = Int<'a, CowEncoding<'a, i128>>;
 pub type CowBigUint<'a> = Uint<'a, CowEncoding<'a, u128>>;
-pub type EnumBigInt = Int<'static, EnumEncoding<'static, i128>>;
-pub type EnumBigUint = Uint<'static, EnumEncoding<'static, u128>>;
-pub type RcBigInt = Int<'static, RcEncoding<'static, i128>>;
-pub type RcBigUint = Uint<'static, RcEncoding<'static, u128>>;
-pub type RcBigIsize = Int<'static, RcEncoding<'static, isize>>;
-pub type RcBigUsize = Uint<'static, RcEncoding<'static, usize>>;
+pub type EnumBigInt = Int<'static, EnumEncoding<i128>>;
+pub type EnumBigUint = Uint<'static, EnumEncoding<u128>>;
+pub type RcBigInt = Int<'static, RcEncoding<i128>>;
+pub type RcBigUint = Uint<'static, RcEncoding<u128>>;
+pub type RcBigIsize = Int<'static, RcEncoding<isize>>;
+pub type RcBigUsize = Uint<'static, RcEncoding<usize>>;
 
 // Only for benchmarking, not for general use.
 #[doc(hidden)]
