@@ -61,16 +61,16 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// assert_eq!(RcBigUint::from_bytes_be(b"A"),
-    ///            RcBigUint::parse_bytes(b"65", 10).unwrap());
-    /// assert_eq!(RcBigUint::from_bytes_be(b"AA"),
-    ///            RcBigUint::parse_bytes(b"16705", 10).unwrap());
-    /// assert_eq!(RcBigUint::from_bytes_be(b"AB"),
-    ///            RcBigUint::parse_bytes(b"16706", 10).unwrap());
-    /// assert_eq!(RcBigUint::from_bytes_be(b"Hello world!"),
-    ///            RcBigUint::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
+    /// assert_eq!(EnumBigUint::from_bytes_be(b"A"),
+    ///            EnumBigUint::parse_bytes(b"65", 10).unwrap());
+    /// assert_eq!(EnumBigUint::from_bytes_be(b"AA"),
+    ///            EnumBigUint::parse_bytes(b"16705", 10).unwrap());
+    /// assert_eq!(EnumBigUint::from_bytes_be(b"AB"),
+    ///            EnumBigUint::parse_bytes(b"16706", 10).unwrap());
+    /// assert_eq!(EnumBigUint::from_bytes_be(b"Hello world!"),
+    ///            EnumBigUint::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     #[inline]
     pub fn from_bytes_be(bytes: &[u8]) -> Uint<'a, E> {
@@ -101,11 +101,11 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// assert_eq!(RcBigUint::parse_bytes(b"1234", 10), Some(RcBigUint::from(1234u32)));
-    /// assert_eq!(RcBigUint::parse_bytes(b"ABCD", 16), Some(RcBigUint::from(0xABCDu32)));
-    /// assert_eq!(RcBigUint::parse_bytes(b"G", 16), None);
+    /// assert_eq!(EnumBigUint::parse_bytes(b"1234", 10), Some(EnumBigUint::from(1234u32)));
+    /// assert_eq!(EnumBigUint::parse_bytes(b"ABCD", 16), Some(EnumBigUint::from(0xABCDu32)));
+    /// assert_eq!(EnumBigUint::parse_bytes(b"G", 16), None);
     /// ```
     #[inline]
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
@@ -122,10 +122,10 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
     /// let inbase190 = &[15, 33, 125, 12, 14];
-    /// let a = RcBigUint::from_radix_be(inbase190, 190).unwrap();
+    /// let a = EnumBigUint::from_radix_be(inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_be(190), inbase190);
     /// ```
     pub fn from_radix_be(buf: &[u8], radix: u32) -> Option<Self> {
@@ -144,10 +144,10 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
     /// let inbase190 = &[14, 12, 125, 33, 15];
-    /// let a = RcBigUint::from_radix_le(inbase190, 190).unwrap();
+    /// let a = EnumBigUint::from_radix_le(inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_le(190), inbase190);
     /// ```
     pub fn from_radix_le(buf: &[u8], radix: u32) -> Option<Uint<'a, E>> {
@@ -161,9 +161,9 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// let i = RcBigUint::parse_bytes(b"1125", 10).unwrap();
+    /// let i = EnumBigUint::parse_bytes(b"1125", 10).unwrap();
     /// assert_eq!(i.to_bytes_be(), vec![4, 101]);
     /// ```
     #[inline]
@@ -176,9 +176,9 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// let i = RcBigUint::parse_bytes(b"1125", 10).unwrap();
+    /// let i = EnumBigUint::parse_bytes(b"1125", 10).unwrap();
     /// assert_eq!(i.to_bytes_le(), vec![101, 4]);
     /// ```
     #[inline]
@@ -192,12 +192,12 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// assert_eq!(RcBigUint::from(1125u32).to_u32_digits(), vec![1125]);
-    /// assert_eq!(RcBigUint::from(4294967295u32).to_u32_digits(), vec![4294967295]);
-    /// assert_eq!(RcBigUint::from(4294967296u64).to_u32_digits(), vec![0, 1]);
-    /// assert_eq!(RcBigUint::from(112500000000u64).to_u32_digits(), vec![830850304, 26]);
+    /// assert_eq!(EnumBigUint::from(1125u32).to_u32_digits(), vec![1125]);
+    /// assert_eq!(EnumBigUint::from(4294967295u32).to_u32_digits(), vec![4294967295]);
+    /// assert_eq!(EnumBigUint::from(4294967296u64).to_u32_digits(), vec![0, 1]);
+    /// assert_eq!(EnumBigUint::from(112500000000u64).to_u32_digits(), vec![830850304, 26]);
     /// ```
     #[inline]
     pub fn to_u32_digits(&self) -> Vec<u32> {
@@ -210,13 +210,13 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// assert_eq!(RcBigUint::from(1125u32).to_u64_digits(), vec![1125]);
-    /// assert_eq!(RcBigUint::from(4294967295u32).to_u64_digits(), vec![4294967295]);
-    /// assert_eq!(RcBigUint::from(4294967296u64).to_u64_digits(), vec![4294967296]);
-    /// assert_eq!(RcBigUint::from(112500000000u64).to_u64_digits(), vec![112500000000]);
-    /// assert_eq!(RcBigUint::from(1u128 << 64).to_u64_digits(), vec![0, 1]);
+    /// assert_eq!(EnumBigUint::from(1125u32).to_u64_digits(), vec![1125]);
+    /// assert_eq!(EnumBigUint::from(4294967295u32).to_u64_digits(), vec![4294967295]);
+    /// assert_eq!(EnumBigUint::from(4294967296u64).to_u64_digits(), vec![4294967296]);
+    /// assert_eq!(EnumBigUint::from(112500000000u64).to_u64_digits(), vec![112500000000]);
+    /// assert_eq!(EnumBigUint::from(1u128 << 64).to_u64_digits(), vec![0, 1]);
     /// ```
     #[inline]
     pub fn to_u64_digits(&self) -> Vec<u64> {
@@ -229,12 +229,12 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// assert_eq!(RcBigUint::from(1125u32).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
-    /// assert_eq!(RcBigUint::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
-    /// assert_eq!(RcBigUint::from(4294967296u64).iter_u32_digits().collect::<Vec<u32>>(), vec![0, 1]);
-    /// assert_eq!(RcBigUint::from(112500000000u64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
+    /// assert_eq!(EnumBigUint::from(1125u32).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
+    /// assert_eq!(EnumBigUint::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
+    /// assert_eq!(EnumBigUint::from(4294967296u64).iter_u32_digits().collect::<Vec<u32>>(), vec![0, 1]);
+    /// assert_eq!(EnumBigUint::from(112500000000u64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
     /// ```
     #[inline]
     pub fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
@@ -247,13 +247,13 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// assert_eq!(RcBigUint::from(1125u32).iter_u64_digits().collect::<Vec<u64>>(), vec![1125]);
-    /// assert_eq!(RcBigUint::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295]);
-    /// assert_eq!(RcBigUint::from(4294967296u64).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967296]);
-    /// assert_eq!(RcBigUint::from(112500000000u64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000]);
-    /// assert_eq!(RcBigUint::from(1u128 << 64).iter_u64_digits().collect::<Vec<u64>>(), vec![0, 1]);
+    /// assert_eq!(EnumBigUint::from(1125u32).iter_u64_digits().collect::<Vec<u64>>(), vec![1125]);
+    /// assert_eq!(EnumBigUint::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295]);
+    /// assert_eq!(EnumBigUint::from(4294967296u64).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967296]);
+    /// assert_eq!(EnumBigUint::from(112500000000u64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000]);
+    /// assert_eq!(EnumBigUint::from(1u128 << 64).iter_u64_digits().collect::<Vec<u64>>(), vec![0, 1]);
     /// ```
     #[inline]
     pub fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
@@ -266,9 +266,9 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// let i = RcBigUint::parse_bytes(b"ff", 16).unwrap();
+    /// let i = EnumBigUint::parse_bytes(b"ff", 16).unwrap();
     /// assert_eq!(i.to_str_radix(16), "ff");
     /// ```
     #[inline]
@@ -284,9 +284,9 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// assert_eq!(RcBigUint::from(0xFFFFu64).to_radix_be(159),
+    /// assert_eq!(EnumBigUint::from(0xFFFFu64).to_radix_be(159),
     ///            vec![2, 94, 27]);
     /// // 0xFFFF = 65535 = 2*(159^2) + 94*159 + 27
     /// ```
@@ -303,9 +303,9 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     ///
-    /// assert_eq!(RcBigUint::from(0xFFFFu64).to_radix_le(159),
+    /// assert_eq!(EnumBigUint::from(0xFFFFu64).to_radix_le(159),
     ///            vec![27, 94, 2]);
     /// // 0xFFFF = 65535 = 27 + 94*159 + 2*(159^2)
     /// ```
@@ -338,20 +338,20 @@ impl<'a, E: Encoding<'a, Big = BigUint>> Uint<'a, E> {
     /// The solution exists if and only if `gcd(self, modulus) == 1`.
     ///
     /// ```
-    /// use compact_bigint::RcBigUint;
+    /// use compact_bigint::EnumBigUint;
     /// use num_traits::{One, Zero};
     ///
-    /// let m = RcBigUint::from(383_u32);
+    /// let m = EnumBigUint::from(383_u32);
     ///
     /// // Trivial cases
-    /// assert_eq!(RcBigUint::zero().modinv(&m), None);
-    /// assert_eq!(RcBigUint::one().modinv(&m), Some(RcBigUint::one()));
+    /// assert_eq!(EnumBigUint::zero().modinv(&m), None);
+    /// assert_eq!(EnumBigUint::one().modinv(&m), Some(EnumBigUint::one()));
     /// let neg1 = &m - 1u32;
     /// assert_eq!(neg1.modinv(&m), Some(neg1));
     ///
-    /// let a = RcBigUint::from(271_u32);
+    /// let a = EnumBigUint::from(271_u32);
     /// let x = a.modinv(&m).unwrap();
-    /// assert_eq!(x, RcBigUint::from(106_u32));
+    /// assert_eq!(x, EnumBigUint::from(106_u32));
     /// assert_eq!(x.modinv(&m).unwrap(), a);
     /// assert!((a * x % m).is_one());
     /// ```

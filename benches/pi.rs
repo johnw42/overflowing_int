@@ -8,7 +8,7 @@ use criterion::{
 };
 
 use compact_bigint::{
-    ArcBigInt, ArcBigIsize, BorrowBignum, BoxBigInt, CowBigInt, RcBigInt, RcBigIsize,
+    ArcBigInt, ArcBigIsize, BorrowBignum, BoxBigInt, CowBigInt, EnumBigInt, RcBigInt, RcBigIsize,
     bench::IdentityBigInt,
 };
 use num_bigint::BigInt;
@@ -27,6 +27,7 @@ macro_rules! duplicate_bigint_types {
                 [Identity]    [IdentityBigInt::<lifetime>];
                 [Rc]          [RcBigInt];
                 [RcSize]      [RcBigIsize];
+                [Enum]        [EnumBigInt];
                 [Control]     [BigInt];
             ]
             $($body)*

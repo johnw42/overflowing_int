@@ -25,6 +25,7 @@ macro_rules! duplicate_bigint_types {
                 [Identity]    [IdentityBigInt::<'static>];
                 [Rc]          [RcBigInt];
                 [RcSize]      [RcBigIsize];
+                [Enum]        [EnumBigInt];
                 [Control]     [BigInt];
             ]
             $($body)*

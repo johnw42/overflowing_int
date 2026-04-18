@@ -1,3 +1,5 @@
+#![doc(hidden)]
+
 #[macro_export]
 macro_rules! duplicate_unsigned_encoded_types {
     ($($body:tt)*) => {
@@ -10,6 +12,7 @@ macro_rules! duplicate_unsigned_encoded_types {
                 [false]    [unsigned]  [BigUint]  [arc_unsigned]      [$crate::ArcBigUint];
                 [false]    [unsigned]  [BigUint]  [identity_unsigned] [$crate::bench::IdentityBigUint::<'static>];
                 [false]    [unsigned]  [BigUint]  [box_unsigned]      [$crate::BoxBigUint];
+                [false]    [unsigned]  [BigUint]  [enum_unsigned]     [$crate::EnumBigUint];
             ]
             $($body)*
         }
@@ -28,6 +31,7 @@ macro_rules! duplicate_signed_encoded_types {
                 [true]     [signed]    [BigInt]  [arc_signed]      [$crate::ArcBigInt];
                 [true]     [signed]    [BigInt]  [identity_signed] [$crate::bench::IdentityBigInt::<'static>];
                 [true]     [signed]    [BigInt]  [box_signed]      [$crate::BoxBigInt];
+                [true]     [signed]    [BigInt]  [enum_signed]     [$crate::EnumBigInt];
             ]
             $($body)*
         }

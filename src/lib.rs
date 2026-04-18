@@ -43,7 +43,7 @@ pub use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUin
 
 use crate::{
     arc_encoding::ArcEncoding, box_encoding::BoxEncoding, cow_encoding::CowEncoding,
-    rc_encoding::RcEncoding, signed::Int, unsigned::Uint,
+    enum_encoding::EnumEncoding, rc_encoding::RcEncoding, signed::Int, unsigned::Uint,
 };
 
 pub mod arc_encoding;
@@ -54,6 +54,7 @@ mod box_encoding;
 mod convert;
 pub mod cow_encoding;
 mod encoding;
+mod enum_encoding;
 pub mod identity_encoding;
 mod macros;
 mod num_ops;
@@ -66,20 +67,20 @@ mod trait_impl_tests;
 mod trait_impls;
 pub mod unsigned;
 
-pub type CowBigInt<'a> = Int<'a, CowEncoding<'a, i128>>;
-pub type CowBigUint<'a> = Uint<'a, CowEncoding<'a, u128>>;
-pub type RcBigInt = Int<'static, RcEncoding<'static, i128>>;
-pub type RcBigUint = Uint<'static, RcEncoding<'static, u128>>;
-pub type RcBigIsize = Int<'static, RcEncoding<'static, isize>>;
-pub type RcBigUsize = Uint<'static, RcEncoding<'static, usize>>;
 pub type ArcBigInt = Int<'static, ArcEncoding<'static, i128>>;
 pub type ArcBigUint = Uint<'static, ArcEncoding<'static, u128>>;
 pub type ArcBigIsize = Int<'static, ArcEncoding<'static, isize>>;
 pub type ArcBigUsize = Uint<'static, ArcEncoding<'static, usize>>;
-pub type BoxBigInt = Int<'static, BoxEncoding<'static, i128>>;
-pub type BoxBigUint = Uint<'static, BoxEncoding<'static, u128>>;
-pub type BoxBigIsize = Int<'static, BoxEncoding<'static, isize>>;
-pub type BoxBigUsize = Uint<'static, BoxEncoding<'static, usize>>;
+pub type BoxBigInt = Int<'static, BoxEncoding<'static, isize>>;
+pub type BoxBigUint = Uint<'static, BoxEncoding<'static, usize>>;
+pub type CowBigInt<'a> = Int<'a, CowEncoding<'a, i128>>;
+pub type CowBigUint<'a> = Uint<'a, CowEncoding<'a, u128>>;
+pub type EnumBigInt = Int<'static, EnumEncoding<'static, i128>>;
+pub type EnumBigUint = Uint<'static, EnumEncoding<'static, u128>>;
+pub type RcBigInt = Int<'static, RcEncoding<'static, i128>>;
+pub type RcBigUint = Uint<'static, RcEncoding<'static, u128>>;
+pub type RcBigIsize = Int<'static, RcEncoding<'static, isize>>;
+pub type RcBigUsize = Uint<'static, RcEncoding<'static, usize>>;
 
 // Only for benchmarking, not for general use.
 #[doc(hidden)]

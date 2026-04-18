@@ -4,7 +4,10 @@ use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::signed::Int;
 use crate::small_num::SmallNumber;
 use crate::unsigned::Uint;
-use crate::{CowBigInt, CowBigUint, RcBigInt, RcBigUint, duplicate_encoded_types};
+use crate::{
+    CowBigInt, CowBigUint, RcBigInt, RcBigUint, duplicate_encoded_types,
+    duplicate_signed_encoded_types,
+};
 use crate::{duplicate_iprims, duplicate_prims, duplicate_uprims};
 use duplicate::duplicate_item;
 use num_bigint::{
@@ -382,103 +385,101 @@ duplicate_encoded_types! { mod encoding_tag {
     } }
 } }
 
-#[duplicate_item(
-    mod_name         EncodedType;
-    [signed_cow_ops] [CowBigInt];
-    [signed_rc_ops]  [RcBigInt];
-)]
-mod mod_name {
-    use quickcheck_macros::quickcheck;
+mod signed {
+    crate::duplicate_signed_encoded_types! {
+    mod encoding_tag {
+        use quickcheck_macros::quickcheck;
 
-    use super::*;
+        use super::super::*;
 
-    //
-    // CheckedEuclid
-    //
+        //
+        // CheckedEuclid
+        //
 
-    #[quickcheck]
-    fn test_checked_div_euclid(a: BigInt, b: BigInt) -> TestResult {
-        TestResult::from_bool(
-            CheckedEuclid::checked_div_euclid(&a, &b)
-                == CheckedEuclid::checked_div_euclid(&EncodedType::from(a), &EncodedType::from(b))
-                    .map(Into::into),
-        )
-    }
-
-    #[quickcheck]
-    fn test_checked_rem_euclid(a: BigInt, b: BigInt) -> TestResult {
-        TestResult::from_bool(
-            CheckedEuclid::checked_rem_euclid(&a, &b)
-                == CheckedEuclid::checked_rem_euclid(&EncodedType::from(a), &EncodedType::from(b))
-                    .map(Into::into),
-        )
-    }
-
-    //
-    // Euclid
-    //
-
-    #[quickcheck]
-    fn test_div_euclid(a: BigInt, b: BigInt) -> TestResult {
-        if b.is_zero() {
-            return TestResult::discard();
+        #[quickcheck]
+        fn test_checked_div_euclid(a: BigInt, b: BigInt) -> TestResult {
+            TestResult::from_bool(
+                CheckedEuclid::checked_div_euclid(&a, &b)
+                    == CheckedEuclid::checked_div_euclid(&EncodedType::from(a), &EncodedType::from(b))
+                        .map(Into::into),
+            )
         }
-        TestResult::from_bool(
-            Euclid::div_euclid(&a, &b)
-                == Euclid::div_euclid(&EncodedType::from(a), &EncodedType::from(b)).into(),
-        )
-    }
 
-    #[quickcheck]
-    fn test_rem_euclid(a: BigInt, b: BigInt) -> TestResult {
-        if b.is_zero() {
-            return TestResult::discard();
+        #[quickcheck]
+        fn test_checked_rem_euclid(a: BigInt, b: BigInt) -> TestResult {
+            TestResult::from_bool(
+                CheckedEuclid::checked_rem_euclid(&a, &b)
+                    == CheckedEuclid::checked_rem_euclid(&EncodedType::from(a), &EncodedType::from(b))
+                        .map(Into::into),
+            )
         }
-        TestResult::from_bool(
-            Euclid::rem_euclid(&a, &b)
-                == Euclid::rem_euclid(&EncodedType::from(a), &EncodedType::from(b)).into(),
-        )
-    }
 
-    //
-    // Neg
-    //
+        //
+        // Euclid
+        //
 
-    #[quickcheck]
-    fn test_neg(n: BigInt) -> bool {
-        -n.clone() == (-EncodedType::from(n)).into()
-    }
+        #[quickcheck]
+        fn test_div_euclid(a: BigInt, b: BigInt) -> TestResult {
+            if b.is_zero() {
+                return TestResult::discard();
+            }
+            TestResult::from_bool(
+                Euclid::div_euclid(&a, &b)
+                    == Euclid::div_euclid(&EncodedType::from(a), &EncodedType::from(b)).into(),
+            )
+        }
 
-    //
-    // Not
-    //
+        #[quickcheck]
+        fn test_rem_euclid(a: BigInt, b: BigInt) -> TestResult {
+            if b.is_zero() {
+                return TestResult::discard();
+            }
+            TestResult::from_bool(
+                Euclid::rem_euclid(&a, &b)
+                    == Euclid::rem_euclid(&EncodedType::from(a), &EncodedType::from(b)).into(),
+            )
+        }
 
-    #[quickcheck]
-    fn test_not(n: BigInt) -> bool {
-        !n.clone() == (!EncodedType::from(n)).into()
-    }
+        //
+        // Neg
+        //
 
-    //
-    // Signed
-    //
+        #[quickcheck]
+        fn test_neg(n: BigInt) -> bool {
+            -n.clone() == (-EncodedType::from(n)).into()
+        }
 
-    #[quickcheck]
-    fn test_abs(n: BigInt) -> bool {
-        Signed::abs(&n) == Signed::abs(&EncodedType::from(n)).into()
-    }
+        //
+        // Not
+        //
 
-    #[quickcheck]
-    fn test_signum(n: BigInt) -> bool {
-        Signed::signum(&n) == Signed::signum(&EncodedType::from(n)).into()
-    }
+        #[quickcheck]
+        fn test_not(n: BigInt) -> bool {
+            !n.clone() == (!EncodedType::from(n)).into()
+        }
 
-    #[quickcheck]
-    fn test_is_positive(n: BigInt) -> bool {
-        Signed::is_positive(&n) == Signed::is_positive(&EncodedType::from(n))
-    }
+        //
+        // Signed
+        //
 
-    #[quickcheck]
-    fn test_is_negative(n: BigInt) -> bool {
-        Signed::is_negative(&n) == Signed::is_negative(&EncodedType::from(n))
-    }
+        #[quickcheck]
+        fn test_abs(n: BigInt) -> bool {
+            Signed::abs(&n) == Signed::abs(&EncodedType::from(n)).into()
+        }
+
+        #[quickcheck]
+        fn test_signum(n: BigInt) -> bool {
+            Signed::signum(&n) == Signed::signum(&EncodedType::from(n)).into()
+        }
+
+        #[quickcheck]
+        fn test_is_positive(n: BigInt) -> bool {
+            Signed::is_positive(&n) == Signed::is_positive(&EncodedType::from(n))
+        }
+
+        #[quickcheck]
+        fn test_is_negative(n: BigInt) -> bool {
+            Signed::is_negative(&n) == Signed::is_negative(&EncodedType::from(n))
+        }
+    } }
 }
