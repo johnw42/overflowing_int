@@ -154,12 +154,12 @@ pub mod mod_name {
     }
 
     //
-    // CheckedSub
+    // ConstZero
     //
 
     impl<'enc, E> ConstZero for GenericBigNumType<'enc, E>
     where
-        E: Encoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType, Owned = E>,
     {
         const ZERO: Self = Self::ZERO;
     }

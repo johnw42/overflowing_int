@@ -2,16 +2,11 @@ use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encode;
 use crate::encoding::Encoding;
+use crate::encoding::EncodingMut;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
 
-/// A wrapper type around `Encoding` that maintains the the invariant that
-/// values that can be represented as `SmallInt` or `SmallUint` are always
-/// stored as such, and only values that cannot be represented as `SmallInt` or
-/// `SmallUint` are stored as `BigInt` or `BigUint`.  This type, in turn, is the
-/// content of `CBigInt` and `CBigUint`, which implement high-level operations
-/// and traits.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CowEncoding<'enc, S>(Decoded<S, Cow<'enc, S::Big>>)
 where
@@ -25,8 +20,8 @@ where
         if let Decoded::Big(big) = &self.0
             && let Some(small) = S::try_from(big.as_ref()).ok()
         {
-            self.0 = Decoded::Small(small);
-        };
+            *self = Self(Decoded::Small(small));
+        }
     }
 }
 
@@ -61,10 +56,16 @@ where
         Self(Decoded::Small(s))
     }
 
-    fn from_big_cow(b: Cow<'enc, S::Big>) -> Self {
-        let mut r = Self(Decoded::Big(b));
-        r.normalize();
-        r
+    fn from_big(b: S::Big) -> Self {
+        let mut this = Self(Decoded::Big(Cow::Owned(b)));
+        this.normalize();
+        this
+    }
+
+    fn from_big_ref(b: &'enc S::Big) -> Self {
+        let mut this = Self(Decoded::Big(Cow::Borrowed(b)));
+        this.normalize();
+        this
     }
 }
 
@@ -75,15 +76,22 @@ where
     type Small = S;
     type Big = S::Big;
     type Unsigned = CowEncoding<'enc, S::Unsigned>;
-    type Static = CowEncoding<'static, S>;
-    type WithLifetime<'a>
+    type Owned = CowEncoding<'static, S>;
+    type Borrowed<'a>
         = CowEncoding<'a, S>
     where
-        'enc: 'a;
+        Self: 'a;
 
     const ZERO: Self = Self(Decoded::Small(S::ZERO));
 
-    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
+    fn into_owned(self) -> Self::Owned {
+        match self.0 {
+            Decoded::Small(s) => CowEncoding(Decoded::Small(s)),
+            Decoded::Big(b) => CowEncoding::from_big(b.into_owned()),
+        }
+    }
+
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
     where
         'enc: 'a,
     {
@@ -92,17 +100,15 @@ where
             Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Borrowed(b.as_ref()))),
         }
     }
+}
 
+impl<'enc, S> EncodingMut<'enc> for CowEncoding<'enc, S>
+where
+    S: SmallNumber,
+{
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<'enc, Self::Big>>)) {
         f(&mut self.0);
         self.normalize();
-    }
-
-    fn into_static(self) -> Self::Static {
-        match self.0 {
-            Decoded::Small(s) => CowEncoding(Decoded::Small(s)),
-            Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Owned(b.into_owned()))),
-        }
     }
 }
 
@@ -115,15 +121,13 @@ where
         if bool::arbitrary(g) {
             Self(Decoded::Small(<S as quickcheck::Arbitrary>::arbitrary(g)))
         } else {
-            Self(Decoded::Big(Cow::Owned(
-                <S::Big as quickcheck::Arbitrary>::arbitrary(g),
-            )))
+            Self::from_big(<S::Big as quickcheck::Arbitrary>::arbitrary(g))
         }
     }
 }
 
 #[cfg(feature = "arbitrary")]
-impl<S> arbitrary::Arbitrary<'_> for CowEncoding<'static, S>
+impl<'enc, S> arbitrary::Arbitrary<'enc> for CowEncoding<'enc, S>
 where
     S: SmallNumber,
 {
@@ -133,9 +137,9 @@ where
                 <S as arbitrary::Arbitrary>::arbitrary(u)?,
             )))
         } else {
-            Ok(Self(Decoded::Big(Cow::Owned(
-                <S::Big as arbitrary::Arbitrary>::arbitrary(u)?,
-            ))))
+            Ok(Self::from_big(<S::Big as arbitrary::Arbitrary>::arbitrary(
+                u,
+            )?))
         }
     }
 }

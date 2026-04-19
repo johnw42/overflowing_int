@@ -38,7 +38,8 @@
 //! performance than their `Arc` or `Rc` counterparts, but benchmark your code
 //! to be sure!
 
-pub use crate::{borrow_bignum::BorrowBignum, convert::TryFromBigIntError};
+pub use crate::bignum_encoding::BorrowBigNum;
+pub use crate::convert::TryFromBigIntError;
 pub use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint};
 
 use crate::{
@@ -48,14 +49,13 @@ use crate::{
 
 pub mod arc_encoding;
 pub mod big_number;
-pub mod borrow_bignum;
+mod bignum_encoding;
 mod bounds;
 mod box_encoding;
 mod convert;
 pub mod cow_encoding;
-mod encoding;
+pub mod encoding;
 mod enum_encoding;
-pub mod identity_encoding;
 mod macros;
 mod num_ops;
 mod num_tests;
@@ -86,8 +86,7 @@ pub type RcBigUsize = Uint<'static, RcEncoding<usize>>;
 #[doc(hidden)]
 pub mod bench {
     use super::*;
-    use crate::identity_encoding::IdentityEncoding;
 
-    pub type IdentityBigInt<'a> = Int<'a, IdentityEncoding<'a, isize>>;
-    pub type IdentityBigUint<'a> = Uint<'a, IdentityEncoding<'a, usize>>;
+    pub type IdentityBigInt = Int<'static, BigInt>;
+    pub type IdentityBigUint = Uint<'static, BigUint>;
 }

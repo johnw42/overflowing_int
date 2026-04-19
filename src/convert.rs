@@ -273,16 +273,7 @@ pub mod tag {
         E: Encoding<'enc, Big = ImplType>,
     {
         fn from(value: &ImplType) -> Self {
-            Self::from_big_cow(Cow::Owned(value.clone()))
-        }
-    }
-
-    impl<'enc, E> From<Cow<'enc, ImplType>> for EncodedType<'enc, E>
-    where
-        E: Encoding<'enc, Big = ImplType>,
-    {
-        fn from(value: Cow<'enc, ImplType>) -> Self {
-            Self::from_big_cow(value)
+            Self::from_big(value.clone())
         }
     }
 
@@ -378,15 +369,6 @@ mod test {
     use crate::duplicate_encoded_types;
 
     use super::*;
-
-    duplicate_encoded_types! {
-        paste! {
-            #[quickcheck]
-            fn [<test_borrow_ encoding_tag>](value: EncodedType) {
-                assert_eq!(value, value.borrow());
-            }
-        }
-    }
 
     // Test infallible conversion from foreign types to signed encoded types.
     duplicate! {

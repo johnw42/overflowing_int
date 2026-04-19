@@ -8,8 +8,7 @@ use criterion::{
 };
 
 use compact_bigint::{
-    ArcBigInt, ArcBigIsize, BorrowBignum, BoxBigInt, CowBigInt, EnumBigInt, RcBigInt, RcBigIsize,
-    bench::IdentityBigInt,
+    ArcBigInt, ArcBigIsize, BorrowBigNum, CowBigInt, EnumBigInt, bench::IdentityBigInt,
 };
 use num_bigint::BigInt;
 use num_traits::Zero;
@@ -22,11 +21,8 @@ macro_rules! duplicate_bigint_types {
                 label         BigInt(lifetime);
                 [Arc]         [ArcBigInt];
                 [ArcSize]     [ArcBigIsize];
-                [Box]         [BoxBigInt];
                 [Cow]         [CowBigInt::<lifetime>];
-                [Identity]    [IdentityBigInt::<lifetime>];
-                [Rc]          [RcBigInt];
-                [RcSize]      [RcBigIsize];
+                [Identity]    [IdentityBigInt];
                 [Enum]        [EnumBigInt];
                 [Control]     [BigInt];
             ]
@@ -41,17 +37,17 @@ duplicate_bigint_types! {
             fn pi_atan_rc<'a>(k: BigInt(['a]), n: BigInt(['a])) -> BigInt(['static]) {
                 let mut a = BigInt(['static])::zero();
                 let mut w = n * k.borrow();
-                let k2 = &k * &k;
+                let k2 = k.pow(2);
                 let mut i = -1;
                 while !w.is_zero() {
-                    w /= &k2;
+                    w /= k2.borrow();
                     i += 2;
                     a += &w / i;
-                    w /= &k2;
+                    w /= k2.borrow();
                     i += 2;
                     a -= &w / i;
                 }
-                a.into_static()
+                a.into_owned()
             }
 
             let n = digits;

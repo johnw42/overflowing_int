@@ -1,4 +1,5 @@
-use crate::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::cow_encoding::CowEncoding;
+use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingMut};
 use crate::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
@@ -75,15 +76,29 @@ where
         }
     }
 
-    fn from_big_cow(b: Cow<'enc, S::Big>) -> Self {
+    fn from_big(b: S::Big) -> Self {
         Self(
-            if let Some(small) = S::try_from(b.as_ref()).ok()
+            if let Some(small) = S::try_from(&b).ok()
                 && let Some(shifted) = Shifted::try_new(small)
             {
                 BoxEncodedRepr { small: shifted }
             } else {
                 BoxEncodedRepr {
-                    big: ManuallyDrop::new(Box::new(b.into_owned())),
+                    big: ManuallyDrop::new(Box::new(b)),
+                }
+            },
+        )
+    }
+
+    fn from_big_ref(b: &'enc S::Big) -> Self {
+        Self(
+            if let Some(small) = S::try_from(b).ok()
+                && let Some(shifted) = Shifted::try_new(small)
+            {
+                BoxEncodedRepr { small: shifted }
+            } else {
+                BoxEncodedRepr {
+                    big: ManuallyDrop::new(Box::new(b.clone())),
                 }
             },
         )
@@ -97,34 +112,35 @@ where
     type Small = S;
     type Big = S::Big;
     type Unsigned = BoxEncoding<S::Unsigned>;
-    type Static = BoxEncoding<S>;
-    type WithLifetime<'a>
-        = BoxEncoding<S>
-    where
-        'enc: 'a;
+    type Owned = Self;
+    type Borrowed<'a> = CowEncoding<'a, S>;
 
     const ZERO: Self = Self(BoxEncodedRepr {
         small: Shifted::ZERO,
     });
 
-    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
+    fn into_owned(self) -> Self::Owned {
+        self
+    }
+
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
     where
         Self: 'a,
-        'enc: 'a,
     {
         unsafe {
-            if self.0.small.validate().is_some() {
-                BoxEncoding(BoxEncodedRepr {
-                    small: self.0.small,
-                })
+            if let Some(s) = self.0.small.validate() {
+                CowEncoding::from_small(s)
             } else {
-                BoxEncoding(BoxEncodedRepr {
-                    big: ManuallyDrop::new(Box::clone(&self.0.big)),
-                })
+                CowEncoding::from_big_ref(self.0.big.as_ref())
             }
         }
     }
+}
 
+impl<'enc, S> EncodingMut<'enc> for BoxEncoding<S>
+where
+    S: SmallNumber,
+{
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
         let mut decoded = unsafe {
             if let Some(s) = self.0.small.validate() {
@@ -138,10 +154,6 @@ where
             Decoded::Small(s) => Self::from_small(s),
             Decoded::Big(b) => Self::from_big(b.into_owned()),
         };
-    }
-
-    fn into_static(self) -> Self::Static {
-        self
     }
 }
 

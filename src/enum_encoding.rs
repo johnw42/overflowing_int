@@ -1,7 +1,9 @@
+use crate::cow_encoding::CowEncoding;
 use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encode;
 use crate::encoding::Encoding;
+use crate::encoding::EncodingMut;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -64,8 +66,14 @@ where
         Self(Decoded::Small(s))
     }
 
-    fn from_big_cow(b: Cow<'enc, S::Big>) -> Self {
-        let mut r = Self(Decoded::Big(b.into_owned()));
+    fn from_big(b: S::Big) -> Self {
+        let mut r = Self(Decoded::Big(b));
+        r.normalize();
+        r
+    }
+
+    fn from_big_ref(b: &'enc S::Big) -> Self {
+        let mut r = Self(Decoded::Big(b.clone()));
         r.normalize();
         r
     }
@@ -78,24 +86,30 @@ where
     type Small = S;
     type Big = S::Big;
     type Unsigned = EnumEncoding<S::Unsigned>;
-    type Static = EnumEncoding<S>;
-    type WithLifetime<'a>
-        = EnumEncoding<S>
-    where
-        'enc: 'a;
+    type Owned = Self;
+    type Borrowed<'a> = CowEncoding<'a, S>;
 
     const ZERO: Self = Self(Decoded::Small(S::ZERO));
 
-    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
     where
-        'enc: 'a,
+        Self: 'a,
     {
         match &self.0 {
-            Decoded::Small(s) => EnumEncoding(Decoded::Small(*s)),
-            Decoded::Big(b) => EnumEncoding(Decoded::Big(b.clone())),
+            Decoded::Small(s) => CowEncoding::from_small(*s),
+            Decoded::Big(b) => CowEncoding::from_big_ref(b),
         }
     }
 
+    fn into_owned(self) -> Self::Owned {
+        self
+    }
+}
+
+impl<'enc, S> EncodingMut<'enc> for EnumEncoding<S>
+where
+    S: SmallNumber,
+{
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
         let mut swapped = Decoded::Small(S::ZERO);
         std::mem::swap(&mut self.0, &mut swapped);
@@ -109,10 +123,6 @@ where
             Decoded::Big(b) => Decoded::Big(b.into_owned()),
         };
         self.normalize();
-    }
-
-    fn into_static(self) -> Self::Static {
-        self
     }
 }
 

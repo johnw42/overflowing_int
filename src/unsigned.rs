@@ -1,5 +1,5 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingMut};
 use crate::small_num::SmallNumber;
 use num_bigint::BigUint;
 use num_traits::{Pow, PrimInt as _};
@@ -21,15 +21,15 @@ where
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
-    pub fn into_static(self) -> Uint<'static, E::Static> {
-        Uint::from_encoding(self.0.into_static())
+    pub fn into_owned(self) -> <Self as Encoding<'enc>>::Owned {
+        Uint::from_encoding(self.0.into_owned())
     }
 
     /// Converts this big integer to into one that borrows from this one's data,
     /// if possible.  If the encoding does not support borrowing, this will
     /// simply clone self.
-    pub fn borrow<'a>(&'a self) -> Uint<'a, E::WithLifetime<'a>> {
-        <Self as Encoding>::WithLifetime::from_decoded(self.decode())
+    pub fn borrow<'a>(&'a self) -> Uint<'a, E::Borrowed<'a>> {
+        Uint::from_encoding(self.0.borrow())
     }
 
     /// A constant bigint with value 0, useful for static initialization.
@@ -413,7 +413,10 @@ where
     ///
     /// Note that setting a bit greater than the current bit length, a reallocation may be needed
     /// to store the new digits
-    pub fn set_bit(&mut self, bit: u64, value: bool) {
+    pub fn set_bit(&mut self, bit: u64, value: bool)
+    where
+        E: EncodingMut<'enc>,
+    {
         self.0.set_bit(bit, value)
     }
 }
@@ -461,8 +464,12 @@ where
         Self::from_encoding(E::from_small(s))
     }
 
-    fn from_big_cow(b: Cow<'enc, E::Big>) -> Self {
-        Self::from_encoding(E::from_big_cow(b))
+    fn from_big(b: E::Big) -> Self {
+        Self::from_encoding(E::from_big(b))
+    }
+
+    fn from_big_ref(b: &'enc E::Big) -> Self {
+        Self::from_encoding(E::from_big_ref(b))
     }
 }
 
@@ -473,28 +480,31 @@ where
     type Small = E::Small;
     type Big = E::Big;
     type Unsigned = Uint<'enc, E::Unsigned>;
-    type Static = Uint<'static, E::Static>;
-    type WithLifetime<'a>
-        = Uint<'a, E::WithLifetime<'a>>
+    type Owned = Uint<'static, E::Owned>;
+    type Borrowed<'a>
+        = Uint<'a, E::Borrowed<'a>>
     where
-        Self: 'a,
-        'enc: 'a;
+        Self: 'a;
 
     const ZERO: Self = Self::ZERO;
 
-    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
     where
         Self: 'a,
-        'enc: 'a,
     {
         Uint::from_encoding(self.0.borrow())
     }
 
+    fn into_owned(self) -> Self::Owned {
+        Uint::from_encoding(self.0.into_owned())
+    }
+}
+
+impl<'enc, E> EncodingMut<'enc> for Uint<'enc, E>
+where
+    E: EncodingMut<'enc, Big = BigUint>,
+{
     fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
         self.0.update_encoding(f);
-    }
-
-    fn into_static(self) -> Self::Static {
-        Uint::from_encoding(self.0.into_static())
     }
 }

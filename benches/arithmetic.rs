@@ -22,7 +22,7 @@ macro_rules! duplicate_bigint_types {
                 [ArcSize]     [ArcBigIsize];
                 [Box]         [BoxBigInt];
                 [Cow]         [CowBigInt::<'static>];
-                [Identity]    [IdentityBigInt::<'static>];
+                [Identity]    [IdentityBigInt];
                 [Rc]          [RcBigInt];
                 [RcSize]      [RcBigIsize];
                 [Enum]        [EnumBigInt];

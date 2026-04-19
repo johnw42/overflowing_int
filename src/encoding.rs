@@ -86,26 +86,6 @@ where
     }
 }
 
-#[inline(always)]
-fn checked_op<'enc, 'a, S, E>(
-    lhs: &'a impl Decode<'enc, S>,
-    rhs: &'a impl Decode<'enc, S>,
-    f_small: impl FnOnce(&S, &S) -> Option<S>,
-    f_big: impl FnOnce(&S::Big, &S::Big) -> Option<S::Big>,
-) -> Option<E>
-where
-    S: SmallNumber,
-    E: Encoding<'enc, Small = S, Big = S::Big>,
-{
-    match E::matching_size(lhs, rhs) {
-        Decoded::Small((s1, s2)) => match f_small(&s1, &s2) {
-            Some(result) => Some(E::from_small(result)),
-            None => f_big(&s1.to_big(), &s2.to_big()).map(E::from_big),
-        },
-        Decoded::Big((b1, b2)) => f_big(b1.as_ref(), b2.as_ref()).map(E::from_big),
-    }
-}
-
 pub trait Encode<'enc, S>: Sized + Clone
 where
     S: SmallNumber,
@@ -114,19 +94,28 @@ where
     fn from_small(s: S) -> Self;
 
     /// Encodes an owned big value.
-    fn from_big(b: S::Big) -> Self {
-        Self::from_big_cow(Cow::Owned(b))
-    }
+    fn from_big(b: S::Big) -> Self;
 
     /// Encodes a big value from a `Cow`.
-    fn from_big_cow(b: Cow<'enc, S::Big>) -> Self;
+    fn from_big_ref(b: &'enc S::Big) -> Self;
+}
 
-    /// Encodes a value.  Prefer [`Self::from_small`] or [`Self::from_big`] when possible.
-    fn from_decoded(enc: Decoded<S, Cow<'enc, S::Big>>) -> Self {
-        match enc {
-            Decoded::Small(s) => Self::from_small(s),
-            Decoded::Big(b) => Self::from_big_cow(b),
-        }
+#[inline(always)]
+fn checked_op<'enc, 'a, E>(
+    lhs: &'a E,
+    rhs: &'a E,
+    f_small: impl FnOnce(&E::Small, &E::Small) -> Option<E::Small>,
+    f_big: impl FnOnce(&E::Big, &E::Big) -> Option<E::Big>,
+) -> Option<E>
+where
+    E: Encoding<'enc>,
+{
+    match E::matching_size(lhs, rhs) {
+        Decoded::Small((s1, s2)) => match f_small(&s1, &s2) {
+            Some(result) => Some(E::from_small(result)),
+            None => f_big(&s1.to_big(), &s2.to_big()).map(E::from_big),
+        },
+        Decoded::Big((b1, b2)) => f_big(b1.as_ref(), b2.as_ref()).map(E::from_big),
     }
 }
 
@@ -138,6 +127,7 @@ pub trait Encoding<'enc>: Decode<'enc, Self::Small> + Encode<'enc, Self::Small>
 where
     Self: Eq,
     Self: Hash,
+    Self::Big: Into<BigInt>,
     Self::Big: Into<BigInt>,
 {
     /// The small type that can be encoded directly in the representation.
@@ -152,30 +142,21 @@ where
     /// A version of this encoding that uses an unsigned representation.
     type Unsigned: Encoding<'enc, Small = <Self::Small as SmallNumber>::Unsigned, Big = BigUint>;
 
-    /// A version of this encoding that has a static lifetime.
-    type Static: Encoding<'static, Small = Self::Small, Big = Self::Big>;
+    type Owned: Encoding<'static, Small = Self::Small, Big = Self::Big, Owned = Self::Owned>;
 
-    type WithLifetime<'a>: Encoding<'a, Small = Self::Small, Big = Self::Big>
+    type Borrowed<'a>: Encoding<'a, Small = Self::Small, Big = Self::Big>
     where
-        Self: 'a,
-        'enc: 'a;
+        Self: 'a;
 
     const ZERO: Self;
 
-    /// Converts this encoding into a version with a shorter lifetime.
-    fn borrow<'a>(&'a self) -> Self::WithLifetime<'a>
-    where
-        Self: 'a,
-        'enc: 'a,
-    {
-        Self::WithLifetime::from_decoded(self.decode())
-    }
-
-    /// Updates the encoding in place using the provided function.
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>));
-
     /// Converts this encoding to a version with a static lifetime.
-    fn into_static(self) -> Self::Static;
+    fn into_owned(self) -> Self::Owned;
+
+    /// Converts this encoding into a version with a shorter lifetime.
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
+    where
+        Self: 'a;
 
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
         Self::Big::parse_bytes(buf, radix).map(Self::from_big)
@@ -282,6 +263,11 @@ where
         let (lhs, rhs) = Self::big_cows(self, modulus);
         lhs.modinv(&rhs).map(Self::from_big)
     }
+}
+
+pub trait EncodingMut<'enc>: Encoding<'enc> {
+    /// Updates the encoding in place using the provided function.
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>));
 
     fn set_bit(&mut self, bit: u64, value: bool) {
         self.update_encoding(|encoding| match encoding {

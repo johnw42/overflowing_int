@@ -123,7 +123,7 @@ def main():
                 system("jj workspace add target/bench-workspace")
                 for rev in REVISIONS:
                     print(f"Testing revision {rev}...")
-                    system(f"jj edit {rev}")
+                    system(f"jj edit --ignore-immutable {rev}")
                     cargo(
                         f"bench -p compact_bigint --bench={opts.bench} -- --save-baseline={rev} {bench_pattern}"
                     )

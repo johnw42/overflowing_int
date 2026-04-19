@@ -168,6 +168,7 @@ where
     Self: TryInto<u64>,
     Self: TryInto<u8>,
     Self: TryInto<usize>,
+    Self: 'static,
 {
     duplicate_arith_ops! {
         paste! {
