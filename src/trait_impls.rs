@@ -52,7 +52,7 @@ pub mod mod_name {
     //
 
     #[cfg(any(test, feature = "quickcheck"))]
-    impl<E> quickcheck::Arbitrary for GenericBigNumType<'static, E>
+    impl<E> quickcheck::Arbitrary for GenericBigNumType<E>
     where
         E: Encoding<'static, Big = ImplType> + 'static,
     {
@@ -76,7 +76,7 @@ pub mod mod_name {
     //
 
     #[cfg(feature = "arbitrary")]
-    impl<'enc, E> arbitrary::Arbitrary<'_> for GenericBigNumType<'enc, E>
+    impl<'enc, E> arbitrary::Arbitrary<'_> for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -92,7 +92,7 @@ pub mod mod_name {
     // Binary
     //
 
-    impl<'enc, E> Binary for GenericBigNumType<'enc, E>
+    impl<'enc, E> Binary for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -105,7 +105,7 @@ pub mod mod_name {
     // CheckedAdd
     //
 
-    impl<'enc, E> CheckedAdd for GenericBigNumType<'enc, E>
+    impl<'enc, E> CheckedAdd for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -118,7 +118,7 @@ pub mod mod_name {
     // CheckedDiv
     //
 
-    impl<'enc, E> CheckedDiv for GenericBigNumType<'enc, E>
+    impl<'enc, E> CheckedDiv for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -131,7 +131,7 @@ pub mod mod_name {
     // CheckedMul
     //
 
-    impl<'enc, E> CheckedMul for GenericBigNumType<'enc, E>
+    impl<'enc, E> CheckedMul for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -144,7 +144,7 @@ pub mod mod_name {
     // CheckedSub
     //
 
-    impl<'enc, E> CheckedSub for GenericBigNumType<'enc, E>
+    impl<'enc, E> CheckedSub for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -157,7 +157,7 @@ pub mod mod_name {
     // ConstZero
     //
 
-    impl<'enc, E> ConstZero for GenericBigNumType<'enc, E>
+    impl<'enc, E> ConstZero for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType, Owned = E>,
     {
@@ -168,7 +168,7 @@ pub mod mod_name {
     // Debug
     //
 
-    impl<'enc, E> Debug for GenericBigNumType<'enc, E>
+    impl<'enc, E> Debug for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -182,7 +182,7 @@ pub mod mod_name {
     //
 
     #[cfg(any(test, feature = "serde"))]
-    impl<'enc, 'de, E> Deserialize<'de> for GenericBigNumType<'enc, E>
+    impl<'enc, 'de, E> Deserialize<'de> for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -198,7 +198,7 @@ pub mod mod_name {
     // Display
     //
 
-    impl<'enc, E> Display for GenericBigNumType<'enc, E>
+    impl<'enc, E> Display for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -212,11 +212,11 @@ pub mod mod_name {
     //
 
     #[cfg(any(test, feature = "rand"))]
-    impl<'enc, E> Distribution<GenericBigNumType<'enc, E>> for RandomBits
+    impl<'enc, E> Distribution<GenericBigNumType<E>> for RandomBits
     where
         E: Encoding<'enc, Big = ImplType>,
     {
-        fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> GenericBigNumType<'enc, E> {
+        fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> GenericBigNumType<E> {
             <RandomBits as Distribution<ImplType>>::sample(self, rng).into()
         }
     }
@@ -225,7 +225,7 @@ pub mod mod_name {
     // FromStr
     //
 
-    impl<'enc, E> FromStr for GenericBigNumType<'enc, E>
+    impl<'enc, E> FromStr for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -240,7 +240,7 @@ pub mod mod_name {
     // Integer
     //
 
-    impl<'enc, E> Integer for GenericBigNumType<'enc, E>
+    impl<'enc, E> Integer for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -349,7 +349,7 @@ pub mod mod_name {
     // Num
     //
 
-    impl<'enc, E> Num for GenericBigNumType<'enc, E>
+    impl<'enc, E> Num for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -364,7 +364,7 @@ pub mod mod_name {
     // One
     //
 
-    impl<'enc, E> One for GenericBigNumType<'enc, E>
+    impl<'enc, E> One for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -384,7 +384,7 @@ pub mod mod_name {
     // PartialOrd
     //
 
-    impl<'enc, E> PartialOrd for GenericBigNumType<'enc, E>
+    impl<'enc, E> PartialOrd for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -397,7 +397,7 @@ pub mod mod_name {
     // Roots
     //
 
-    impl<'enc, E> Roots for GenericBigNumType<'enc, E>
+    impl<'enc, E> Roots for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -414,25 +414,23 @@ pub mod mod_name {
     //
 
     #[cfg(any(test, feature = "rand"))]
-    impl<'enc, E> SampleUniform for GenericBigNumType<'enc, E>
+    impl<'enc, E> SampleUniform for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType> + 'enc,
     {
-        type Sampler = UniformSamplerImpl<'enc, E>;
+        type Sampler = UniformSamplerImpl<E>;
     }
 
     paste! {
         #[cfg(any(test, feature = "rand"))]
-        pub struct UniformSamplerImpl<'enc, E>([<Uniform ImplType>], PhantomData<&'enc E>)
-        where
-            E: Encoding<'enc, Big = ImplType>;
+        pub struct UniformSamplerImpl<E>([<Uniform ImplType>], PhantomData<E>);
 
         #[cfg(any(test, feature = "rand"))]
-        impl<'enc, E> UniformSampler for UniformSamplerImpl<'enc, E>
+        impl<'enc, E> UniformSampler for UniformSamplerImpl<E>
         where
             E: Encoding<'enc, Big = ImplType>,
         {
-            type X = GenericBigNumType<'enc, E>;
+            type X = GenericBigNumType<E>;
 
             fn new<B1, B2>(low: B1, high: B2) -> Self
             where
@@ -468,7 +466,7 @@ pub mod mod_name {
     // ToBytes
     //
 
-    impl<'enc, E> ToBytes for GenericBigNumType<'enc, E>
+    impl<'enc, E> ToBytes for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -487,7 +485,7 @@ pub mod mod_name {
     // ToPrimitive
     //
 
-    impl<'enc, E> ToPrimitive for GenericBigNumType<'enc, E>
+    impl<'enc, E> ToPrimitive for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -507,7 +505,7 @@ pub mod mod_name {
     // LowerHex
     //
 
-    impl<'enc, E> LowerHex for GenericBigNumType<'enc, E>
+    impl<'enc, E> LowerHex for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -520,7 +518,7 @@ pub mod mod_name {
     // Octal
     //
 
-    impl<'enc, E> Octal for GenericBigNumType<'enc, E>
+    impl<'enc, E> Octal for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -533,14 +531,14 @@ pub mod mod_name {
     // RefUnwindSafe
     //
 
-    impl<'enc, E> RefUnwindSafe for GenericBigNumType<'enc, E> where E: Encoding<'enc, Big = ImplType> {}
+    impl<'enc, E> RefUnwindSafe for GenericBigNumType<E> where E: Encoding<'enc, Big = ImplType> {}
 
     //
     // Serialize
     //
 
     #[cfg(any(test, feature = "serde"))]
-    impl<'enc, E> Serialize for GenericBigNumType<'enc, E>
+    impl<'enc, E> Serialize for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -556,7 +554,7 @@ pub mod mod_name {
     // UpperHex
     //
 
-    impl<'enc, E> UpperHex for GenericBigNumType<'enc, E>
+    impl<'enc, E> UpperHex for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -569,7 +567,7 @@ pub mod mod_name {
     // Zero
     //
 
-    impl<'enc, E> Zero for GenericBigNumType<'enc, E>
+    impl<'enc, E> Zero for GenericBigNumType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -590,7 +588,7 @@ pub mod mod_name {
 // CheckedEuclid
 //
 
-impl<'enc, E> CheckedEuclid for Int<'enc, E>
+impl<'enc, E> CheckedEuclid for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -609,7 +607,7 @@ where
 // Euclid
 //
 
-impl<'enc, E> Euclid for Int<'enc, E>
+impl<'enc, E> Euclid for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -628,7 +626,7 @@ where
 // FromBytes
 //
 
-impl<'enc, E> FromBytes for Int<'enc, E>
+impl<'enc, E> FromBytes for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -643,7 +641,7 @@ where
     }
 }
 
-impl<'enc, E> FromBytes for Uint<'enc, E>
+impl<'enc, E> FromBytes for Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
@@ -662,7 +660,7 @@ where
 // FromPrimitive
 //
 
-impl<'enc, E> FromPrimitive for Int<'enc, E>
+impl<'enc, E> FromPrimitive for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -677,7 +675,7 @@ where
 // FromPrimitive
 //
 
-impl<'enc, E> FromPrimitive for Uint<'enc, E>
+impl<'enc, E> FromPrimitive for Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
@@ -700,11 +698,11 @@ where
 // Neg
 //
 
-impl<'enc, E> Neg for Int<'enc, E>
+impl<'enc, E> Neg for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
-    type Output = Int<'enc, E>;
+    type Output = Int<E>;
 
     fn neg(self) -> Self::Output {
         match self.into_decoded() {
@@ -720,11 +718,11 @@ where
     }
 }
 
-impl<'enc, E> Neg for &Int<'enc, E>
+impl<'enc, E> Neg for &Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
-    type Output = Int<'enc, E>;
+    type Output = Int<E>;
 
     fn neg(self) -> Self::Output {
         match self.decode() {
@@ -744,11 +742,11 @@ where
 // Not
 //
 
-impl<'enc, E> Not for Int<'enc, E>
+impl<'enc, E> Not for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
-    type Output = Int<'enc, E>;
+    type Output = Int<E>;
 
     fn not(self) -> Self::Output {
         match self.into_decoded() {
@@ -758,11 +756,11 @@ where
     }
 }
 
-impl<'enc, E> Not for &Int<'enc, E>
+impl<'enc, E> Not for &Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
-    type Output = Int<'enc, E>;
+    type Output = Int<E>;
 
     fn not(self) -> Self::Output {
         match self.decode() {
@@ -776,7 +774,7 @@ where
 // Ord
 //
 
-impl<'enc, E> Ord for Int<'enc, E>
+impl<'enc, E> Ord for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -806,7 +804,7 @@ where
     }
 }
 
-impl<'enc, E> Ord for Uint<'enc, E>
+impl<'enc, E> Ord for Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
@@ -827,7 +825,7 @@ where
 // Signed
 //
 
-impl<'enc, E> Signed for Int<'enc, E>
+impl<'enc, E> Signed for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {

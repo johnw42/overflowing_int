@@ -50,7 +50,7 @@ impl<T> Error for TryFromBigIntError<T> where T: Debug {}
 // =============================================================================
 
 duplicate_generic_bignum! {
-    impl<'enc, E> ToBigInt for EncodedType<'enc, E>
+    impl<'enc, E> ToBigInt for EncodedType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -59,7 +59,7 @@ duplicate_generic_bignum! {
         }
     }
 
-    impl<'enc, E> ToBigUint for EncodedType<'enc, E>
+    impl<'enc, E> ToBigUint for EncodedType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -74,7 +74,7 @@ duplicate_generic_bignum! {
 // TryFrom Signed to Unsigned
 // =============================================================================
 
-impl<'enc, E> TryFrom<BigInt> for Uint<'enc, E>
+impl<'enc, E> TryFrom<BigInt> for Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<'enc, E> TryFrom<&BigInt> for Uint<'enc, E>
+impl<'enc, E> TryFrom<&BigInt> for Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
@@ -102,13 +102,13 @@ where
     }
 }
 
-impl<'enc, E> TryFrom<Int<'enc, E>> for BigUint
+impl<'enc, E> TryFrom<Int<E>> for BigUint
 where
     E: Encoding<'enc, Big = BigInt>,
 {
-    type Error = TryFromBigIntError<Int<'enc, E>>;
+    type Error = TryFromBigIntError<Int<E>>;
 
-    fn try_from(value: Int<'enc, E>) -> Result<Self, Self::Error> {
+    fn try_from(value: Int<E>) -> Result<Self, Self::Error> {
         value
             .to_biguint()
             .map(Uint::into_big)
@@ -116,13 +116,13 @@ where
     }
 }
 
-impl<'enc, E> TryFrom<&Int<'enc, E>> for BigUint
+impl<'enc, E> TryFrom<&Int<E>> for BigUint
 where
     E: Encoding<'enc, Big = BigInt>,
 {
     type Error = TryFromBigIntError<()>;
 
-    fn try_from(value: &Int<'enc, E>) -> Result<Self, Self::Error> {
+    fn try_from(value: &Int<E>) -> Result<Self, Self::Error> {
         value
             .to_biguint()
             .map(Uint::into_big)
@@ -130,15 +130,15 @@ where
     }
 }
 
-impl<'e1, 'e2, E1, E2> TryFrom<Int<'e1, E1>> for Uint<'e2, E2>
+impl<'e1, 'e2, E1, E2> TryFrom<Int<E1>> for Uint<E2>
 where
     E1: Encoding<'e1, Big = BigInt>,
     E2: Encoding<'e2, Big = BigUint>,
     E2::Small: TryFrom<E1::Small>,
 {
-    type Error = TryFromBigIntError<Int<'e1, E1>>;
+    type Error = TryFromBigIntError<Int<E1>>;
 
-    fn try_from(value: Int<'e1, E1>) -> Result<Self, Self::Error> {
+    fn try_from(value: Int<E1>) -> Result<Self, Self::Error> {
         match value.decode() {
             Decoded::Small(s) => match E2::Small::try_from(s) {
                 Ok(u) => Some(Self::from_small(u)),
@@ -152,7 +152,7 @@ where
 
 duplicate_iprims! {
     paste! {
-        impl<'enc, E> TryFrom<prim> for Uint<'enc, E>
+        impl<'enc, E> TryFrom<prim> for Uint<E>
         where
             E: Encoding<'enc, Big = BigUint>,
         {
@@ -177,7 +177,7 @@ duplicate_iprims! {
 // From Unsigned to Signed
 // =============================================================================
 
-impl<'enc, E> From<BigUint> for Int<'enc, E>
+impl<'enc, E> From<BigUint> for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -186,7 +186,7 @@ where
     }
 }
 
-impl<'enc, E> From<&BigUint> for Int<'enc, E>
+impl<'enc, E> From<&BigUint> for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -195,31 +195,31 @@ where
     }
 }
 
-impl<'enc, E> From<Uint<'enc, E>> for BigInt
+impl<'enc, E> From<Uint<E>> for BigInt
 where
     E: Encoding<'enc, Big = BigUint>,
 {
-    fn from(value: Uint<'enc, E>) -> Self {
+    fn from(value: Uint<E>) -> Self {
         BigInt::from(value.into_big())
     }
 }
 
-impl<'enc, E> From<&Uint<'enc, E>> for BigInt
+impl<'enc, E> From<&Uint<E>> for BigInt
 where
     E: Encoding<'enc, Big = BigUint>,
 {
-    fn from(value: &Uint<'enc, E>) -> Self {
+    fn from(value: &Uint<E>) -> Self {
         BigInt::from(value.clone().into_big())
     }
 }
 
-impl<'e1, 'e2, E1, E2> From<Uint<'e1, E1>> for Int<'e2, E2>
+impl<'e1, 'e2, E1, E2> From<Uint<E1>> for Int<E2>
 where
     E1: Encoding<'e1, Big = BigUint>,
     E2: Encoding<'e2, Big = BigInt>,
     E2::Small: TryFrom<E1::Small>,
 {
-    fn from(value: Uint<'e1, E1>) -> Self {
+    fn from(value: Uint<E1>) -> Self {
         match value.decode() {
             Decoded::Small(s) => match E2::Small::try_from(s) {
                 Ok(small) => Self::from_small(small),
@@ -231,7 +231,7 @@ where
 }
 
 duplicate_uprims! {
-    impl<'enc, E> From<prim> for Int<'enc, E>
+    impl<'enc, E> From<prim> for Int<E>
     where
         E: Encoding<'enc, Big = BigInt>,
     {
@@ -259,7 +259,7 @@ pub mod tag {
 
     use super::*;
 
-    impl<'enc, E> From<ImplType> for EncodedType<'enc, E>
+    impl<'enc, E> From<ImplType> for EncodedType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -268,7 +268,7 @@ pub mod tag {
         }
     }
 
-    impl<'enc, E> From<&ImplType> for EncodedType<'enc, E>
+    impl<'enc, E> From<&ImplType> for EncodedType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -277,25 +277,25 @@ pub mod tag {
         }
     }
 
-    impl<'enc, E> From<EncodedType<'enc, E>> for ImplType
+    impl<'enc, E> From<EncodedType<E>> for ImplType
     where
         E: Encoding<'enc, Big = ImplType>,
     {
-        fn from(value: EncodedType<'enc, E>) -> Self {
+        fn from(value: EncodedType<E>) -> Self {
             value.0.into_big()
         }
     }
 
-    impl<'enc, E> From<&EncodedType<'enc, E>> for ImplType
+    impl<'enc, E> From<&EncodedType<E>> for ImplType
     where
         E: Encoding<'enc, Big = ImplType>,
     {
-        fn from(value: &EncodedType<'enc, E>) -> Self {
+        fn from(value: &EncodedType<E>) -> Self {
             value.clone().0.into_big()
         }
     }
 
-    impl<'enc, E> From<bool> for EncodedType<'enc, E>
+    impl<'enc, E> From<bool> for EncodedType<E>
     where
         E: Encoding<'enc, Big = ImplType>,
     {
@@ -306,7 +306,7 @@ pub mod tag {
 
     duplicate_prims_with_signedness! { signedness;
         paste! {
-            impl<'enc, E> From<prim> for EncodedType<'enc, E>
+            impl<'enc, E> From<prim> for EncodedType<E>
             where
                 E: Encoding<'enc, Big=ImplType>,
             {
@@ -326,13 +326,13 @@ pub mod tag {
     // to primitives
     duplicate_prims! {
         paste! {
-            impl<'enc, E> TryFrom<EncodedType<'enc, E>> for prim
+            impl<'enc, E> TryFrom<EncodedType<E>> for prim
             where
                 E: Encoding<'enc, Big=ImplType>,
             {
-                    type Error = TryFromBigIntError<EncodedType<'enc, E>>;
+                    type Error = TryFromBigIntError<EncodedType<E>>;
 
-                    fn try_from(value: EncodedType<'enc, E>) -> Result<Self, Self::Error> {
+                    fn try_from(value: EncodedType<E>) -> Result<Self, Self::Error> {
                         match value.decode() {
                             Decoded::Small(n) => n.[<to_ prim>](),
                             Decoded::Big(n) => n.[<to_ prim>](),
@@ -340,13 +340,13 @@ pub mod tag {
                     }
                 }
 
-            impl<'enc, 'a, E> TryFrom<&'a EncodedType<'enc, E>> for prim
+            impl<'enc, 'a, E> TryFrom<&'a EncodedType<E>> for prim
             where
                 E: Encoding<'enc, Big=ImplType>,
             {
                 type Error = TryFromBigIntError<()>;
 
-                fn try_from(value: &'a EncodedType<'enc, E>) -> Result<Self, Self::Error> {
+                fn try_from(value: &'a EncodedType<E>) -> Result<Self, Self::Error> {
                     match value.decode() {
                         Decoded::Small(n) => n.[<to_ prim>](),
                         Decoded::Big(n) => n.[<to_ prim>](),

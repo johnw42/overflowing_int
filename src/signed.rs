@@ -6,21 +6,19 @@ use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Pow, Zero};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::marker::PhantomData;
+
 use std::ops::Neg;
 
 /// A signed big integer type that can be used with any encoding that implements `Encoding` with `Big = BigInt`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Int<'enc, E>(pub(crate) E, PhantomData<&'enc ()>)
-where
-    E: Encoding<'enc, Big = BigInt>;
+pub struct Int<E>(pub(crate) E);
 
-impl<'enc, E> Int<'enc, E>
+impl<'enc, E> Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
     const fn from_encoding(encoding: E) -> Self {
-        Self(encoding, PhantomData)
+        Self(encoding)
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
@@ -31,7 +29,7 @@ where
     /// Converts this big integer to into one that borrows from this one's data,
     /// if possible.  If the encoding does not support borrowing, this will
     /// simply clone self.
-    pub fn borrow<'a>(&'a self) -> Int<'a, E::Borrowed<'a>> {
+    pub fn borrow<'a>(&'a self) -> Int<E::Borrowed<'a>> {
         Int::from_encoding(self.0.borrow())
     }
 
@@ -54,7 +52,7 @@ where
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn from_biguint(sign: Sign, data: Uint<'enc, E::Unsigned>) -> Self {
+    pub fn from_biguint(sign: Sign, data: Uint<E::Unsigned>) -> Self {
         BigInt::from_biguint(sign, BigUint::from(data)).into()
     }
 
@@ -428,7 +426,7 @@ where
     /// assert!(EnumBigInt::ZERO.clone().magnitude().is_zero());
     /// ```
     #[inline]
-    pub fn magnitude(self) -> Uint<'enc, E::Unsigned> {
+    pub fn magnitude(self) -> Uint<E::Unsigned> {
         Uint::from(self.into_parts().1)
     }
 
@@ -472,7 +470,7 @@ where
 
     /// Converts this bigint into a an unsigned bigint, if it's not negative.
     #[inline]
-    pub fn to_biguint(&self) -> Option<Uint<'enc, E::Unsigned>> {
+    pub fn to_biguint(&self) -> Option<Uint<E::Unsigned>> {
         match self.sign() {
             Sign::Minus => None,
             _ => Some(self.clone().magnitude()),
@@ -619,7 +617,7 @@ where
     }
 }
 
-impl<'enc, E> Default for Int<'enc, E>
+impl<'enc, E> Default for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -628,7 +626,7 @@ where
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for Int<'enc, E>
+impl<'enc, E> Decode<'enc, E::Small> for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -641,7 +639,7 @@ where
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for &Int<'enc, E>
+impl<'enc, E> Decode<'enc, E::Small> for &Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -654,7 +652,7 @@ where
     }
 }
 
-impl<'enc, E> Encode<'enc, E::Small> for Int<'enc, E>
+impl<'enc, E> Encode<'enc, E::Small> for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -671,19 +669,18 @@ where
     }
 }
 
-impl<'enc, E> Encoding<'enc> for Int<'enc, E>
+impl<'enc, E> Encoding<'enc> for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
     type Small = E::Small;
     type Big = E::Big;
-    type Unsigned = Uint<'enc, E::Unsigned>;
-    type Owned = Int<'static, E::Owned>;
+    type Unsigned = Uint<E::Unsigned>;
+    type Owned = Int<E::Owned>;
     type Borrowed<'a>
-        = Int<'a, E::Borrowed<'a>>
+        = Int<E::Borrowed<'a>>
     where
-        Self: 'a,
-        'enc: 'a;
+        Self: 'a;
 
     const ZERO: Self = Self::ZERO;
 
@@ -699,7 +696,7 @@ where
     }
 }
 
-impl<'enc, E> EncodingMut<'enc> for Int<'enc, E>
+impl<'enc, E> EncodingMut<'enc> for Int<E>
 where
     E: EncodingMut<'enc, Big = BigInt>,
 {

@@ -4,20 +4,17 @@ use crate::small_num::SmallNumber;
 use num_bigint::BigUint;
 use num_traits::{Pow, PrimInt as _};
 use std::borrow::Cow;
-use std::marker::PhantomData;
 
 /// An unsigned big integer type that can be used with any encoding that implements `Encoding` with `Big = BigUint`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Uint<'enc, E>(pub(crate) E, PhantomData<&'enc ()>)
-where
-    E: Encoding<'enc>;
+pub struct Uint<E>(pub(crate) E);
 
-impl<'enc, E> Uint<'enc, E>
+impl<'enc, E> Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
     const fn from_encoding(encoding: E) -> Self {
-        Self(encoding, PhantomData)
+        Self(encoding)
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
@@ -28,7 +25,7 @@ where
     /// Converts this big integer to into one that borrows from this one's data,
     /// if possible.  If the encoding does not support borrowing, this will
     /// simply clone self.
-    pub fn borrow<'a>(&'a self) -> Uint<'a, E::Borrowed<'a>> {
+    pub fn borrow<'a>(&'a self) -> Uint<E::Borrowed<'a>> {
         Uint::from_encoding(self.0.borrow())
     }
 
@@ -39,7 +36,7 @@ where
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn new(digits: Vec<u32>) -> Uint<'enc, E> {
+    pub fn new(digits: Vec<u32>) -> Uint<E> {
         Self::from_encoding(E::from_big(E::Big::new(digits)))
     }
 
@@ -47,7 +44,7 @@ where
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn from_slice(slice: &[u32]) -> Uint<'enc, E> {
+    pub fn from_slice(slice: &[u32]) -> Uint<E> {
         Self::from_encoding(E::from_big(E::Big::from_slice(slice)))
     }
 
@@ -78,7 +75,7 @@ where
     ///            EnumBigUint::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     #[inline]
-    pub fn from_bytes_be(bytes: &[u8]) -> Uint<'enc, E> {
+    pub fn from_bytes_be(bytes: &[u8]) -> Uint<E> {
         Self::from_encoding(
             if let Some(from_bytes) = SmallNumber::from_bytes_be(bytes) {
                 E::from_small(from_bytes)
@@ -92,7 +89,7 @@ where
     ///
     /// The bytes are in little-endian byte order.
     #[inline]
-    pub fn from_bytes_le(bytes: &[u8]) -> Uint<'enc, E> {
+    pub fn from_bytes_le(bytes: &[u8]) -> Uint<E> {
         Self::from_encoding(E::from_big(E::Big::from_bytes_le(bytes)))
     }
 
@@ -155,7 +152,7 @@ where
     /// let a = EnumBigUint::from_radix_le(inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_le(190), inbase190);
     /// ```
-    pub fn from_radix_le(buf: &[u8], radix: u32) -> Option<Uint<'enc, E>> {
+    pub fn from_radix_le(buf: &[u8], radix: u32) -> Option<Uint<E>> {
         E::Big::from_radix_le(buf, radix)
             .map(E::from_big)
             .map(Self::from_encoding)
@@ -421,7 +418,7 @@ where
     }
 }
 
-impl<'enc, E> Default for Uint<'enc, E>
+impl<'enc, E> Default for Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
@@ -430,7 +427,7 @@ where
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for Uint<'enc, E>
+impl<'enc, E> Decode<'enc, E::Small> for Uint<E>
 where
     E: Encoding<'enc>,
 {
@@ -443,7 +440,7 @@ where
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for &Uint<'enc, E>
+impl<'enc, E> Decode<'enc, E::Small> for &Uint<E>
 where
     E: Encoding<'enc>,
 {
@@ -456,7 +453,7 @@ where
     }
 }
 
-impl<'enc, E> Encode<'enc, E::Small> for Uint<'enc, E>
+impl<'enc, E> Encode<'enc, E::Small> for Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
@@ -473,16 +470,16 @@ where
     }
 }
 
-impl<'enc, E> Encoding<'enc> for Uint<'enc, E>
+impl<'enc, E> Encoding<'enc> for Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
     type Small = E::Small;
     type Big = E::Big;
-    type Unsigned = Uint<'enc, E::Unsigned>;
-    type Owned = Uint<'static, E::Owned>;
+    type Unsigned = Uint<E::Unsigned>;
+    type Owned = Uint<E::Owned>;
     type Borrowed<'a>
-        = Uint<'a, E::Borrowed<'a>>
+        = Uint<E::Borrowed<'a>>
     where
         Self: 'a;
 
@@ -500,7 +497,7 @@ where
     }
 }
 
-impl<'enc, E> EncodingMut<'enc> for Uint<'enc, E>
+impl<'enc, E> EncodingMut<'enc> for Uint<E>
 where
     E: EncodingMut<'enc, Big = BigUint>,
 {

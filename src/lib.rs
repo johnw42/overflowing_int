@@ -67,26 +67,26 @@ mod trait_impl_tests;
 mod trait_impls;
 pub mod unsigned;
 
-pub type ArcBigInt = Int<'static, ArcEncoding<i128>>;
-pub type ArcBigUint = Uint<'static, ArcEncoding<u128>>;
-pub type ArcBigIsize = Int<'static, ArcEncoding<isize>>;
-pub type ArcBigUsize = Uint<'static, ArcEncoding<usize>>;
-pub type BoxBigInt = Int<'static, BoxEncoding<isize>>;
-pub type BoxBigUint = Uint<'static, BoxEncoding<usize>>;
-pub type CowBigInt<'a> = Int<'a, CowEncoding<'a, i128>>;
-pub type CowBigUint<'a> = Uint<'a, CowEncoding<'a, u128>>;
-pub type EnumBigInt = Int<'static, EnumEncoding<i128>>;
-pub type EnumBigUint = Uint<'static, EnumEncoding<u128>>;
-pub type RcBigInt = Int<'static, RcEncoding<i128>>;
-pub type RcBigUint = Uint<'static, RcEncoding<u128>>;
-pub type RcBigIsize = Int<'static, RcEncoding<isize>>;
-pub type RcBigUsize = Uint<'static, RcEncoding<usize>>;
+pub type ArcBigInt = Int<ArcEncoding<i128>>;
+pub type ArcBigUint = Uint<ArcEncoding<u128>>;
+pub type ArcBigIsize = Int<ArcEncoding<isize>>;
+pub type ArcBigUsize = Uint<ArcEncoding<usize>>;
+pub type BoxBigInt = Int<BoxEncoding<isize>>;
+pub type BoxBigUint = Uint<BoxEncoding<usize>>;
+pub type CowBigInt<'a> = Int<CowEncoding<'a, i128>>;
+pub type CowBigUint<'a> = Uint<CowEncoding<'a, u128>>;
+pub type EnumBigInt = Int<EnumEncoding<i128>>;
+pub type EnumBigUint = Uint<EnumEncoding<u128>>;
+pub type RcBigInt = Int<RcEncoding<i128>>;
+pub type RcBigUint = Uint<RcEncoding<u128>>;
+pub type RcBigIsize = Int<RcEncoding<isize>>;
+pub type RcBigUsize = Uint<RcEncoding<usize>>;
 
 // Only for benchmarking, not for general use.
 #[doc(hidden)]
 pub mod bench {
     use super::*;
 
-    pub type IdentityBigInt = Int<'static, BigInt>;
-    pub type IdentityBigUint = Uint<'static, BigUint>;
+    pub type IdentityBigInt = Int<BigInt>;
+    pub type IdentityBigUint = Uint<BigUint>;
 }

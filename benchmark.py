@@ -23,7 +23,7 @@ REVISIONS = [
     "uny",
 ]
 
-FUNCTIONS = ["Control", "Cow", "Rc", "RcIsize", "Identity", "Box"]
+FUNCTIONS = ["Control", "Cow", "Arc", "ArcIsize", "Identity", "Enum"]
 SIZES = [10, 15, 20, 30, 40, 50, 100]
 
 
