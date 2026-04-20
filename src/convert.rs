@@ -4,7 +4,7 @@ use crate::signed::Int;
 use crate::small_num::SmallNumber;
 use crate::unsigned::Uint;
 use crate::{
-    CowBigInt, CowBigUint, RcBigInt, RcBigUint, duplicate_generic_bignum, duplicate_iprims,
+    CowBigInt, CowBigUint, duplicate_generic_bignum, duplicate_iprims,
     duplicate_iprims_if_unsigned, duplicate_prims, duplicate_signed_encoded_types,
     duplicate_unsigned_encoded_types, duplicate_uprims, duplicate_uprims_and_iprims_if_signed,
 };

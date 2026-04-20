@@ -7,24 +7,12 @@ import json
 
 TOP_DIR = os.path.dirname(__file__)
 
-DEFAULT_BASELINE = "uny"
+DEFAULT_BASELINE = "out"
 
-REVISIONS = [
-    "lmu",
-    "tyq",
-    "uxw",
-    "vuq",
-    "nws",
-    "nsy",
-    "kpw",
-    "tkr",
-    "ply",
-    "pxr",
-    "uny",
-]
+REVISIONS = ["out", "tns"]
 
-FUNCTIONS = ["Control", "Cow", "Arc", "ArcIsize", "Identity", "Enum"]
-SIZES = [10, 15, 20, 30, 40, 50, 100]
+FUNCTIONS = ["Control", "Cow", "Arc", "ArcSize", "Identity", "Enum"]
+SIZES = ["10", "15", "20", "30", "40", "50", "100"]
 
 
 def cargo(cmd):
@@ -45,18 +33,17 @@ class RevisionData:
         self.revision = revision
         self.data = {}
 
-        for function in FUNCTIONS:
+        for encoding in FUNCTIONS:
             for size in SIZES:
-                name = f"Pi/{function}/{size}"
                 with open(
-                    f"../target/criterion/Pi/{function}/{size}/{revision}/estimates.json"
+                    f"../target/criterion/Pi/{encoding}/{size}/{revision}/estimates.json"
                 ) as f:
                     data = json.load(f)
-                    throughput = 1000 * size / data["mean"]["point_estimate"]
+                    throughput = 1000 * int(size) / data["mean"]["point_estimate"]
                     if throughput:
-                        self.data[(function, size)] = float(throughput)
+                        self.data[(encoding, size)] = float(throughput)
                     else:
-                        self.data[(function, size)] = None
+                        self.data[(encoding, size)] = None
 
 
 def system(cmd):
@@ -81,17 +68,23 @@ def main():
     p.add_argument(
         "--group",
         "-g",
-        help="Regex to filter which groups to benchmark.",
+        action="append",
+        default=[],
+        help="Group(s) to filter which benchmarks to run.",
     )
     p.add_argument(
         "--encoding",
         "-e",
-        help="Regex to filter which encodings to benchmark.",
+        action="append",
+        default=[],
+        help="Encoding(s) to filter which benchmarks to run.",
     )
     p.add_argument(
         "--size",
         "-s",
-        help="Regex to filter which input sizes to benchmark.",
+        action="append",
+        default=[],
+        help="Size(s) to filter which benchmarks to run.",
     )
     p.add_argument(
         "--baseline",
@@ -112,9 +105,12 @@ def main():
     )
 
     opts = p.parse_args()
+    print(opts)
 
     bench_pattern = shlex.quote(
-        f"({opts.group or '[^/]+'})/({opts.encoding or '[^/]+'})/({opts.size or '[^/]+'})"
+        f"({"|".join(opts.group) if opts.group else '[^/]+'})"
+        + f"/({"|".join(opts.encoding) if opts.encoding else '[^/]+'})"
+        + f"/({"|".join(opts.size) if opts.size else '[^/]+'})"
     )
 
     match opts.command:
@@ -135,16 +131,16 @@ def main():
             print("Printing summary of benchmark results...")
             rev_data = {rev: RevisionData(rev) for rev in REVISIONS}
             baseline_data = rev_data[opts.baseline]
-            for function in FUNCTIONS:
-                for size in SIZES:
-                    print(f"{function}({size}):")
+            for encoding in opts.encoding or FUNCTIONS:
+                for size in opts.size or SIZES:
+                    print(f"{encoding}({size}):")
                     for rev in REVISIONS:
                         data = rev_data.get(rev)
                         if data is None:
                             continue
-                        if (function, size) in data.data:
-                            reference = baseline_data.data[(function, size)]
-                            throughput = data.data[(function, size)]
+                        if (encoding, size) in data.data:
+                            reference = baseline_data.data[(encoding, size)]
+                            throughput = data.data[(encoding, size)]
                             fraction = throughput / reference
                             delta_percent = 100 * (fraction - 1)
                             if throughput is not None:

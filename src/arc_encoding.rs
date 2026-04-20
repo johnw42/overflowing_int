@@ -135,19 +135,21 @@ impl<'enc, S> EncodingMut<'enc> for ArcEncoding<S>
 where
     S: SmallNumber,
 {
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
-        let mut decoded = unsafe {
-            if let Some(s) = self.0.small.validate() {
-                Decoded::Small(s)
-            } else {
-                Decoded::Big(Cow::Borrowed(Arc::as_ref(&self.0.big)))
+    fn update_encoding(
+        &mut self,
+        f: impl FnOnce(Decoded<Self::Small, &mut Self::Big>) -> Option<Decoded<Self::Small, Self::Big>>,
+    ) {
+        unsafe {
+            let new_decoded = match self.0.small.validate() {
+                Some(s) => f(Decoded::Small(s)),
+                None => f(Decoded::Big(Arc::make_mut(&mut self.0.big))),
+            };
+            match new_decoded {
+                Some(Decoded::Small(s)) => *self = Self::from_small(s),
+                Some(Decoded::Big(b)) => *self = Self::from_big(b),
+                None => {}
             }
-        };
-        f(&mut decoded);
-        *self = match decoded {
-            Decoded::Small(s) => Self::from_small(s),
-            Decoded::Big(b) => Self::from_big(b.into_owned()),
-        };
+        }
     }
 }
 

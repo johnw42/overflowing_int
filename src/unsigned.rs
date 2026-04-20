@@ -501,7 +501,10 @@ impl<'enc, E> EncodingMut<'enc> for Uint<E>
 where
     E: EncodingMut<'enc, Big = BigUint>,
 {
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
+    fn update_encoding(
+        &mut self,
+        f: impl FnOnce(Decoded<Self::Small, &mut Self::Big>) -> Option<Decoded<Self::Small, Self::Big>>,
+    ) {
         self.0.update_encoding(f);
     }
 }

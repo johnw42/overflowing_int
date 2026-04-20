@@ -267,25 +267,27 @@ where
 
 pub trait EncodingMut<'enc>: Encoding<'enc> {
     /// Updates the encoding in place using the provided function.
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>));
+    fn update_encoding(
+        &mut self,
+        f: impl FnOnce(Decoded<Self::Small, &mut Self::Big>) -> Option<Decoded<Self::Small, Self::Big>>,
+    );
 
     fn set_bit(&mut self, bit: u64, value: bool) {
-        self.update_encoding(|encoding| match encoding {
-            Decoded::Small(n) if (bit as u32) < Self::Small::BITS - 1 => {
+        self.update_encoding(|decoded| match decoded {
+            Decoded::Small(n) if bit < (Self::Small::BITS - 1) as u64 => {
                 let to_set = Self::Small::one() << bit as u32;
-                if value {
-                    *n = *n | to_set;
-                } else {
-                    *n = *n & !to_set;
-                }
+                Some(Decoded::Small(if value { n | to_set } else { n & !to_set }))
             }
             Decoded::Small(n) => {
                 let mut big = n.to_big();
                 big.set_bit(bit, value);
-                *encoding = Decoded::Big(Cow::Owned(big));
+                Some(Decoded::Big(big))
             }
-            Decoded::Big(n) => n.to_mut().set_bit(bit, value),
-        })
+            Decoded::Big(n) => {
+                n.set_bit(bit, value);
+                None
+            }
+        });
     }
 }
 

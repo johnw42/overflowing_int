@@ -73,17 +73,11 @@ where
         E: EncodingMut<'enc>,
     {
         self.update_encoding(|enc| match enc {
-            Decoded::Small(_) => {
-                *enc = Decoded::Big(Cow::Owned(E::Big::from_slice(sign, slice)));
+            Decoded::Small(_) => Some(Decoded::Big(E::Big::from_slice(sign, slice))),
+            Decoded::Big(b) => {
+                b.assign_from_slice(sign, slice);
+                None
             }
-            Decoded::Big(b) => match b {
-                Cow::Borrowed(_) => {
-                    *enc = Decoded::Big(Cow::Owned(E::Big::from_slice(sign, slice)));
-                }
-                Cow::Owned(b) => {
-                    b.assign_from_slice(sign, slice);
-                }
-            },
         });
     }
 
@@ -700,7 +694,10 @@ impl<'enc, E> EncodingMut<'enc> for Int<E>
 where
     E: EncodingMut<'enc, Big = BigInt>,
 {
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<E::Small, Cow<E::Big>>)) {
+    fn update_encoding(
+        &mut self,
+        f: impl FnOnce(Decoded<Self::Small, &mut Self::Big>) -> Option<Decoded<Self::Small, Self::Big>>,
+    ) {
         self.0.update_encoding(f);
     }
 }

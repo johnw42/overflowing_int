@@ -20,11 +20,8 @@ macro_rules! duplicate_bigint_types {
                 label         Encoded;
                 [Arc]         [ArcBigInt];
                 [ArcSize]     [ArcBigIsize];
-                [Box]         [BoxBigInt];
                 [Cow]         [CowBigInt::<'static>];
                 [Identity]    [IdentityBigInt];
-                [Rc]          [RcBigInt];
-                [RcSize]      [RcBigIsize];
                 [Enum]        [EnumBigInt];
                 [Control]     [BigInt];
             ]

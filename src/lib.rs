@@ -43,15 +43,14 @@ pub use crate::convert::TryFromBigIntError;
 pub use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint};
 
 use crate::{
-    arc_encoding::ArcEncoding, box_encoding::BoxEncoding, cow_encoding::CowEncoding,
-    enum_encoding::EnumEncoding, rc_encoding::RcEncoding, signed::Int, unsigned::Uint,
+    arc_encoding::ArcEncoding, cow_encoding::CowEncoding, enum_encoding::EnumEncoding, signed::Int,
+    unsigned::Uint,
 };
 
 pub mod arc_encoding;
 pub mod big_number;
 mod bignum_encoding;
 mod bounds;
-mod box_encoding;
 mod convert;
 pub mod cow_encoding;
 pub mod encoding;
@@ -59,7 +58,6 @@ mod enum_encoding;
 mod macros;
 mod num_ops;
 mod num_tests;
-pub mod rc_encoding;
 mod shifted;
 pub mod signed;
 mod small_num;
@@ -71,16 +69,10 @@ pub type ArcBigInt = Int<ArcEncoding<i128>>;
 pub type ArcBigUint = Uint<ArcEncoding<u128>>;
 pub type ArcBigIsize = Int<ArcEncoding<isize>>;
 pub type ArcBigUsize = Uint<ArcEncoding<usize>>;
-pub type BoxBigInt = Int<BoxEncoding<isize>>;
-pub type BoxBigUint = Uint<BoxEncoding<usize>>;
 pub type CowBigInt<'a> = Int<CowEncoding<'a, i128>>;
 pub type CowBigUint<'a> = Uint<CowEncoding<'a, u128>>;
 pub type EnumBigInt = Int<EnumEncoding<i128>>;
 pub type EnumBigUint = Uint<EnumEncoding<u128>>;
-pub type RcBigInt = Int<RcEncoding<i128>>;
-pub type RcBigUint = Uint<RcEncoding<u128>>;
-pub type RcBigIsize = Int<RcEncoding<isize>>;
-pub type RcBigUsize = Uint<RcEncoding<usize>>;
 
 // Only for benchmarking, not for general use.
 #[doc(hidden)]

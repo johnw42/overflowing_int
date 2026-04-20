@@ -8,12 +8,6 @@ use crate::small_num::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
 
-/// A wrapper type around `Encoding` that maintains the the invariant that
-/// values that can be represented as `SmallInt` or `SmallUint` are always
-/// stored as such, and only values that cannot be represented as `SmallInt` or
-/// `SmallUint` are stored as `BigInt` or `BigUint`.  This type, in turn, is the
-/// content of `CBigInt` and `CBigUint`, which implement high-level operations
-/// and traits.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EnumEncoding<S>(Decoded<S, S::Big>)
 where
@@ -110,18 +104,19 @@ impl<'enc, S> EncodingMut<'enc> for EnumEncoding<S>
 where
     S: SmallNumber,
 {
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
-        let mut swapped = Decoded::Small(S::ZERO);
-        std::mem::swap(&mut self.0, &mut swapped);
-        let mut encoding = match swapped {
-            Decoded::Small(s) => Decoded::Small(s),
-            Decoded::Big(b) => Decoded::Big(Cow::Owned(b)),
+    fn update_encoding(
+        &mut self,
+        f: impl FnOnce(Decoded<Self::Small, &mut Self::Big>) -> Option<Decoded<Self::Small, Self::Big>>,
+    ) {
+        let new_decoded = match &mut self.0 {
+            Decoded::Small(s) => f(Decoded::Small(*s)),
+            Decoded::Big(b) => f(Decoded::Big(b)),
         };
-        f(&mut encoding);
-        self.0 = match encoding {
-            Decoded::Small(s) => Decoded::Small(s),
-            Decoded::Big(b) => Decoded::Big(b.into_owned()),
-        };
+        match new_decoded {
+            Some(Decoded::Small(ns)) => self.0 = Decoded::Small(ns),
+            Some(Decoded::Big(nb)) => self.0 = Decoded::Big(nb),
+            None => {}
+        }
         self.normalize();
     }
 }
