@@ -1,7 +1,7 @@
 // Adapted from https://github.com/scymtym/sb-benchmarks/blob/master/cl-bench.bignum.benchmark.lisp
 // Original code from Bruno Haible <haible@ilog.fr>
 
-use std::{borrow::Borrow, time::Duration};
+use std::time::Duration;
 
 use criterion::{
     AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group, criterion_main,
@@ -34,16 +34,16 @@ duplicate_bigint_types! {
         fn [<calc_pi_atan_ label:lower>](digits: u32) -> BigInt(['static]) {
             fn pi_atan_rc<'a>(k: BigInt(['a]), n: BigInt(['a])) -> BigInt(['static]) {
                 let mut a = BigInt(['static])::zero();
-                let mut w = n * k.borrow();
+                let mut w = n * &k;
                 let k2 = k.pow(2);
                 let mut i = -1;
                 while !w.is_zero() {
-                    w /= k2.borrow();
+                    w /= &k2;
                     i += 2;
-                    a += w.borrow() / i;
-                    w /= k2.borrow();
+                    a += &w / i;
+                    w /= &k2;
                     i += 2;
-                    a -= w.borrow() / i;
+                    a -= &w / i;
                 }
                 a
             }

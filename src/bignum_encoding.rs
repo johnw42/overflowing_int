@@ -56,16 +56,14 @@ impl<'enc> Encoding<'enc> for BigInt {
 }
 
 impl<'enc> EncodingMut<'enc> for BigInt {
-    fn update_encoding(
-        &mut self,
-        f: impl FnOnce(Decoded<Self::Small, &mut Self::Big>) -> Option<Decoded<Self::Small, Self::Big>>,
-    ) {
-        let new_decoded = f(Decoded::Big(self));
-        match new_decoded {
-            Some(Decoded::Small(s)) => *self = s.into(),
-            Some(Decoded::Big(b)) => *self = b,
-            _ => (),
-        }
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
+        let mut decoded = Decoded::Big(Cow::Owned(std::mem::take(self)));
+        f(&mut decoded);
+        *self = match decoded {
+            Decoded::Small(s) => s.into(),
+            Decoded::Big(Cow::Borrowed(b)) => b.clone(),
+            Decoded::Big(Cow::Owned(o)) => o,
+        };
     }
 }
 
@@ -131,16 +129,14 @@ impl<'enc> Encoding<'enc> for BigUint {
 }
 
 impl<'enc> EncodingMut<'enc> for BigUint {
-    fn update_encoding(
-        &mut self,
-        f: impl FnOnce(Decoded<Self::Small, &mut Self::Big>) -> Option<Decoded<Self::Small, Self::Big>>,
-    ) {
-        let new_decoded = f(Decoded::Big(self));
-        match new_decoded {
-            Some(Decoded::Small(s)) => *self = s.into(),
-            Some(Decoded::Big(b)) => *self = b,
-            _ => (),
-        }
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
+        let mut decoded = Decoded::Big(Cow::Owned(std::mem::take(self)));
+        f(&mut decoded);
+        match decoded {
+            Decoded::Big(Cow::Borrowed(b)) => debug_assert_eq!(self, b),
+            Decoded::Big(Cow::Owned(o)) => *self = o,
+            Decoded::Small(s) => *self = s.into(),
+        };
     }
 }
 

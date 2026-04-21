@@ -38,6 +38,7 @@ pub trait SmallNumber:
     + CheckedSub
     + ConstOne
     + ConstZero
+    + Default
     + LowerHex
     + Shl<u32, Output = Self>
     + Shr<u32, Output = Self>

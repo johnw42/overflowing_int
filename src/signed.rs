@@ -81,10 +81,9 @@ where
         E: EncodingMut<'enc>,
     {
         self.0.update_encoding(|enc| match enc {
-            Decoded::Small(_) => Some(Decoded::Big(E::Big::from_slice(sign, slice))),
+            Decoded::Small(_) => *enc = Decoded::Big(Cow::Owned(E::Big::from_slice(sign, slice))),
             Decoded::Big(b) => {
-                b.assign_from_slice(sign, slice);
-                None
+                b.to_mut().assign_from_slice(sign, slice);
             }
         });
     }

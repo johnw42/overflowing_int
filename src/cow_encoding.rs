@@ -103,20 +103,8 @@ impl<'enc, S> EncodingMut<'enc> for CowEncoding<'enc, S>
 where
     S: SmallNumber,
 {
-    fn update_encoding(
-        &mut self,
-        f: impl FnOnce(Decoded<Self::Small, &mut Self::Big>) -> Option<Decoded<Self::Small, Self::Big>>,
-    ) {
-        let new_decoded = match &mut self.0 {
-            Decoded::Small(s) => f(Decoded::Small(*s)),
-            Decoded::Big(b) => f(Decoded::Big(b.to_mut())),
-        };
-        match new_decoded {
-            Some(Decoded::Small(ns)) => self.0 = Decoded::Small(ns),
-            Some(Decoded::Big(nb)) => self.0 = Decoded::Big(Cow::Owned(nb)),
-            None => {}
-        }
-
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<'enc, Self::Big>>)) {
+        f(&mut self.0);
         self.normalize();
     }
 }

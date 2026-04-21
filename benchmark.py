@@ -7,9 +7,9 @@ import json
 
 TOP_DIR = os.path.dirname(__file__)
 
-DEFAULT_BASELINE = "out"
+REVISIONS = ["xzw", "out", "msu", "tns", "xmr", "oot", "kmo"]
 
-REVISIONS = ["out", "tns", "xmr"]
+DEFAULT_BASELINE = REVISIONS[0]
 
 FUNCTIONS = ["Control", "Cow", "Arc", "ArcSize", "Identity", "Enum"]
 SIZES = ["10", "15", "20", "30", "40", "50", "100"]
@@ -48,7 +48,8 @@ class RevisionData:
 
 def system(cmd):
     print(f"$ {cmd}")
-    return os.system(cmd)
+    if os.system(cmd) != 0:
+        raise RuntimeError(f"Command failed: {cmd}")
 
 
 def popen(cmd):
@@ -115,18 +116,25 @@ def main():
 
     match opts.command:
         case "all":
+            workspace_name = "bench-workspace"
+            target_dir = f"{TOP_DIR}/../target"
+            workspace_dir = f"{target_dir}/{workspace_name}"
             try:
-                system("jj workspace add target/bench-workspace")
+                system(f"jj workspace add {workspace_dir}")
+                os.chdir(workspace_dir)
                 for rev in REVISIONS:
-                    print(f"Testing revision {rev}...")
+                    print(f"Benchmarking revision {rev}...")
                     system(f"jj edit --ignore-immutable {rev}")
                     cargo(
                         f"bench -p compact_bigint --bench={opts.bench} -- --save-baseline={rev} {bench_pattern}"
                     )
+                system(
+                    f"rsync -a {workspace_dir}/target/criterion/ {target_dir}/criterion/"
+                )
             finally:
                 os.chdir(TOP_DIR)
-                system("jj workspace forget target/bench-workspace")
-                shutil.rmtree("target/bench-workspace", ignore_errors=True)
+                system(f"jj workspace forget {workspace_name}")
+                shutil.rmtree(workspace_dir, ignore_errors=True)
         case "summary":
             print("Printing summary of benchmark results...")
             rev_data = {rev: RevisionData(rev) for rev in REVISIONS}

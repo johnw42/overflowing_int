@@ -97,19 +97,19 @@ impl<'enc, S> EncodingMut<'enc> for EnumEncoding<S>
 where
     S: SmallNumber,
 {
-    fn update_encoding(
-        &mut self,
-        f: impl FnOnce(Decoded<Self::Small, &mut Self::Big>) -> Option<Decoded<Self::Small, Self::Big>>,
-    ) {
-        let new_decoded = match &mut self.0 {
-            Decoded::Small(s) => f(Decoded::Small(*s)),
-            Decoded::Big(b) => f(Decoded::Big(b)),
+    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
+        let mut swapped = Decoded::Small(S::ZERO);
+        std::mem::swap(&mut self.0, &mut swapped);
+        let mut encoding = match &mut swapped {
+            Decoded::Small(s) => Decoded::Small(*s),
+            Decoded::Big(b) => Decoded::Big(Cow::Borrowed(b)),
         };
-        match new_decoded {
-            Some(Decoded::Small(ns)) => self.0 = Decoded::Small(ns),
-            Some(Decoded::Big(nb)) => self.0 = Decoded::Big(nb),
-            None => {}
-        }
+        f(&mut encoding);
+        self.0 = match encoding {
+            Decoded::Small(s) => Decoded::Small(s),
+            Decoded::Big(Cow::Owned(b)) => Decoded::Big(b),
+            Decoded::Big(Cow::Borrowed(_)) => swapped,
+        };
         self.normalize();
     }
 }
