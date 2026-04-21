@@ -1,4 +1,3 @@
-use crate::cow_encoding::CowEncoding;
 use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encode;
@@ -81,18 +80,12 @@ where
     type Big = S::Big;
     type Unsigned = EnumEncoding<S::Unsigned>;
     type Owned = Self;
-    type Borrowed<'a> = CowEncoding<'a, S>;
+    type Borrowed<'a> = Self;
 
     const ZERO: Self = Self(Decoded::Small(S::ZERO));
 
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
-    where
-        Self: 'a,
-    {
-        match &self.0 {
-            Decoded::Small(s) => CowEncoding::from_small(*s),
-            Decoded::Big(b) => CowEncoding::from_big_ref(b),
-        }
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
+        self.clone()
     }
 
     fn into_owned(self) -> Self::Owned {

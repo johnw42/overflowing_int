@@ -65,10 +65,7 @@ impl<'enc> Encoding<'enc> for BigInt {
         self
     }
 
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
-    where
-        Self: 'a,
-    {
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         CowEncoding::from_big_ref(self)
     }
 }
@@ -153,10 +150,7 @@ impl<'enc> Encoding<'enc> for BigUint {
         self
     }
 
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
-    where
-        Self: 'a,
-    {
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         CowEncoding::from_big_ref(self)
     }
 }

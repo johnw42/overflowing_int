@@ -1,5 +1,5 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingMut};
+use crate::encoding::{Decode, Decoded, Encoding, EncodingMut};
 use crate::small_num::SmallNumber;
 use num_bigint::BigUint;
 use num_traits::{Pow, PrimInt as _};
@@ -13,31 +13,39 @@ impl<'enc, E> Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
-    const fn from_encoding(encoding: E) -> Self {
-        Self(encoding)
+    /// Converts an `Uint` with one encoding into an `Uint` with another encoding.
+    ///
+    /// This cannot be implemented using the standard `From` trait because it would overlap
+    /// with the blanket implementation of `T: From<T>`.
+    pub fn reencode<'e2, E2>(other: Uint<E2>) -> Self
+    where
+        E2: Encoding<'e2, Big = BigUint>,
+        E2::Small: SmallNumber<Wide = <E::Small as SmallNumber>::Wide>,
+        'e2: 'enc,
+    {
+        Self(E::reencode(other.0))
     }
 
-    /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
-    pub fn into_owned(self) -> <Self as Encoding<'enc>>::Owned {
-        Uint::from_encoding(self.0.into_owned())
+    /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigUint`.
+    pub fn into_owned(self) -> Uint<E::Owned> {
+        Uint(self.0.into_owned())
     }
 
-    /// Converts this big integer to into one that borrows from this one's data,
-    /// if possible.  If the encoding does not support borrowing, this will
-    /// simply clone self.
+    /// Creates a big integer that borrows from this one's data, if possible.
+    /// If the encoding does not support borrowing, this will simply clone self.
     pub fn borrow<'a>(&'a self) -> Uint<E::Borrowed<'a>> {
-        Uint::from_encoding(self.0.borrow())
+        Uint(self.0.borrow())
     }
 
     /// A constant bigint with value 0, useful for static initialization.
-    pub const ZERO: Self = Self::from_encoding(E::ZERO);
+    pub const ZERO: Self = Self(E::ZERO);
 
     /// Creates and initializes a [`Uint`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
     pub fn new(digits: Vec<u32>) -> Uint<E> {
-        Self::from_encoding(E::from_big(E::Big::new(digits)))
+        Self(E::from_big(E::Big::new(digits)))
     }
 
     /// Creates and initializes a [`Uint`].
@@ -45,7 +53,7 @@ where
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
     pub fn from_slice(slice: &[u32]) -> Uint<E> {
-        Self::from_encoding(E::from_big(E::Big::from_slice(slice)))
+        Self(E::from_big(E::Big::from_slice(slice)))
     }
 
     /// Assign a value to a [`Uint`].
@@ -76,7 +84,7 @@ where
     /// ```
     #[inline]
     pub fn from_bytes_be(bytes: &[u8]) -> Uint<E> {
-        Self::from_encoding(
+        Self(
             if let Some(from_bytes) = SmallNumber::from_bytes_be(bytes) {
                 E::from_small(from_bytes)
             } else {
@@ -90,7 +98,7 @@ where
     /// The bytes are in little-endian byte order.
     #[inline]
     pub fn from_bytes_le(bytes: &[u8]) -> Uint<E> {
-        Self::from_encoding(E::from_big(E::Big::from_bytes_le(bytes)))
+        Self(E::from_big(E::Big::from_bytes_le(bytes)))
     }
 
     /// Creates and initializes a [`Uint`]. The input slice must contain
@@ -111,7 +119,7 @@ where
     /// ```
     #[inline]
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
-        E::parse_bytes(buf, radix).map(Self::from_encoding)
+        E::parse_bytes(buf, radix).map(Self)
     }
 
     /// Creates and initializes a [`Uint`]. Each `u8` of the input slice is
@@ -131,9 +139,7 @@ where
     /// assert_eq!(a.to_radix_be(190), inbase190);
     /// ```
     pub fn from_radix_be(buf: &[u8], radix: u32) -> Option<Self> {
-        E::Big::from_radix_be(buf, radix)
-            .map(E::from_big)
-            .map(Self::from_encoding)
+        E::Big::from_radix_be(buf, radix).map(E::from_big).map(Self)
     }
 
     /// Creates and initializes a [`Uint`]. Each `u8` of the input slice is
@@ -153,9 +159,7 @@ where
     /// assert_eq!(a.to_radix_le(190), inbase190);
     /// ```
     pub fn from_radix_le(buf: &[u8], radix: u32) -> Option<Uint<E>> {
-        E::Big::from_radix_le(buf, radix)
-            .map(E::from_big)
-            .map(Self::from_encoding)
+        E::Big::from_radix_le(buf, radix).map(E::from_big).map(Self)
     }
 
     /// Returns the byte representation of the [`Uint`] in big-endian byte order.
@@ -331,7 +335,7 @@ where
     ///
     /// Panics if the modulus is zero.
     pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-        Self::from_encoding(self.0.modpow(&exponent.0, &modulus.0))
+        Self(self.0.modpow(&exponent.0, &modulus.0))
     }
 
     /// Returns the modular multiplicative inverse if it exists, otherwise `None`.
@@ -358,25 +362,25 @@ where
     /// assert!((a * x % m).is_one());
     /// ```
     pub fn modinv(&self, modulus: &Self) -> Option<Self> {
-        self.0.modinv(&modulus.0).map(Self::from_encoding)
+        self.0.modinv(&modulus.0).map(Self)
     }
 
     /// Returns the truncated principal square root of `self` --
     /// see [Roots::sqrt](https://docs.rs/num-integer/0.1/num_integer/trait.Roots.html#method.sqrt)
     pub fn sqrt(&self) -> Self {
-        Self::from_encoding(self.0.sqrt())
+        Self(self.0.sqrt())
     }
 
     /// Returns the truncated principal cube root of `self` --
     /// see [Roots::cbrt](https://docs.rs/num-integer/0.1/num_integer/trait.Roots.html#method.cbrt).
     pub fn cbrt(&self) -> Self {
-        Self::from_encoding(self.0.cbrt())
+        Self(self.0.cbrt())
     }
 
     /// Returns the truncated principal `n`th root of `self` --
     /// see [Roots::nth_root](https://docs.rs/num-integer/0.1/num_integer/trait.Roots.html#tymethod.nth_root).
     pub fn nth_root(&self, n: u32) -> Self {
-        Self::from_encoding(self.0.nth_root(n))
+        Self(self.0.nth_root(n))
     }
 
     /// Returns the number of least-significant bits that are zero,
@@ -450,61 +454,5 @@ where
 
     fn decode<'a>(&'a self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
         self.0.decode()
-    }
-}
-
-impl<'enc, E> Encode<'enc, E::Small> for Uint<E>
-where
-    E: Encoding<'enc, Big = BigUint>,
-{
-    fn from_small(s: E::Small) -> Self {
-        Self::from_encoding(E::from_small(s))
-    }
-
-    fn from_big(b: E::Big) -> Self {
-        Self::from_encoding(E::from_big(b))
-    }
-
-    fn from_big_ref(b: &'enc E::Big) -> Self {
-        Self::from_encoding(E::from_big_ref(b))
-    }
-}
-
-impl<'enc, E> Encoding<'enc> for Uint<E>
-where
-    E: Encoding<'enc, Big = BigUint>,
-{
-    type Small = E::Small;
-    type Big = E::Big;
-    type Unsigned = Uint<E::Unsigned>;
-    type Owned = Uint<E::Owned>;
-    type Borrowed<'a>
-        = Uint<E::Borrowed<'a>>
-    where
-        Self: 'a;
-
-    const ZERO: Self = Self::ZERO;
-
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
-    where
-        Self: 'a,
-    {
-        Uint::from_encoding(self.0.borrow())
-    }
-
-    fn into_owned(self) -> Self::Owned {
-        Uint::from_encoding(self.0.into_owned())
-    }
-}
-
-impl<'enc, E> EncodingMut<'enc> for Uint<E>
-where
-    E: EncodingMut<'enc, Big = BigUint>,
-{
-    fn update_encoding(
-        &mut self,
-        f: impl FnOnce(Decoded<Self::Small, &mut Self::Big>) -> Option<Decoded<Self::Small, Self::Big>>,
-    ) {
-        self.0.update_encoding(f);
     }
 }

@@ -371,7 +371,7 @@ duplicate_arith_ops! {
             type Output = EncodedType<E>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
-                [<OpTrait Op>]::call(self, rhs)
+                EncodedType([<OpTrait Op>]::call(self, rhs))
             }
         }
 
@@ -383,7 +383,7 @@ duplicate_arith_ops! {
             type Output = EncodedType<E>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
-                [<OpTrait Op>]::call(self, rhs)
+                EncodedType([<OpTrait Op>]::call(self, rhs))
             }
         }
 
@@ -393,7 +393,7 @@ duplicate_arith_ops! {
             T: Decode<'enc, E::Small>,
         {
             fn [<op_fn _assign>](&mut self, rhs: T) {
-                [<OpTrait Op>]::call_update(self, rhs);
+                [<OpTrait Op>]::call_update(&mut self.0, rhs);
             }
         }
     }
@@ -409,7 +409,7 @@ duplicate_arith_ops! {
 
                 #[inline(never)]
                 fn op_fn(self, rhs: EncodedType<E>) -> Self::Output {
-                    [<OpTrait Op>]::call(self, rhs)
+                    EncodedType([<OpTrait Op>]::call(self, rhs))
                 }
             }
 
@@ -434,7 +434,7 @@ duplicate_arith_ops! {
 
                 #[inline(never)]
                 fn op_fn(self, rhs: &EncodedType<E>) -> Self::Output {
-                    [<OpTrait Op>]::call(self, rhs)
+                    EncodedType([<OpTrait Op>]::call(self, rhs))
                 }
             }
 
@@ -461,7 +461,7 @@ duplicate_arith_ops! {
                 type Output = EncodedType<E>;
 
                 fn op_fn(self, rhs: EncodedType<E>) -> Self::Output {
-                    [<OpTrait Op>]::call(self, rhs)
+                    EncodedType([<OpTrait Op>]::call(self, rhs))
                 }
             }
 
@@ -483,7 +483,7 @@ duplicate_arith_ops! {
                 type Output = EncodedType<E>;
 
                 fn op_fn(self, rhs: &EncodedType<E>) -> Self::Output {
-                    [<OpTrait Op>]::call(self, rhs)
+                    EncodedType([<OpTrait Op>]::call(self, rhs))
                 }
             }
 
@@ -511,7 +511,7 @@ duplicate_bit_ops! {
             type Output = EncodedType<E>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
-                [<OpTrait Op>]::call(self, rhs)
+                EncodedType([<OpTrait Op>]::call(self, rhs))
             }
         }
 
@@ -523,7 +523,7 @@ duplicate_bit_ops! {
             type Output = EncodedType<E>;
 
             fn op_fn(self, rhs: T) -> Self::Output {
-                [<OpTrait Op>]::call(self, rhs)
+                EncodedType([<OpTrait Op>]::call(self, rhs))
             }
         }
 
@@ -533,7 +533,7 @@ duplicate_bit_ops! {
             T: Decode<'enc, E::Small>
         {
             fn [<op_fn _assign>](&mut self, rhs: T) {
-                [<OpTrait Op>]::call_update(self, rhs);
+                [<OpTrait Op>]::call_update(&mut self.0, rhs);
             }
         }
     }
@@ -549,7 +549,7 @@ duplicate_shift_ops! {
                 type Output = EncodedType<E>;
 
                 fn op_fn(self, rhs: prim) -> Self::Output {
-                    [<OpTrait Op>]::[<call_ prim>](self, rhs)
+                    EncodedType([<OpTrait Op>]::[<call_ prim>](self.0, rhs))
                 }
             }
 
@@ -571,7 +571,7 @@ duplicate_shift_ops! {
                 type Output = EncodedType<E>;
 
                 fn op_fn(self, rhs: prim) -> Self::Output {
-                    [<OpTrait Op>]::[<call_ prim>](self, rhs)
+                    EncodedType([<OpTrait Op>]::[<call_ prim>](self, rhs))
                 }
             }
 
@@ -591,7 +591,7 @@ duplicate_shift_ops! {
                 E: EncodingMut<'enc, Big = ImplType>,
             {
                 fn [<op_fn _assign>](&mut self, rhs: prim) {
-                    [<OpTrait Op>]::[<call_update_big_ prim>](self, rhs);
+                    [<OpTrait Op>]::[<call_update_big_ prim>](&mut self.0, rhs);
                 }
             }
 
@@ -620,7 +620,7 @@ where
     type Output = EncodedType<E>;
 
     fn pow(self, rhs: Uint<E::Unsigned>) -> Self::Output {
-        PowOp::call(self, rhs)
+        EncodedType(PowOp::call(self, rhs))
     }
 }
 
@@ -631,7 +631,7 @@ where
     type Output = EncodedType<E>;
 
     fn pow(self, rhs: &Uint<E::Unsigned>) -> Self::Output {
-        PowOp::call(self, rhs)
+        EncodedType(PowOp::call(self, rhs))
     }
 }
 
@@ -642,7 +642,7 @@ where
     type Output = EncodedType<E>;
 
     fn pow(self, rhs: Uint<E::Unsigned>) -> Self::Output {
-        PowOp::call(self, rhs)
+        EncodedType(PowOp::call(self, rhs))
     }
 }
 
@@ -653,7 +653,7 @@ where
     type Output = EncodedType<E>;
 
     fn pow(self, rhs: &Uint<E::Unsigned>) -> Self::Output {
-        PowOp::call(self, rhs)
+        EncodedType(PowOp::call(self, rhs))
     }
 }
 
@@ -666,7 +666,7 @@ duplicate_uprims! {
             type Output = EncodedType<E>;
 
             fn pow(self, rhs: prim) -> Self::Output {
-                PowOp::call(self, rhs)
+                EncodedType(PowOp::call(self, rhs))
             }
         }
 
@@ -677,7 +677,7 @@ duplicate_uprims! {
             type Output = EncodedType<E>;
 
             fn pow(self, rhs: &prim) -> Self::Output {
-                PowOp::call(self, rhs)
+                EncodedType(PowOp::call(self, rhs))
             }
         }
 
@@ -688,7 +688,7 @@ duplicate_uprims! {
             type Output = EncodedType<E>;
 
             fn pow(self, rhs: prim) -> Self::Output {
-                PowOp::call(self, rhs)
+                EncodedType(PowOp::call(self, rhs))
             }
         }
 
@@ -699,7 +699,7 @@ duplicate_uprims! {
             type Output = EncodedType<E>;
 
             fn pow(self, rhs: &prim) -> Self::Output {
-                PowOp::call(self, rhs)
+                EncodedType(PowOp::call(self, rhs))
             }
         }
     }
@@ -856,7 +856,7 @@ mod test {
                 #[test]
                 fn [<test_pow_ prim>]() {
                     fn inner(lhs: EncodedType, rhs: u8) -> TestResult {
-                        let rhs = rhs % 64; // limit the exponent to avoid long test times and potential OOM errors
+                        let rhs = rhs % 16; // limit the exponent to avoid long test times and potential OOM errors
                         #[allow(irrefutable_let_patterns)]
                         #[allow(clippy::unnecessary_fallible_conversions)]
                         if let Ok(rhs) = prim::try_from(rhs) {

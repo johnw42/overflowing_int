@@ -83,7 +83,8 @@ where
     fn try_from(value: BigInt) -> Result<Self, Self::Error> {
         value
             .to_biguint()
-            .map(Self::from_big)
+            .map(E::from_big)
+            .map(Self)
             .ok_or_else(|| TryFromBigIntError::new(value))
     }
 }
@@ -97,7 +98,8 @@ where
     fn try_from(value: &BigInt) -> Result<Self, Self::Error> {
         value
             .to_biguint()
-            .map(Self::from_big)
+            .map(E::from_big)
+            .map(Self)
             .ok_or_else(|| TryFromBigIntError::new(()))
     }
 }
@@ -141,10 +143,10 @@ where
     fn try_from(value: Int<E1>) -> Result<Self, Self::Error> {
         match value.decode() {
             Decoded::Small(s) => match E2::Small::try_from(s) {
-                Ok(u) => Some(Self::from_small(u)),
-                Err(_) => s.to_biguint().map(Self::from_big),
+                Ok(u) => Some(Self(E2::from_small(u))),
+                Err(_) => s.to_biguint().map(E2::from_big).map(Self),
             },
-            Decoded::Big(b) => b.to_biguint().map(Self::from_big),
+            Decoded::Big(b) => b.to_biguint().map(E2::from_big).map(Self),
         }
         .ok_or_else(|| TryFromBigIntError::new(value))
     }
@@ -161,11 +163,12 @@ duplicate_iprims! {
             fn try_from(value: prim) -> Result<Self, Self::Error> {
                 #[allow(clippy::unnecessary_fallible_conversions)]
                 if let Ok(small) = E::Small::try_from(value) {
-                    Ok(Self::from_small(small))
+                    Ok(Self(E::from_small(small)))
                 } else {
                     BigUint::try_from(value)
                         .ok()
-                        .map(Self::from_big)
+                        .map(E::from_big)
+                        .map(Self)
                         .ok_or_else(|| TryFromBigIntError::new(()))
                 }
             }
@@ -182,7 +185,7 @@ where
     E: Encoding<'enc, Big = BigInt>,
 {
     fn from(value: BigUint) -> Self {
-        Self::from_big(value.into())
+        Self(E::from_big(value.into()))
     }
 }
 
@@ -191,7 +194,7 @@ where
     E: Encoding<'enc, Big = BigInt>,
 {
     fn from(value: &BigUint) -> Self {
-        Self::from_big(value.clone().into())
+        Self(E::from_big(value.clone().into()))
     }
 }
 
@@ -222,10 +225,10 @@ where
     fn from(value: Uint<E1>) -> Self {
         match value.decode() {
             Decoded::Small(s) => match E2::Small::try_from(s) {
-                Ok(small) => Self::from_small(small),
-                Err(_) => Self::from_big(s.to_big().into()),
+                Ok(small) => Self(E2::from_small(small)),
+                Err(_) => Self(E2::from_big(s.to_big().into())),
             },
-            Decoded::Big(b) => Self::from_big(b.into_owned().into()),
+            Decoded::Big(b) => Self(E2::from_big(b.into_owned().into())),
         }
     }
 }
@@ -238,8 +241,8 @@ duplicate_uprims! {
         fn from(value: prim) -> Self {
             #[allow(clippy::unnecessary_fallible_conversions)]
             match E::Small::try_from(value) {
-                Ok(small) => Self::from_small(small),
-                Err(_) => Self::from_big(BigInt::from(value)),
+                Ok(small) => Self(E::from_small(small)),
+                Err(_) => Self(E::from_big(BigInt::from(value))),
             }
         }
     }
@@ -264,7 +267,7 @@ pub mod tag {
         E: Encoding<'enc, Big = ImplType>,
     {
         fn from(value: ImplType) -> Self {
-            Self::from_big(value)
+            Self(E::from_big(value))
         }
     }
 
@@ -273,7 +276,7 @@ pub mod tag {
         E: Encoding<'enc, Big = ImplType>,
     {
         fn from(value: &ImplType) -> Self {
-            Self::from_big(value.clone())
+            Self(E::from_big(value.clone()))
         }
     }
 
@@ -314,9 +317,9 @@ pub mod tag {
                     #[allow(irrefutable_let_patterns)]
                     #[allow(clippy::unnecessary_fallible_conversions)]
                     if let Ok(n) = E::Small::try_from(value) {
-                        Self::from_small(n)
+                        Self(E::from_small(n))
                     } else {
-                        Self::from_big(E::Big::from(value))
+                        Self(E::from_big(E::Big::from(value)))
                     }
                 }
             }
@@ -393,7 +396,6 @@ mod test {
             paste! {
                 #[quickcheck]
                 fn [<test_ ForeignType:lower _to_ encoding_tag>](value: ForeignType) {
-                    // #[allow(clippy::clone_on_copy)]
                     let converted: EncodedType = EncodedType::from(value.clone());
                     #[allow(clippy::unnecessary_fallible_conversions)]
                     let round_trip: Option<ForeignType> = ForeignType::try_from(converted).ok();
@@ -415,7 +417,6 @@ mod test {
             paste! {
                 #[quickcheck]
                 fn [<test_ref_ SourceType:lower _to_ encoding_tag>](value: SourceType) {
-                    // #[allow(clippy::clone_on_copy)]
                     let converted: EncodedType = EncodedType::from(&value);
                     #[allow(clippy::unnecessary_fallible_conversions)]
                     let round_trip: Option<SourceType> = SourceType::try_from(converted).ok();
@@ -441,9 +442,7 @@ mod test {
             paste! {
                 #[quickcheck]
                 fn [<test_ SourceType:lower _to_ encoding_tag>](value: SourceType) {
-                    // #[allow(clippy::clone_on_copy)]
                     let converted: EncodedType = EncodedType::from(value.clone());
-                    // #[allow(clippy::unnecessary_fallible_conversions)]
                     let round_trip: Option<SourceType> = SourceType::try_from(converted).ok();
                     assert_eq!(Some(value), round_trip);
                 }
@@ -457,7 +456,6 @@ mod test {
             #[quickcheck]
             fn [<test_ref_biguint_to_ encoding_tag>](value: BigUint) {
                 let converted: EncodedType = EncodedType::from(&value);
-                // #[allow(clippy::unnecessary_fallible_conversions)]
                 let round_trip: Option<BigUint> = BigUint::try_from(converted).ok();
                 assert_eq!(Some(value), round_trip);
             }

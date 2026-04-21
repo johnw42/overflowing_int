@@ -9,7 +9,7 @@ TOP_DIR = os.path.dirname(__file__)
 
 DEFAULT_BASELINE = "out"
 
-REVISIONS = ["out", "tns"]
+REVISIONS = ["out", "tns", "xmr"]
 
 FUNCTIONS = ["Control", "Cow", "Arc", "ArcSize", "Identity", "Enum"]
 SIZES = ["10", "15", "20", "30", "40", "50", "100"]

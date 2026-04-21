@@ -123,10 +123,7 @@ where
         self
     }
 
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
-    where
-        Self: 'a,
-    {
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         self.clone()
     }
 }

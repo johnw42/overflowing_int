@@ -1,9 +1,10 @@
 #![cfg(test)]
 
-use crate::encoding::Encoding;
+use crate::{encoding::Encoding, signed::Int, unsigned::Uint};
 use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Pow, Zero};
+use paste::paste;
 use quickcheck::{Arbitrary, Gen, TestResult};
 use quickcheck_macros::quickcheck;
 
@@ -91,6 +92,18 @@ impl Arbitrary for BinaryRadixBytes {
             }
         }))
     }
+}
+
+/// Needed to find unsigned versions of signed integer types.
+trait Unsigned {
+    type Unsigned;
+}
+
+impl<E> Unsigned for Int<E>
+where
+    E: Encoding<'static, Big = BigInt>,
+{
+    type Unsigned = Uint<E::Unsigned>;
 }
 
 duplicate_encoded_types! {
@@ -250,6 +263,7 @@ mod encoding_tag {
         if n.is_even() && a < EncodedType::ZERO {
             return TestResult::discard();
         }
+        eprintln!("test_nth_root: a = {:?}, n = {}", a, n);
         let expected = to_impl(&a).nth_root(n);
         let actual = ImplType::from(a.nth_root(n));
         assert_eq!(expected, actual);
@@ -292,7 +306,7 @@ mod signed {
             ImplType::from(a.clone())
         }
 
-        type UnsignedEncodedType = <EncodedType as Encoding<'static>>::Unsigned;
+        type UnsignedEncodedType = <EncodedType as Unsigned>::Unsigned;
 
         #[derive(Clone, Debug)]
         struct ArbSign(Sign);
@@ -311,6 +325,14 @@ mod signed {
                     *g.choose(&options)
                     .unwrap(),
                 )
+            }
+        }
+        crate::duplicate_signed_encoded_types! { [SourceType, source_tag]
+            paste! {
+                #[quickcheck]
+                fn [<test_reencode_ source_tag _to_ encoding_tag>](value: SourceType) {
+                    assert_eq!(BigInt::from(value.clone()), BigInt::from(EncodedType::reencode(value)));
+                }
             }
         }
 
@@ -442,6 +464,15 @@ mod unsigned {
             ImplType::from(a.clone())
         }
 
+        crate::duplicate_unsigned_encoded_types! { [SourceType, source_tag]
+            paste! {
+                #[quickcheck]
+                fn [<test_reencode_ source_tag _to_ encoding_tag>](value: SourceType) {
+                    assert_eq!(BigUint::from(value.clone()), BigUint::from(EncodedType::reencode(value)));
+                }
+            }
+        }
+
         #[quickcheck]
         fn test_new(magnitude: Vec<u32>) {
             let expected = BigUint::new(magnitude.clone());
@@ -511,7 +542,7 @@ mod unsigned {
 
         #[quickcheck]
         fn test_trailing_ones(a: EncodedType, extra_ones: u32) {
-            let a = a | EncodedType::from((1u32 << (extra_ones % 16)) - 1u32);
+            let a = a | EncodedType::from((1u32 << (extra_ones % 16)) - 1);
             let expected = to_impl(&a).trailing_ones();
             let actual = a.trailing_ones();
             assert_eq!(expected, actual);

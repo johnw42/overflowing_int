@@ -2,10 +2,10 @@
 
 #[macro_export]
 macro_rules! duplicate_unsigned_encoded_types {
-    ($($body:tt)*) => {
+    ([$EncodedType:ident, $encoding_tag:ident] $($body:tt)*) => {
         duplicate::duplicate! {
             [
-                IS_SIGNED  signedness  ImplType   encoding_tag        EncodedType;
+                IS_SIGNED  signedness  ImplType   $encoding_tag       $EncodedType;
                 [false]    [unsigned]  [BigUint]  [cow_unsigned]      [$crate::CowBigUint::<'static>];
                 [false]    [unsigned]  [BigUint]  [arc_unsigned]      [$crate::ArcBigUint];
                 [false]    [unsigned]  [BigUint]  [identity_unsigned] [$crate::bench::IdentityBigUint];
@@ -14,14 +14,17 @@ macro_rules! duplicate_unsigned_encoded_types {
             $($body)*
         }
     };
+    ($($body:tt)*) => {
+        $crate::duplicate_unsigned_encoded_types! { [EncodedType, encoding_tag] $($body)* }
+    }
 }
 
 #[macro_export]
 macro_rules! duplicate_signed_encoded_types {
-    ($($body:tt)*) => {
+    ([$EncodedType:ident, $encoding_tag:ident] $($body:tt)*) => {
         duplicate::duplicate! {
             [
-                IS_SIGNED  signedness  ImplType  encoding_tag      EncodedType;
+                IS_SIGNED  signedness  ImplType  $encoding_tag     $EncodedType;
                 [true]     [signed]    [BigInt]  [cow_signed]      [$crate::CowBigInt::<'static>];
                 [true]     [signed]    [BigInt]  [arc_signed]      [$crate::ArcBigInt];
                 [true]     [signed]    [BigInt]  [identity_signed] [$crate::bench::IdentityBigInt];
@@ -30,6 +33,9 @@ macro_rules! duplicate_signed_encoded_types {
             $($body)*
         }
     };
+    ($($body:tt)*) => {
+        $crate::duplicate_signed_encoded_types! { [EncodedType, encoding_tag] $($body)* }
+    }
 }
 
 #[macro_export]

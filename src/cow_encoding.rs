@@ -91,10 +91,7 @@ where
         }
     }
 
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
-    where
-        'enc: 'a,
-    {
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         match &self.0 {
             Decoded::Small(s) => CowEncoding(Decoded::Small(*s)),
             Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Borrowed(b.as_ref()))),

@@ -150,13 +150,28 @@ where
 
     const ZERO: Self;
 
+    /// Converts an encoding of one type into an encoding of another type with the same big representation.
+    fn reencode<'e2, E2>(other: E2) -> Self
+    where
+        E2: Encoding<'e2, Big = Self::Big>,
+        E2::Small: SmallNumber<Wide = <Self::Small as SmallNumber>::Wide>,
+        'e2: 'enc,
+    {
+        match other.into_decoded() {
+            Decoded::Small(s) => match Self::Small::try_from(s.widen()).ok() {
+                Some(s) => Self::from_small(s),
+                None => Self::from_big(s.to_big()),
+            },
+            Decoded::Big(Cow::Owned(b)) => Self::from_big(b),
+            Decoded::Big(Cow::Borrowed(b)) => Self::from_big_ref(b),
+        }
+    }
+
     /// Converts this encoding to a version with a static lifetime.
     fn into_owned(self) -> Self::Owned;
 
     /// Converts this encoding into a version with a shorter lifetime.
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>
-    where
-        Self: 'a;
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>;
 
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
         Self::Big::parse_bytes(buf, radix).map(Self::from_big)
@@ -213,7 +228,7 @@ where
 
     fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         let (lhs, rhs) = Self::big_cows(self, exponent);
-        Self::from_big(lhs.modpow(&rhs, modulus.big_cow().as_ref()))
+        Self::from_big(lhs.modpow(rhs.as_ref(), modulus.big_cow().as_ref()))
     }
 
     fn sqrt(&self) -> Self {
@@ -232,7 +247,16 @@ where
 
     fn nth_root(&self, n: u32) -> Self {
         match self.decode() {
-            Decoded::Small(x) => Self::from_small(x.nth_root(n)),
+            Decoded::Small(x) => {
+                // Corner case: Computing the nth root of the minimum value of a
+                // small number type causes an overflow when the implemention
+                // attempts to negate the value.
+                if x < Self::Small::zero() && x == Self::Small::MIN {
+                    Self::from_big(Self::Small::MIN.to_big().nth_root(n))
+                } else {
+                    Self::from_small(x.nth_root(n))
+                }
+            }
             Decoded::Big(x) => Self::from_big(Roots::nth_root(&x, n)),
         }
     }
@@ -274,6 +298,8 @@ pub trait EncodingMut<'enc>: Encoding<'enc> {
 
     fn set_bit(&mut self, bit: u64, value: bool) {
         self.update_encoding(|decoded| match decoded {
+            // We test for BITS - 1 instead of just BITS because we don't want
+            // to change the sign of the small value.
             Decoded::Small(n) if bit < (Self::Small::BITS - 1) as u64 => {
                 let to_set = Self::Small::one() << bit as u32;
                 Some(Decoded::Small(if value { n | to_set } else { n & !to_set }))

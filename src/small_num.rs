@@ -66,19 +66,28 @@ pub trait SmallNumber:
     + TryFrom<u128>
     + TryFrom<usize>
     + TryFrom<Self::Unsigned>
+    + TryFrom<Self::Wide>
     + for<'a> TryFrom<&'a Self::Big>
     + TryInto<BigUint>
     + TryInto<u32>
+    + TryInto<Self::Wide>
     + QuickcheckBounds
     + UpperHex
     + Zero
 {
     type Big: BigNumber;
     type Unsigned: SmallNumber<Big = BigUint> + Unsigned;
+    type Wide;
 
     const BITS: u32;
     const MIN: Self;
     const MINUS_ONE: Self;
+
+    fn widen(self) -> Self::Wide {
+        self.try_into()
+            .ok()
+            .expect("widening conversion should never fail")
+    }
 
     fn try_from_unsigned(u: Self::Unsigned) -> Option<Self> {
         Self::try_from(u).ok()
@@ -173,6 +182,8 @@ macro_rules! impl_small_num {
         impl SmallNumber for $signed {
             type Big = BigInt;
             type Unsigned = $unsigned;
+            type Wide = i128;
+
             const BITS: u32 = <$signed>::BITS;
             const MIN: Self = <$signed>::MIN;
             const MINUS_ONE: Self = -1;
@@ -219,6 +230,8 @@ macro_rules! impl_small_num {
         impl SmallNumber for $unsigned {
             type Big = BigUint;
             type Unsigned = $unsigned;
+            type Wide = u128;
+
             const BITS: u32 = <$unsigned>::BITS;
             const MIN: Self = <$unsigned>::MIN;
             const MINUS_ONE: Self = <$unsigned>::MAX;

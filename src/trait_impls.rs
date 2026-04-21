@@ -25,7 +25,7 @@ use {
 
 use crate::{
     duplicate_iprims, duplicate_prims, duplicate_uprims,
-    encoding::{Decode, Decoded, Encode, Encoding},
+    encoding::{Decode, Decoded, Encoding},
     signed::Int,
     small_num::SmallNumber,
     unsigned::Uint,
@@ -58,15 +58,15 @@ pub mod mod_name {
     {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             match bool::arbitrary(g) {
-                true => Self::from_small(E::Small::arbitrary(g)),
-                false => Self::from_big(E::Big::arbitrary(g)),
+                true => Self(E::from_small(E::Small::arbitrary(g))),
+                false => Self(E::from_big(E::Big::arbitrary(g))),
             }
         }
 
         fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
             match self.decode() {
-                Decoded::Small(small) => Box::new(small.shrink().map(Self::from_small)),
-                Decoded::Big(big) => Box::new(big.shrink().map(Self::from_big)),
+                Decoded::Small(small) => Box::new(small.shrink().map(E::from_small).map(Self)),
+                Decoded::Big(big) => Box::new(big.shrink().map(E::from_big).map(Self)),
             }
         }
     }
@@ -82,8 +82,8 @@ pub mod mod_name {
     {
         fn arbitrary(g: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
             Ok(match bool::arbitrary(g)? {
-                true => Self::from_small(E::Small::arbitrary(g)?),
-                false => Self::from_big(E::Big::arbitrary(g)?),
+                true => Self(E::from_small(E::Small::arbitrary(g)?)),
+                false => Self(E::from_big(E::Big::arbitrary(g)?)),
             })
         }
     }
@@ -110,7 +110,7 @@ pub mod mod_name {
         E: Encoding<'enc, Big = ImplType>,
     {
         fn checked_add(&self, v: &Self) -> Option<Self> {
-            <Self as Encoding>::checked_add(self, v)
+            Some(Self(self.0.checked_add(&v.0)?))
         }
     }
 
@@ -123,7 +123,7 @@ pub mod mod_name {
         E: Encoding<'enc, Big = ImplType>,
     {
         fn checked_div(&self, v: &Self) -> Option<Self> {
-            <Self as Encoding>::checked_div(self, v)
+            Some(Self(self.0.checked_div(&v.0)?))
         }
     }
 
@@ -136,7 +136,7 @@ pub mod mod_name {
         E: Encoding<'enc, Big = ImplType>,
     {
         fn checked_mul(&self, v: &Self) -> Option<Self> {
-            <Self as Encoding>::checked_mul(self, v)
+            Some(Self(self.0.checked_mul(&v.0)?))
         }
     }
 
@@ -149,7 +149,7 @@ pub mod mod_name {
         E: Encoding<'enc, Big = ImplType>,
     {
         fn checked_sub(&self, v: &Self) -> Option<Self> {
-            <Self as Encoding>::checked_sub(self, v)
+            Some(Self(self.0.checked_sub(&v.0)?))
         }
     }
 
@@ -249,10 +249,10 @@ pub mod mod_name {
                 && let Some(rhs) = other.small()
                 && (lhs, rhs) != (E::Small::MIN, E::Small::MINUS_ONE)
             {
-                return Self::from_small(Integer::div_floor(&lhs, &rhs));
+                return Self(E::from_small(Integer::div_floor(&lhs, &rhs)));
             }
             let (lhs, rhs) = Self::big_cows(self, other);
-            Self::from_big(lhs.div_floor(rhs.as_ref()))
+            Self(E::from_big(lhs.div_floor(rhs.as_ref())))
         }
 
         fn mod_floor(&self, other: &Self) -> Self {
@@ -260,20 +260,20 @@ pub mod mod_name {
                 && let Some(rhs) = other.small()
                 && (lhs, rhs) != (E::Small::MIN, E::Small::MINUS_ONE)
             {
-                return Self::from_small(Integer::mod_floor(&lhs, &rhs));
+                return Self(E::from_small(Integer::mod_floor(&lhs, &rhs)));
             }
             let (lhs, rhs) = Self::big_cows(self, other);
-            Self::from_big(lhs.mod_floor(rhs.as_ref()))
+            Self(E::from_big(lhs.mod_floor(rhs.as_ref())))
         }
 
         fn gcd(&self, other: &Self) -> Self {
             if let Some(lhs) = self.small()
                 && let Some(rhs) = other.small()
             {
-                return Self::from_small(lhs.gcd(&rhs));
+                return Self(E::from_small(lhs.gcd(&rhs)));
             }
             let (lhs, rhs) = Self::big_cows(self, other);
-            Self::from_big(lhs.gcd(rhs.as_ref()))
+            Self(E::from_big(lhs.gcd(rhs.as_ref())))
         }
 
         fn lcm(&self, other: &Self) -> Self {
@@ -282,10 +282,10 @@ pub mod mod_name {
                 // See note in gcd_lcm about this check.
                 && lhs.checked_mul(&rhs).is_some()
             {
-                return Self::from_small(lhs.lcm(&rhs));
+                return Self(E::from_small(lhs.lcm(&rhs)));
             }
             let (lhs, rhs) = Self::big_cows(self, other);
-            Self::from_big(lhs.lcm(rhs.as_ref()))
+            Self(E::from_big(lhs.lcm(rhs.as_ref())))
         }
 
         fn is_multiple_of(&self, other: &Self) -> bool {
@@ -318,12 +318,12 @@ pub mod mod_name {
                 && (lhs, rhs) != (E::Small::MIN, E::Small::MINUS_ONE)
             {
                 let (q, r) = lhs.div_rem(&rhs);
-                return (Self::from_small(q), Self::from_small(r));
+                return (Self(E::from_small(q)), Self(E::from_small(r)));
             }
             let (q, r) = E::big_cows(self, other);
             (
-                Self::from_big(q.div_rem(r.as_ref()).0),
-                Self::from_big(q.div_rem(r.as_ref()).1),
+                Self(E::from_big(q.div_rem(r.as_ref()).0)),
+                Self(E::from_big(q.div_rem(r.as_ref()).1)),
             )
         }
 
@@ -337,11 +337,11 @@ pub mod mod_name {
                 && lhs.checked_mul(&rhs).is_some()
             {
                 let (gcd, lcm) = lhs.gcd_lcm(&rhs);
-                return (Self::from_small(gcd), Self::from_small(lcm));
+                return (Self(E::from_small(gcd)), Self(E::from_small(lcm)));
             }
             let (lhs, rhs) = Self::big_cows(self, other);
             let (gcd, lcm) = lhs.gcd_lcm(rhs.as_ref());
-            (Self::from_big(gcd), Self::from_big(lcm))
+            (Self(E::from_big(gcd)), Self(E::from_big(lcm)))
         }
     }
 
@@ -369,7 +369,7 @@ pub mod mod_name {
         E: Encoding<'enc, Big = ImplType>,
     {
         fn one() -> Self {
-            Self::from_small(E::Small::one())
+            Self(E::from_small(E::Small::one()))
         }
 
         fn is_one(&self) -> bool {
@@ -403,8 +403,8 @@ pub mod mod_name {
     {
         fn nth_root(&self, n: u32) -> Self {
             match self.decode() {
-                Decoded::Small(a) => Self::from_small(a.nth_root(n)),
-                Decoded::Big(a) => Self::from_big(a.nth_root(n)),
+                Decoded::Small(a) => Self(E::from_small(a.nth_root(n))),
+                Decoded::Big(a) => Self(E::from_big(a.nth_root(n))),
             }
         }
     }
@@ -572,7 +572,7 @@ pub mod mod_name {
         E: Encoding<'enc, Big = ImplType>,
     {
         fn zero() -> Self {
-            Self::from_small(E::Small::zero())
+            Self(E::from_small(E::Small::zero()))
         }
 
         fn is_zero(&self) -> bool {
@@ -594,12 +594,16 @@ where
 {
     fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
         let (lhs, rhs) = Self::big_cows(self, v);
-        lhs.checked_rem_euclid(rhs.as_ref()).map(Self::from_big)
+        lhs.checked_rem_euclid(rhs.as_ref())
+            .map(E::from_big)
+            .map(Self)
     }
 
     fn checked_div_euclid(&self, v: &Self) -> Option<Self> {
         let (lhs, rhs) = Self::big_cows(self, v);
-        lhs.checked_div_euclid(rhs.as_ref()).map(Self::from_big)
+        lhs.checked_div_euclid(rhs.as_ref())
+            .map(E::from_big)
+            .map(Self)
     }
 }
 
@@ -613,12 +617,12 @@ where
 {
     fn rem_euclid(&self, v: &Self) -> Self {
         let (lhs, rhs) = Self::big_cows(self, v);
-        Self::from_big(lhs.rem_euclid(rhs.as_ref()))
+        Self(E::from_big(lhs.rem_euclid(rhs.as_ref())))
     }
 
     fn div_euclid(&self, v: &Self) -> Self {
         let (lhs, rhs) = Self::big_cows(self, v);
-        Self::from_big(lhs.div_euclid(rhs.as_ref()))
+        Self(E::from_big(lhs.div_euclid(rhs.as_ref())))
     }
 }
 
@@ -708,9 +712,9 @@ where
         match self.into_decoded() {
             Decoded::Small(s) => {
                 if let Some(neg) = s.try_neg() {
-                    Self::Output::from_small(neg)
+                    Self(E::from_small(neg))
                 } else {
-                    s.to_big().neg().into()
+                    Self(E::from_big(s.to_big().neg()))
                 }
             }
             Decoded::Big(b) => b.into_owned().neg().into(),
@@ -728,12 +732,12 @@ where
         match self.decode() {
             Decoded::Small(s) => {
                 if let Some(neg) = s.try_neg() {
-                    Self::Output::from_small(neg)
+                    Int(E::from_small(neg))
                 } else {
-                    s.to_big().neg().into()
+                    Int(E::from_big(s.to_big().neg()))
                 }
             }
-            Decoded::Big(b) => b.into_owned().neg().into(),
+            Decoded::Big(b) => Int(E::from_big(b.into_owned().neg())),
         }
     }
 }
@@ -750,8 +754,8 @@ where
 
     fn not(self) -> Self::Output {
         match self.into_decoded() {
-            Decoded::Small(n) => Self::from_small(n.not()),
-            Decoded::Big(n) => Self::from_big(n.into_owned().not()),
+            Decoded::Small(n) => Self(E::from_small(n.not())),
+            Decoded::Big(n) => Self(E::from_big(n.into_owned().not())),
         }
     }
 }
@@ -764,8 +768,8 @@ where
 
     fn not(self) -> Self::Output {
         match self.decode() {
-            Decoded::Small(n) => Int::from_small(n.not()),
-            Decoded::Big(n) => Int::from_big(n.into_owned().not()),
+            Decoded::Small(n) => Int(E::from_small(n.not())),
+            Decoded::Big(n) => Int(E::from_big(n.into_owned().not())),
         }
     }
 }
@@ -833,12 +837,12 @@ where
         match self.decode() {
             Decoded::Small(s) => {
                 if let Some(s) = s.try_abs() {
-                    Self::from_small(s)
+                    Self(E::from_small(s))
                 } else {
-                    s.to_big().abs().into()
+                    Self(E::from_big(s.to_big().abs()))
                 }
             }
-            Decoded::Big(b) => b.abs().into(),
+            Decoded::Big(b) => Self(E::from_big(b.abs())),
         }
     }
 
@@ -848,8 +852,8 @@ where
 
     fn signum(&self) -> Self {
         match self.decode() {
-            Decoded::Small(n) => Self::from_small(n.signum()),
-            Decoded::Big(n) => Self::from_big(n.signum()),
+            Decoded::Small(n) => Self(E::from_small(n.signum())),
+            Decoded::Big(n) => Self(E::from_big(n.signum())),
         }
     }
 
