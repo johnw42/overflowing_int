@@ -34,10 +34,10 @@ where
     fn update_small(lhs: &mut E::Big, rhs: E::Small);
 
     /// Calls a version of the binary operator that returns a new number.
-    fn call<L, R>(lhs: L, rhs: R) -> E
+    fn call<'lhs, 'rhs, L, R>(lhs: L, rhs: R) -> E
     where
-        L: Decode<'enc, E::Small>,
-        R: Decode<'enc, E::Small>,
+        L: Decode<'lhs, E::Small>,
+        R: Decode<'rhs, E::Small>,
     {
         match (lhs.decode(), rhs.decode()) {
             (Decoded::Small(lhs), Decoded::Small(rhs)) => {
@@ -60,10 +60,10 @@ where
     }
 
     /// Calls a version of the binary operator that updates a bigint argument in place.
-    fn call_update<R>(lhs: &mut E, rhs: R)
+    fn call_update<'rhs, R>(lhs: &mut E, rhs: R)
     where
         E: EncodingMut<'enc>,
-        R: Decode<'enc, E::Small>,
+        R: Decode<'rhs, E::Small>,
     {
         lhs.update_encoding(|encoding| match (encoding, rhs.decode()) {
             (Decoded::Small(s), Decoded::Small(rhs)) => {
@@ -95,19 +95,18 @@ trait BitOp<'enc, E>
 where
     E: Encoding<'enc>,
 {
-    fn on_big(lhs: Cow<E::Big>, rhs: Cow<E::Big>) -> E::Big;
+    fn on_big<'lhs, 'rhs>(lhs: Cow<'lhs, E::Big>, rhs: Cow<'rhs, E::Big>) -> E::Big;
     fn update_big(lhs: &mut E::Big, rhs: Cow<E::Big>);
 
-    fn call<L, R>(lhs: L, rhs: R) -> E
+    fn call<'lhs, 'rhs, L, R>(lhs: L, rhs: R) -> E
     where
-        L: Decode<'enc, E::Small>,
-        R: Decode<'enc, E::Small>,
+        L: Decode<'lhs, E::Small>,
+        R: Decode<'rhs, E::Small>,
     {
-        let (lhs, rhs) = E::big_cows(&lhs, &rhs);
-        E::from_big(Self::on_big(lhs, rhs))
+        E::from_big(Self::on_big(lhs.big_cow(), rhs.big_cow()))
     }
 
-    fn call_update<'lhs, 'rhs, R>(lhs: &'lhs mut E, rhs: R)
+    fn call_update<'rhs, R>(lhs: &mut E, rhs: R)
     where
         E: EncodingMut<'enc>,
         R: Decode<'rhs, E::Small>,
@@ -175,10 +174,10 @@ where
     fn on_big(lhs: Cow<E::Big>, rhs: Cow<<E::Unsigned as Encoding<'enc>>::Big>) -> E::Big;
 
     /// Calls a version of the binary operator that returns a new number.
-    fn call<L, R>(lhs: L, rhs: R) -> E
+    fn call<'lhs, 'rhs, L, R>(lhs: L, rhs: R) -> E
     where
-        L: Decode<'enc, E::Small>,
-        R: Decode<'enc, <E::Unsigned as Encoding<'enc>>::Small>,
+        L: Decode<'lhs, E::Small>,
+        R: Decode<'rhs, <E::Unsigned as Encoding<'enc>>::Small>,
     {
         match (lhs.decode(), rhs.decode()) {
             (Decoded::Small(lhs), Decoded::Small(rhs)) => {
@@ -363,10 +362,10 @@ duplicate_generic_bignum! {
 
 duplicate_arith_ops! {
     paste! {
-        impl<'enc, T, E> OpTrait<T> for EncodedType<E>
+        impl<'enc, 'rhs, T, E> OpTrait<T> for EncodedType<E>
         where
             E: Encoding<'enc, Big = ImplType>,
-            T: Decode<'enc, E::Small>,
+            T: Decode<'rhs, E::Small>,
         {
             type Output = EncodedType<E>;
 
@@ -375,10 +374,10 @@ duplicate_arith_ops! {
             }
         }
 
-        impl<'enc, T, E> OpTrait<T> for &EncodedType<E>
+        impl<'enc, 'lhs, 'rhs, T, E> OpTrait<T> for &'lhs EncodedType<E>
         where
             E: Encoding<'enc, Big = ImplType>,
-            T: Decode<'enc, E::Small>,
+            T: Decode<'rhs, E::Small>,
         {
             type Output = EncodedType<E>;
 
@@ -387,10 +386,10 @@ duplicate_arith_ops! {
             }
         }
 
-        impl<'enc, T, E> [<OpTrait  Assign>]<T> for EncodedType<E>
+        impl<'enc, 'rhs, T, E> [<OpTrait  Assign>]<T> for EncodedType<E>
         where
             E: EncodingMut<'enc, Big = ImplType>,
-            T: Decode<'enc, E::Small>,
+            T: Decode<'rhs, E::Small>,
         {
             fn [<op_fn _assign>](&mut self, rhs: T) {
                 [<OpTrait Op>]::call_update(&mut self.0, rhs);
@@ -413,7 +412,7 @@ duplicate_arith_ops! {
                 }
             }
 
-            impl<'enc, E> OpTrait<EncodedType<E>> for &prim
+            impl<'enc, 'lhs, E> OpTrait<EncodedType<E>> for &'lhs prim
             where
                 E: Encoding<'enc, Big = ImplType>,
                 E::Big: BigSigned,
@@ -425,7 +424,7 @@ duplicate_arith_ops! {
                 }
             }
 
-            impl<'enc, E> OpTrait<&EncodedType<E>> for prim
+            impl<'enc, 'rhs, E> OpTrait<&'rhs EncodedType<E>> for prim
             where
                 E: Encoding<'enc, Big = ImplType>,
                 E::Big: BigSigned,
@@ -433,19 +432,19 @@ duplicate_arith_ops! {
                 type Output = EncodedType<E>;
 
                 #[inline(never)]
-                fn op_fn(self, rhs: &EncodedType<E>) -> Self::Output {
+                fn op_fn(self, rhs: &'rhs EncodedType<E>) -> Self::Output {
                     EncodedType([<OpTrait Op>]::call(self, rhs))
                 }
             }
 
-            impl<'enc, E> OpTrait<&EncodedType<E>> for &prim
+            impl<'enc, 'rhs, E> OpTrait<&'rhs EncodedType<E>> for &prim
             where
                 E: Encoding<'enc, Big = ImplType>,
                 E::Big: BigSigned,
             {
                 type Output = EncodedType<E>;
 
-                fn op_fn(self, rhs: &EncodedType<E>) -> Self::Output {
+                fn op_fn(self, rhs: &'rhs EncodedType<E>) -> Self::Output {
                     (*self).op_fn(rhs)
                 }
             }
@@ -476,24 +475,24 @@ duplicate_arith_ops! {
                 }
             }
 
-            impl<'enc, E> OpTrait<&EncodedType<E>> for prim
+            impl<'enc, 'rhs, E> OpTrait<&'rhs EncodedType<E>> for prim
             where
                 E: Encoding<'enc, Big = ImplType>,
             {
                 type Output = EncodedType<E>;
 
-                fn op_fn(self, rhs: &EncodedType<E>) -> Self::Output {
+                fn op_fn(self, rhs: &'rhs EncodedType<E>) -> Self::Output {
                     EncodedType([<OpTrait Op>]::call(self, rhs))
                 }
             }
 
-            impl<'enc, E> OpTrait<&EncodedType<E>> for &prim
+            impl<'enc, 'rhs, E> OpTrait<&'rhs EncodedType<E>> for &prim
             where
                 E: Encoding<'enc, Big = ImplType>,
             {
                 type Output = EncodedType<E>;
 
-                fn op_fn(self, rhs: &EncodedType<E>) -> Self::Output {
+                fn op_fn(self, rhs: &'rhs EncodedType<E>) -> Self::Output {
                     (*self).op_fn(rhs)
                 }
             }
@@ -503,36 +502,36 @@ duplicate_arith_ops! {
 
 duplicate_bit_ops! {
     paste! {
-        impl<'enc, T, E> OpTrait<T> for EncodedType<E>
+        impl<'enc, 'rhs, R, E> OpTrait<R> for EncodedType<E>
         where
             E: Encoding<'enc, Big = ImplType>,
-            T: Decode<'enc, E::Small>,
+            R: Decode<'rhs, E::Small>,
         {
             type Output = EncodedType<E>;
 
-            fn op_fn(self, rhs: T) -> Self::Output {
+            fn op_fn(self, rhs: R) -> Self::Output {
                 EncodedType([<OpTrait Op>]::call(self, rhs))
             }
         }
 
-        impl<'enc, T, E> OpTrait<T> for &EncodedType<E>
+        impl<'enc, 'lhs, 'rhs, R, E> OpTrait<R> for &'lhs EncodedType<E>
         where
             E: Encoding<'enc, Big = ImplType>,
-            T: Decode<'enc, E::Small>,
+            R: Decode<'rhs, E::Small>,
         {
             type Output = EncodedType<E>;
 
-            fn op_fn(self, rhs: T) -> Self::Output {
+            fn op_fn(self, rhs: R) -> Self::Output {
                 EncodedType([<OpTrait Op>]::call(self, rhs))
             }
         }
 
-        impl<'enc, T, E> [<OpTrait  Assign>]<T> for EncodedType<E>
+        impl<'enc, 'rhs, R, E> [<OpTrait  Assign>]<R> for EncodedType<E>
         where
             E: EncodingMut<'enc, Big = ImplType>,
-            T: Decode<'enc, E::Small>
+            R: Decode<'rhs, E::Small>
         {
-            fn [<op_fn _assign>](&mut self, rhs: T) {
+            fn [<op_fn _assign>](&mut self, rhs: R) {
                 [<OpTrait Op>]::call_update(&mut self.0, rhs);
             }
         }
@@ -564,7 +563,7 @@ duplicate_shift_ops! {
                 }
             }
 
-            impl<'enc, E> OpTrait<prim> for &EncodedType<E>
+            impl<'enc, 'lhs, E> OpTrait<prim> for &'lhs EncodedType<E>
             where
                 E: Encoding<'enc, Big = ImplType>,
             {
@@ -575,7 +574,7 @@ duplicate_shift_ops! {
                 }
             }
 
-            impl<'enc, E> OpTrait<&prim> for &EncodedType<E>
+            impl<'enc, 'lhs, E> OpTrait<&prim> for &'lhs EncodedType<E>
             where
                 E: Encoding<'enc, Big = ImplType>,
             {
@@ -624,18 +623,18 @@ where
     }
 }
 
-impl<'enc, E> Pow<&Uint<E::Unsigned>> for EncodedType<E>
+impl<'enc, 'rhs, E> Pow<&'rhs Uint<E::Unsigned>> for EncodedType<E>
 where
     E: Encoding<'enc, Big = ImplType>,
 {
     type Output = EncodedType<E>;
 
-    fn pow(self, rhs: &Uint<E::Unsigned>) -> Self::Output {
+    fn pow(self, rhs: &'rhs Uint<E::Unsigned>) -> Self::Output {
         EncodedType(PowOp::call(self, rhs))
     }
 }
 
-impl<'enc, E> Pow<Uint<E::Unsigned>> for &EncodedType<E>
+impl<'enc, 'lhs, E> Pow<Uint<E::Unsigned>> for &'lhs EncodedType<E>
 where
     E: Encoding<'enc, Big = ImplType>,
 {
@@ -646,13 +645,13 @@ where
     }
 }
 
-impl<'enc, E> Pow<&Uint<E::Unsigned>> for &EncodedType<E>
+impl<'enc,'lhs, 'rhs, E> Pow<&'rhs Uint<E::Unsigned>> for &'lhs EncodedType<E>
 where
     E: Encoding<'enc, Big = ImplType>,
 {
     type Output = EncodedType<E>;
 
-    fn pow(self, rhs: &Uint<E::Unsigned>) -> Self::Output {
+    fn pow(self, rhs: &'rhs Uint<E::Unsigned>) -> Self::Output {
         EncodedType(PowOp::call(self, rhs))
     }
 }
@@ -735,6 +734,7 @@ mod test {
 
     duplicate_encoded_types! { mod encoding_tag {
         use super::*;
+        use std::borrow::Borrow as _;
 
         macro_rules! test_bin_op {
             ($expected: ident, $lhs: ident, $rhs: ident, $OpTrait: ident, $op_fn: ident, $op_test_pred: ident) => {
@@ -746,14 +746,20 @@ mod test {
                         return TestResult::discard();
                     }
                     let $expected = $OpTrait::$op_fn(big_lhs, big_rhs);
-                    let actual1 = $OpTrait::$op_fn($lhs.clone(), $rhs.clone()).into();
-                    assert_eq!($expected, actual1);
-                    let actual2 = $OpTrait::$op_fn($lhs.clone(), &$rhs).into();
-                    assert_eq!($expected, actual2);
-                    let actual3 = $OpTrait::$op_fn(&$lhs, $rhs.clone()).into();
-                    assert_eq!($expected, actual3);
-                    let actual4 = $OpTrait::$op_fn(&$lhs, &$rhs).into();
-                    assert_eq!($expected, actual4);
+                    let actual = $OpTrait::$op_fn($lhs.clone(), $rhs.clone()).into();
+                    assert_eq!($expected, actual);
+                    let actual = $OpTrait::$op_fn($lhs.clone(), &$rhs).into();
+                    assert_eq!($expected, actual);
+                    let actual = $OpTrait::$op_fn(&$lhs, $rhs.clone()).into();
+                    assert_eq!($expected, actual);
+                    let actual = $OpTrait::$op_fn(&$lhs, &$rhs).into();
+                    assert_eq!($expected, actual);
+                    let actual = $OpTrait::$op_fn($lhs.clone(), $rhs.borrow()).into();
+                    assert_eq!($expected, actual);
+                    let actual = $OpTrait::$op_fn($lhs.borrow(), $rhs.clone()).into();
+                    assert_eq!($expected, actual);
+                    let actual = $OpTrait::$op_fn($lhs.borrow(), $rhs.borrow()).into();
+                    assert_eq!($expected, actual);
                 }
             };
         }
@@ -762,9 +768,9 @@ mod test {
             ($expected: ident, $lhs: ident, $rhs: ident, $OpTrait: ident, $op_fn: ident, $op_test_pred: ident) => {
                 paste! {
                     test_bin_op!($expected, $lhs, $rhs, $OpTrait, $op_fn, $op_test_pred);
-                    let mut actual5 = $lhs.clone();
-                    [<$OpTrait  Assign>]::[<$op_fn _assign>](&mut actual5, $rhs.clone());
-                    assert_eq!($expected, actual5.into());
+                    let mut actual = $lhs.clone();
+                    [<$OpTrait  Assign>]::[<$op_fn _assign>](&mut actual, $rhs.clone());
+                    assert_eq!($expected, actual.into());
                 }
             };
         }
@@ -773,9 +779,12 @@ mod test {
             ($expected: ident, $lhs: ident, $rhs: ident, $OpTrait: ident, $op_fn: ident, $op_test_pred: ident) => {
                 paste! {
                     test_bin_op_with_assign!($expected, $lhs, $rhs, $OpTrait, $op_fn, $op_test_pred);
-                    let mut actual6 = $lhs.clone();
-                    [<$OpTrait  Assign>]::[<$op_fn _assign>](&mut actual6, &$rhs);
-                    assert_eq!($expected, actual6.into());
+                    let mut actual = $lhs.clone();
+                    [<$OpTrait  Assign>]::[<$op_fn _assign>](&mut actual, &$rhs);
+                    assert_eq!($expected, actual.into());
+                    let mut actual = $lhs.clone();
+                    [<$OpTrait  Assign>]::[<$op_fn _assign>](&mut actual, $rhs.borrow());
+                    assert_eq!($expected, actual.into());
                 }
             };
         }
@@ -813,17 +822,17 @@ mod test {
                             assert!(nonnegative_rhs, "shift amount must be non-negative");
 
                             let expected = OpTrait::op_fn(big_lhs, rhs);
-                            let actual1 = OpTrait::op_fn(lhs.clone(), rhs).into();
-                            assert_eq!(expected, actual1);
-                            let actual2 = OpTrait::op_fn(lhs.clone(), &rhs).into();
-                            assert_eq!(expected, actual2);
-                            let actual3 = OpTrait::op_fn(&lhs, rhs).into();
-                            assert_eq!(expected, actual3,);
-                            let actual4 = OpTrait::op_fn(&lhs, &rhs).into();
-                            assert_eq!(expected, actual4);
-                            let mut actual5 = lhs.clone();
-                            [<OpTrait  Assign>]::[<op_fn _assign>](&mut actual5, rhs);
-                            assert_eq!(expected, actual5.clone().into());
+                            let actual = OpTrait::op_fn(lhs.clone(), rhs).into();
+                            assert_eq!(expected, actual);
+                            let actual = OpTrait::op_fn(lhs.clone(), &rhs).into();
+                            assert_eq!(expected, actual);
+                            let actual = OpTrait::op_fn(&lhs, rhs).into();
+                            assert_eq!(expected, actual,);
+                            let actual = OpTrait::op_fn(&lhs, &rhs).into();
+                            assert_eq!(expected, actual);
+                            let mut actual = lhs.clone();
+                            [<OpTrait  Assign>]::[<op_fn _assign>](&mut actual, rhs);
+                            assert_eq!(expected, actual.clone().into());
                             TestResult::passed()
                         } else {
                             TestResult::discard()
@@ -862,10 +871,10 @@ mod test {
                         if let Ok(rhs) = prim::try_from(rhs) {
                             let big_lhs = &EncodedType::from(lhs.clone());
                             let expected = Pow::pow(big_lhs, rhs);
-                            let actual1 = EncodedType::from(Pow::pow(lhs.clone(), rhs));
-                            let actual2 = EncodedType::from(Pow::pow(lhs, rhs));
-                            assert_eq!(expected, actual1);
-                            assert_eq!(expected, actual2);
+                            let actual = EncodedType::from(Pow::pow(lhs.clone(), rhs));
+                            assert_eq!(expected, actual);
+                            let actual = EncodedType::from(Pow::pow(lhs, rhs));
+                            assert_eq!(expected, actual);
                             TestResult::passed()
                         } else {
                             TestResult::discard()

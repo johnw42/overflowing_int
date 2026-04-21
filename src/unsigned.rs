@@ -119,7 +119,7 @@ where
     /// ```
     #[inline]
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
-        E::parse_bytes(buf, radix).map(Self)
+        Some(Self(E::parse_bytes(buf, radix)?))
     }
 
     /// Creates and initializes a [`Uint`]. Each `u8` of the input slice is
@@ -139,7 +139,7 @@ where
     /// assert_eq!(a.to_radix_be(190), inbase190);
     /// ```
     pub fn from_radix_be(buf: &[u8], radix: u32) -> Option<Self> {
-        E::Big::from_radix_be(buf, radix).map(E::from_big).map(Self)
+        Some(Self(E::Big::from_radix_be(buf, radix).map(E::from_big)?))
     }
 
     /// Creates and initializes a [`Uint`]. Each `u8` of the input slice is
@@ -159,7 +159,7 @@ where
     /// assert_eq!(a.to_radix_le(190), inbase190);
     /// ```
     pub fn from_radix_le(buf: &[u8], radix: u32) -> Option<Uint<E>> {
-        E::Big::from_radix_le(buf, radix).map(E::from_big).map(Self)
+        Some(Self(E::Big::from_radix_le(buf, radix).map(E::from_big)?))
     }
 
     /// Returns the byte representation of the [`Uint`] in big-endian byte order.
@@ -362,7 +362,7 @@ where
     /// assert!((a * x % m).is_one());
     /// ```
     pub fn modinv(&self, modulus: &Self) -> Option<Self> {
-        self.0.modinv(&modulus.0).map(Self)
+        Some(Self(self.0.modinv(&modulus.0)?))
     }
 
     /// Returns the truncated principal square root of `self` --

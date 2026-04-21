@@ -21,7 +21,8 @@ use crate::{
 /// A trait implemented by primitive integer types that can be used as the
 /// "small" part of a big integer encoding.
 pub trait SmallNumber:
-    Copy
+    'static
+    + Copy
     + Debug
     + Display
     + Eq

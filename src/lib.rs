@@ -38,8 +38,7 @@
 //! performance than their `Arc` or `Rc` counterparts, but benchmark your code
 //! to be sure!
 
-pub use crate::bignum_encoding::BorrowBigNum;
-pub use crate::convert::TryFromBigIntError;
+pub use crate::{convert::TryFromBigIntError, encoding::Encoding};
 pub use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint};
 
 use crate::{

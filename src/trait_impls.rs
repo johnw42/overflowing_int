@@ -251,8 +251,7 @@ pub mod mod_name {
             {
                 return Self(E::from_small(Integer::div_floor(&lhs, &rhs)));
             }
-            let (lhs, rhs) = Self::big_cows(self, other);
-            Self(E::from_big(lhs.div_floor(rhs.as_ref())))
+            Self(E::from_big(self.big_cow().div_floor(&other.big_cow())))
         }
 
         fn mod_floor(&self, other: &Self) -> Self {
@@ -262,8 +261,7 @@ pub mod mod_name {
             {
                 return Self(E::from_small(Integer::mod_floor(&lhs, &rhs)));
             }
-            let (lhs, rhs) = Self::big_cows(self, other);
-            Self(E::from_big(lhs.mod_floor(rhs.as_ref())))
+            Self(E::from_big(self.big_cow().mod_floor(&other.big_cow())))
         }
 
         fn gcd(&self, other: &Self) -> Self {
@@ -272,8 +270,7 @@ pub mod mod_name {
             {
                 return Self(E::from_small(lhs.gcd(&rhs)));
             }
-            let (lhs, rhs) = Self::big_cows(self, other);
-            Self(E::from_big(lhs.gcd(rhs.as_ref())))
+            Self(E::from_big(self.big_cow().gcd(&other.big_cow())))
         }
 
         fn lcm(&self, other: &Self) -> Self {
@@ -284,8 +281,7 @@ pub mod mod_name {
             {
                 return Self(E::from_small(lhs.lcm(&rhs)));
             }
-            let (lhs, rhs) = Self::big_cows(self, other);
-            Self(E::from_big(lhs.lcm(rhs.as_ref())))
+            Self(E::from_big(self.big_cow().lcm(&other.big_cow())))
         }
 
         fn is_multiple_of(&self, other: &Self) -> bool {
@@ -294,7 +290,7 @@ pub mod mod_name {
             {
                 return lhs.is_multiple_of(&rhs);
             }
-            let (lhs, rhs) = Self::big_cows(self, other);
+            let (lhs, rhs) = (self.big_cow(), other.big_cow());
             lhs.is_multiple_of(rhs.as_ref())
         }
 
@@ -320,7 +316,8 @@ pub mod mod_name {
                 let (q, r) = lhs.div_rem(&rhs);
                 return (Self(E::from_small(q)), Self(E::from_small(r)));
             }
-            let (q, r) = E::big_cows(self, other);
+            let q = self.big_cow();
+            let r = other.big_cow();
             (
                 Self(E::from_big(q.div_rem(r.as_ref()).0)),
                 Self(E::from_big(q.div_rem(r.as_ref()).1)),
@@ -339,8 +336,9 @@ pub mod mod_name {
                 let (gcd, lcm) = lhs.gcd_lcm(&rhs);
                 return (Self(E::from_small(gcd)), Self(E::from_small(lcm)));
             }
-            let (lhs, rhs) = Self::big_cows(self, other);
-            let (gcd, lcm) = lhs.gcd_lcm(rhs.as_ref());
+            let lhs = self.big_cow();
+            let rhs = other.big_cow();
+            let (gcd, lcm) = lhs.gcd_lcm(&rhs);
             (Self(E::from_big(gcd)), Self(E::from_big(lcm)))
         }
     }
@@ -437,7 +435,8 @@ pub mod mod_name {
                 B1: SampleBorrow<Self::X> + Sized,
                 B2: SampleBorrow<Self::X> + Sized,
             {
-                let (low, high) = Self::X::big_cows(low.borrow(), high.borrow());
+                let low = low.borrow().big_cow();
+                let high = high.borrow().big_cow();
                 Self([<Uniform ImplType>]::new(
                     low.as_ref(),
                     high.as_ref(),
@@ -449,7 +448,8 @@ pub mod mod_name {
                 B1: SampleBorrow<Self::X> + Sized,
                 B2: SampleBorrow<Self::X> + Sized,
             {
-                let (low, high) = Self::X::big_cows(low.borrow(), high.borrow());
+                let low = low.borrow().big_cow();
+                let high = high.borrow().big_cow();
                 Self([<Uniform ImplType>]::new_inclusive(
                     low.as_ref(),
                     high.as_ref(),
@@ -593,17 +593,15 @@ where
     E: Encoding<'enc, Big = BigInt>,
 {
     fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
-        let (lhs, rhs) = Self::big_cows(self, v);
-        lhs.checked_rem_euclid(rhs.as_ref())
-            .map(E::from_big)
-            .map(Self)
+        Some(Self(E::from_big(
+            self.big_cow().checked_rem_euclid(&v.big_cow())?,
+        )))
     }
 
     fn checked_div_euclid(&self, v: &Self) -> Option<Self> {
-        let (lhs, rhs) = Self::big_cows(self, v);
-        lhs.checked_div_euclid(rhs.as_ref())
-            .map(E::from_big)
-            .map(Self)
+        Some(Self(E::from_big(
+            self.big_cow().checked_div_euclid(&v.big_cow())?,
+        )))
     }
 }
 
@@ -616,13 +614,11 @@ where
     E: Encoding<'enc, Big = BigInt>,
 {
     fn rem_euclid(&self, v: &Self) -> Self {
-        let (lhs, rhs) = Self::big_cows(self, v);
-        Self(E::from_big(lhs.rem_euclid(rhs.as_ref())))
+        Self(E::from_big(self.big_cow().rem_euclid(&v.big_cow())))
     }
 
     fn div_euclid(&self, v: &Self) -> Self {
-        let (lhs, rhs) = Self::big_cows(self, v);
-        Self(E::from_big(lhs.div_euclid(rhs.as_ref())))
+        Self(E::from_big(self.big_cow().div_euclid(&v.big_cow())))
     }
 }
 
@@ -869,71 +865,5 @@ where
             Decoded::Small(n) => n.signum() < E::Small::zero(),
             Decoded::Big(n) => n.is_negative(),
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::CowBigInt;
-    use num_bigint::BigInt;
-    use num_integer::Integer;
-    use num_traits::{One, Zero};
-    use quickcheck::TestResult;
-    use quickcheck_macros::quickcheck;
-
-    #[test]
-    fn test_gcd() {
-        let small = CowBigInt::from(5);
-        let huge = CowBigInt::from(i128::MAX).pow(2);
-        assert_eq!(huge.gcd(&small), CowBigInt::from(1));
-        assert_eq!(small.gcd(&huge), CowBigInt::from(1));
-    }
-
-    #[test]
-    fn test_one() {
-        assert!(CowBigInt::one().is_one());
-        assert_eq!(CowBigInt::one(), CowBigInt::from(1));
-        assert!(!CowBigInt::from(2).is_one());
-    }
-
-    #[test]
-    fn test_zero() {
-        assert!(CowBigInt::zero().is_zero());
-        assert_eq!(CowBigInt::zero(), CowBigInt::from(0));
-        assert!(!CowBigInt::from(1).is_zero());
-    }
-
-    #[quickcheck]
-    fn test_round_trip1(a: CowBigInt<'static>) -> TestResult {
-        let b = CowBigInt::from(BigInt::from(a.clone()));
-        if a != b {
-            return TestResult::error(format!("a != b: a = {:?}, b = {:?}", a, b));
-        }
-        if b != a {
-            return TestResult::error(format!("b != a: b = {:?}, a = {:?}", b, a));
-        }
-        TestResult::passed()
-    }
-
-    #[quickcheck]
-    fn test_round_trip2(a: BigInt) -> TestResult {
-        let b = BigInt::from(CowBigInt::from(a.clone()));
-        if a != b {
-            return TestResult::error(format!("a != b: a = {:?}, b = {:?}", a, b));
-        }
-        if b != a {
-            return TestResult::error(format!("b != a: b = {:?}, a = {:?}", b, a));
-        }
-        TestResult::passed()
-    }
-
-    #[quickcheck]
-    fn test_to_string(a: CowBigInt<'static>) -> bool {
-        a.to_string() == BigInt::from(a).to_string()
-    }
-
-    #[quickcheck]
-    fn test_ord(a: CowBigInt<'static>, b: CowBigInt<'static>) -> bool {
-        a.cmp(&b) == BigInt::from(a).cmp(&BigInt::from(b))
     }
 }

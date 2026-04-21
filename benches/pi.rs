@@ -1,15 +1,13 @@
 // Adapted from https://github.com/scymtym/sb-benchmarks/blob/master/cl-bench.bignum.benchmark.lisp
 // Original code from Bruno Haible <haible@ilog.fr>
 
-use std::time::Duration;
+use std::{borrow::Borrow, time::Duration};
 
 use criterion::{
     AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group, criterion_main,
 };
 
-use compact_bigint::{
-    ArcBigInt, ArcBigIsize, BorrowBigNum, CowBigInt, EnumBigInt, bench::IdentityBigInt,
-};
+use compact_bigint::{ArcBigInt, ArcBigIsize, CowBigInt, EnumBigInt, bench::IdentityBigInt};
 use num_bigint::BigInt;
 use num_traits::Zero;
 use paste::paste;
@@ -42,12 +40,12 @@ duplicate_bigint_types! {
                 while !w.is_zero() {
                     w /= k2.borrow();
                     i += 2;
-                    a += &w / i;
+                    a += w.borrow() / i;
                     w /= k2.borrow();
                     i += 2;
-                    a -= &w / i;
+                    a -= w.borrow() / i;
                 }
-                a.into_owned()
+                a
             }
 
             let n = digits;

@@ -6,24 +6,9 @@ use crate::{
 use num_bigint::{BigInt, BigUint};
 use std::borrow::Cow;
 
-pub trait BorrowBigNum {
-    fn borrow(&self) -> &Self;
-    fn into_owned(self) -> Self;
-}
-
 //
 // BigInt
 //
-
-impl<'enc> BorrowBigNum for BigInt {
-    fn borrow(&self) -> &Self {
-        self
-    }
-
-    fn into_owned(self) -> Self {
-        self
-    }
-}
 
 impl<'enc> Decode<'enc, i128> for BigInt {
     fn decode<'a>(&'a self) -> Decoded<i128, Cow<'a, <i128 as SmallNumber>::Big>> {
@@ -99,16 +84,6 @@ impl<'enc> Decode<'enc, i128> for &'enc BigInt {
 //
 // BigUint
 //
-
-impl BorrowBigNum for BigUint {
-    fn borrow(&self) -> &Self {
-        self
-    }
-
-    fn into_owned(self) -> Self {
-        self
-    }
-}
 
 impl<'enc> Decode<'enc, u128> for BigUint {
     fn decode<'a>(&'a self) -> Decoded<u128, Cow<'a, <u128 as SmallNumber>::Big>> {

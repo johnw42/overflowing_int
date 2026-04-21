@@ -58,32 +58,6 @@ where
             Decoded::Big(_) => None,
         }
     }
-
-    /// A helper method for working with two decoded values at the same time,
-    /// where the big values need to be passed as `Cow`s.
-    #[inline(always)]
-    fn big_cows<'a>(
-        lhs: &'a impl Decode<'enc, S>,
-        rhs: &'a impl Decode<'enc, S>,
-    ) -> (Cow<'a, S::Big>, Cow<'a, S::Big>) {
-        (lhs.big_cow(), rhs.big_cow())
-    }
-
-    /// A helper method for working with two decoded values at the same time,
-    /// where the big values need to be passed as `Cow`s, and if both values are
-    /// small, they can be passed as smalls without converting to bigs.
-    #[inline(always)]
-    fn matching_size<'a>(
-        lhs: &'a impl Decode<'enc, S>,
-        rhs: &'a impl Decode<'enc, S>,
-    ) -> Decoded<(S, S), (Cow<'a, S::Big>, Cow<'a, S::Big>)> {
-        match (lhs.decode(), rhs.decode()) {
-            (Decoded::Small(s1), Decoded::Small(s2)) => Decoded::Small((s1, s2)),
-            (Decoded::Small(s1), Decoded::Big(b2)) => Decoded::Big((Cow::Owned(s1.to_big()), b2)),
-            (Decoded::Big(b1), Decoded::Small(s2)) => Decoded::Big((b1, Cow::Owned(s2.to_big()))),
-            (Decoded::Big(b1), Decoded::Big(b2)) => Decoded::Big((b1, b2)),
-        }
-    }
 }
 
 pub trait Encode<'enc, S>: Sized + Clone
@@ -101,22 +75,29 @@ where
 }
 
 #[inline(always)]
-fn checked_op<'enc, 'a, E>(
-    lhs: &'a E,
-    rhs: &'a E,
+fn checked_op<'enc, E>(
+    lhs: &E,
+    rhs: &E,
     f_small: impl FnOnce(&E::Small, &E::Small) -> Option<E::Small>,
     f_big: impl FnOnce(&E::Big, &E::Big) -> Option<E::Big>,
 ) -> Option<E>
 where
     E: Encoding<'enc>,
 {
-    match E::matching_size(lhs, rhs) {
+    let same_size = match (lhs.decode(), rhs.decode()) {
+        (Decoded::Small(s1), Decoded::Small(s2)) => Decoded::Small((s1, s2)),
+        (Decoded::Small(s1), Decoded::Big(b2)) => Decoded::Big((Cow::Owned(s1.to_big()), b2)),
+        (Decoded::Big(b1), Decoded::Small(s2)) => Decoded::Big((b1, Cow::Owned(s2.to_big()))),
+        (Decoded::Big(b1), Decoded::Big(b2)) => Decoded::Big((b1, b2)),
+    };
+
+    Some(match same_size {
         Decoded::Small((s1, s2)) => match f_small(&s1, &s2) {
-            Some(result) => Some(E::from_small(result)),
-            None => f_big(&s1.to_big(), &s2.to_big()).map(E::from_big),
+            Some(result) => E::from_small(result),
+            None => E::from_big(f_big(&s1.to_big(), &s2.to_big())?),
         },
-        Decoded::Big((b1, b2)) => f_big(b1.as_ref(), b2.as_ref()).map(E::from_big),
-    }
+        Decoded::Big((b1, b2)) => E::from_big(f_big(b1.as_ref(), b2.as_ref())?),
+    })
 }
 
 /// An encoding of a big number, where small values are encoded directly in the
@@ -125,6 +106,7 @@ where
 /// compared for equality and hashed without decoding.
 pub trait Encoding<'enc>: Decode<'enc, Self::Small> + Encode<'enc, Self::Small>
 where
+    Self: 'enc,
     Self: Eq,
     Self: Hash,
     Self::Big: Into<BigInt>,
@@ -227,8 +209,10 @@ where
     // TODO: Add `checked_rem` and `checked_pow` when those methods are added to `BigNumber`.
 
     fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-        let (lhs, rhs) = Self::big_cows(self, exponent);
-        Self::from_big(lhs.modpow(rhs.as_ref(), modulus.big_cow().as_ref()))
+        Self::from_big(
+            self.big_cow()
+                .modpow(&exponent.big_cow(), &modulus.big_cow()),
+        )
     }
 
     fn sqrt(&self) -> Self {
@@ -284,8 +268,7 @@ where
     }
 
     fn modinv(&self, modulus: &Self) -> Option<Self> {
-        let (lhs, rhs) = Self::big_cows(self, modulus);
-        lhs.modinv(&rhs).map(Self::from_big)
+        Some(Self::from_big(self.big_cow().modinv(&modulus.big_cow())?))
     }
 }
 
@@ -382,8 +365,9 @@ duplicate_prims! {
         }
     }
 
-    impl<'enc, S: SmallNumber> Decode<'enc, S> for &prim
+    impl<'enc, 'r, S: SmallNumber> Decode<'enc, S> for &'r prim
     where
+        'r: 'enc,
         S::Big: From<prim>,
         S: TryFrom<prim>
     {
