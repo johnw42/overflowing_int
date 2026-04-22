@@ -15,10 +15,8 @@ FUNCTIONS = ["Control", "Cow", "Arc", "ArcSize", "Identity", "Enum"]
 SIZES = ["10", "15", "20", "30", "40", "50", "100"]
 
 
-def cargo(cmd):
-    os.system(
-        f"cargo --config target-dir='\"{TOP_DIR}/../target/bench-workspace\"' {cmd}"
-    )
+def cargo_with_target(cmd):
+    system(f"cargo --config target-dir='\"{TOP_DIR}/target/bench-workspace\"' {cmd}")
 
 
 def current_revision():
@@ -36,7 +34,7 @@ class RevisionData:
         for encoding in FUNCTIONS:
             for size in SIZES:
                 with open(
-                    f"../target/criterion/Pi/{encoding}/{size}/{revision}/estimates.json"
+                    f"target/criterion/Pi/{encoding}/{size}/{revision}/estimates.json"
                 ) as f:
                     data = json.load(f)
                     throughput = 1000 * int(size) / data["mean"]["point_estimate"]
@@ -117,7 +115,7 @@ def main():
     match opts.command:
         case "all":
             workspace_name = "bench-workspace"
-            target_dir = f"{TOP_DIR}/../target"
+            target_dir = f"{TOP_DIR}/target"
             workspace_dir = f"{target_dir}/{workspace_name}"
             try:
                 system(f"jj workspace add {workspace_dir}")
@@ -125,7 +123,7 @@ def main():
                 for rev in REVISIONS:
                     print(f"Benchmarking revision {rev}...")
                     system(f"jj edit --ignore-immutable {rev}")
-                    cargo(
+                    cargo_with_target(
                         f"bench -p overflowing_int --bench={opts.bench} -- --save-baseline={rev} {bench_pattern}"
                     )
                 system(

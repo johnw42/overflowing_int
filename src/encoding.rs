@@ -133,7 +133,7 @@ where
     const ZERO: Self;
 
     /// Converts an encoding of one type into an encoding of another type with the same big representation.
-    fn reencode<'e2, E2>(other: E2) -> Self
+    fn reencode_from<'e2, E2>(other: E2) -> Self
     where
         E2: Encoding<'e2, Big = Self::Big>,
         E2::Small: SmallNumber<Wide = <Self::Small as SmallNumber>::Wide>,

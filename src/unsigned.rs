@@ -5,7 +5,8 @@ use num_bigint::BigUint;
 use num_traits::{Pow, PrimInt as _};
 use std::borrow::Cow;
 
-/// An unsigned big integer type that can be used with any encoding that implements `Encoding` with `Big = BigUint`.
+/// An unsigned overflowing integer type that can be used with any encoding that
+/// implements `Encoding` with `Big = BigUint`.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Uint<E>(pub(crate) E);
 
@@ -13,17 +14,30 @@ impl<'enc, E> Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
-    /// Converts an `Uint` with one encoding into an `Uint` with another encoding.
+    /// Converts self `Uint` with another encoding.
     ///
     /// This cannot be implemented using the standard `From` trait because it would overlap
     /// with the blanket implementation of `T: From<T>`.
-    pub fn reencode<'e2, E2>(other: Uint<E2>) -> Self
+    pub fn reencode_into<'e2, E2>(self) -> Uint<E2>
+    where
+        E2: Encoding<'e2, Big = BigUint>,
+        E2::Small: SmallNumber<Wide = <E::Small as SmallNumber>::Wide>,
+        'enc: 'e2,
+    {
+        Uint::<E2>::reencode_from(self)
+    }
+
+    /// Converts an `Uint` with one encoding into a `Uint` with another encoding.
+    ///
+    /// This cannot be implemented using the standard `From` trait because it would overlap
+    /// with the blanket implementation of `T: From<T>`.
+    pub fn reencode_from<'e2, E2>(other: Uint<E2>) -> Self
     where
         E2: Encoding<'e2, Big = BigUint>,
         E2::Small: SmallNumber<Wide = <E::Small as SmallNumber>::Wide>,
         'e2: 'enc,
     {
-        Self(E::reencode(other.0))
+        Self(E::reencode_from(other.0))
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigUint`.

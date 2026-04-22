@@ -9,7 +9,8 @@ use std::cmp::Ordering;
 
 use std::ops::Neg;
 
-/// A signed big integer type that can be used with any encoding that implements `Encoding` with `Big = BigInt`.
+/// A signed overflowing integer type that can be used with any encoding that
+/// implements `Encoding` with `Big = BigInt`.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Int<E>(pub(crate) E);
 
@@ -17,17 +18,30 @@ impl<'enc, E> Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
+    /// Converts self into an `Int` with different encoding.
+    ///
+    /// This cannot be implemented using the standard `From` trait because it would overlap
+    /// with the blanket implementation of `T: From<T>`.
+    pub fn reencode_into<'e2, E2>(self) -> Int<E2>
+    where
+        E2: Encoding<'e2, Big = BigInt>,
+        E2::Small: SmallNumber<Wide = <E::Small as SmallNumber>::Wide>,
+        'enc: 'e2,
+    {
+        Int::<E2>::reencode_from(self)
+    }
+
     /// Converts an `Int` with one encoding into an `Int` with another encoding.
     ///
     /// This cannot be implemented using the standard `From` trait because it would overlap
     /// with the blanket implementation of `T: From<T>`.
-    pub fn reencode<'e2, E2>(other: Int<E2>) -> Self
+    pub fn reencode_from<'e2, E2>(other: Int<E2>) -> Self
     where
         E2: Encoding<'e2, Big = BigInt>,
         E2::Small: SmallNumber<Wide = <E::Small as SmallNumber>::Wide>,
         'e2: 'enc,
     {
-        Self(E::reencode(other.0))
+        Self(E::reencode_from(other.0))
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.

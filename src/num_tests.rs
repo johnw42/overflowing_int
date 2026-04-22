@@ -330,8 +330,14 @@ mod signed {
         crate::duplicate_signed_encoded_types! { [SourceType, source_tag]
             paste! {
                 #[quickcheck]
-                fn [<test_reencode_ source_tag _to_ encoding_tag>](value: SourceType) {
-                    assert_eq!(BigInt::from(value.clone()), BigInt::from(EncodedType::reencode(value)));
+                fn [<test_reencode_into_ encoding_tag _from source_tag>](value: SourceType) {
+                    let reencoded: EncodedType = value.clone().reencode_into();
+                    assert_eq!(BigInt::from(value), BigInt::from(reencoded));
+                }
+
+                #[quickcheck]
+                fn [<test_reencode_from_ source_tag _to_ encoding_tag>](value: SourceType) {
+                    assert_eq!(BigInt::from(value.clone()), BigInt::from(EncodedType::reencode_from(value)));
                 }
             }
         }
@@ -442,7 +448,7 @@ mod signed {
         fn test_into_parts(a: EncodedType) {
             let expected = to_impl(&a).into_parts();
             let (sign, magnitude) = a.into_parts();
-            let actual = (sign, BigUint::from(magnitude));
+            let actual = (sign, magnitude);
             assert_eq!(expected, actual);
         }
 
@@ -468,7 +474,7 @@ mod unsigned {
             paste! {
                 #[quickcheck]
                 fn [<test_reencode_ source_tag _to_ encoding_tag>](value: SourceType) {
-                    assert_eq!(BigUint::from(value.clone()), BigUint::from(EncodedType::reencode(value)));
+                    assert_eq!(BigUint::from(value.clone()), BigUint::from(EncodedType::reencode_from(value)));
                 }
             }
         }

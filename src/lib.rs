@@ -1,6 +1,6 @@
 //! A wrapper around `num-bigint` that provides faster, more memory-efficient
 //! representations for integers that fit in primitive types.  It can serve as a
-//! drop-in replacement for `num-bigint` in many cases.
+//! drop-in replacement for `num-bigint` in most cases.
 //!
 //! ## Caveats
 //!
@@ -25,18 +25,18 @@
 //! performance.
 //!
 //! If you'd rather avoid dealing with lifetimes, or you frequently need to
-//! share values, `RcBigInt` and `RcBigUint` are a good choice.
+//! share values, `ArcBigInt` and `ArcBigUint` are a good choice.
 //!
-//! If you are working with number that are almost alway small enough to fit in
-//! an 63 bits, your best option is ot use `RcBigIsize` and `RcBigUsize`, which
-//! use the same amount of stack space as a pointer.
+//! If you are working with numbers that are almost always small enough to fit
+//! in an 63 bits, your best option is to use `ArcBigIsize` and `ArcBigUsize`,
+//! which use the same amount of stack space as a pointer.
 //!
-//! If you need to share values across threads, `ArcBigInt` and its relatives
-//! are a good choice.
+//! ## Safety
 //!
-//! In some cases, `BoxBigInt` and its relatives may be better for for
-//! performance than their `Arc` or `Rc` counterparts, but benchmark your code
-//! to be sure!
+//! All of the wrapper types in this crate are safe to use, and all of their
+//! methods are safe to call.  However, if you're concerned about depending code
+//! that uses `unsafe`, avoid using the `Arc`-based wrapper types, because they
+//! use `unsafe` internally.
 
 pub use crate::{convert::TryFromBigIntError, encoding::Encoding};
 pub use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint};
