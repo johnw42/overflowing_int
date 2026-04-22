@@ -12,19 +12,6 @@ pub struct EnumEncoding<S>(Decoded<S, S::Big>)
 where
     S: SmallNumber;
 
-impl<S> EnumEncoding<S>
-where
-    S: SmallNumber,
-{
-    fn normalize(&mut self) {
-        if let Decoded::Big(big) = &self.0
-            && let Some(small) = S::try_from(big).ok()
-        {
-            self.0 = Decoded::Small(small);
-        };
-    }
-}
-
 impl<'enc, S> Decode<'enc, S> for EnumEncoding<S>
 where
     S: SmallNumber,
@@ -61,14 +48,16 @@ where
 
     fn from_big(b: S::Big) -> Self {
         let mut r = Self(Decoded::Big(b));
-        r.normalize();
+        if let Decoded::Big(big) = &r.0
+            && let Some(small) = S::try_from(big).ok()
+        {
+            r.0 = Decoded::Small(small);
+        }
         r
     }
 
     fn from_big_ref(b: &'enc S::Big) -> Self {
-        let mut r = Self(Decoded::Big(b.clone()));
-        r.normalize();
-        r
+        Self::from_big(b.clone())
     }
 }
 
@@ -97,20 +86,11 @@ impl<'enc, S> EncodingMut<'enc> for EnumEncoding<S>
 where
     S: SmallNumber,
 {
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
-        let mut swapped = Decoded::Small(S::ZERO);
-        std::mem::swap(&mut self.0, &mut swapped);
-        let mut encoding = match &mut swapped {
+    fn decode_mut(&mut self) -> Decoded<S, &mut <S as SmallNumber>::Big> {
+        match &mut self.0 {
             Decoded::Small(s) => Decoded::Small(*s),
-            Decoded::Big(b) => Decoded::Big(Cow::Borrowed(b)),
-        };
-        f(&mut encoding);
-        self.0 = match encoding {
-            Decoded::Small(s) => Decoded::Small(s),
-            Decoded::Big(Cow::Owned(b)) => Decoded::Big(b),
-            Decoded::Big(Cow::Borrowed(_)) => swapped,
-        };
-        self.normalize();
+            Decoded::Big(b) => Decoded::Big(b),
+        }
     }
 }
 
@@ -121,11 +101,9 @@ where
 {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         if bool::arbitrary(g) {
-            Self(Decoded::Small(<S as quickcheck::Arbitrary>::arbitrary(g)))
+            Self::from_small(<S as quickcheck::Arbitrary>::arbitrary(g))
         } else {
-            Self(Decoded::Big(<S::Big as quickcheck::Arbitrary>::arbitrary(
-                g,
-            )))
+            Self::from_big(<S::Big as quickcheck::Arbitrary>::arbitrary(g))
         }
     }
 }
@@ -136,14 +114,10 @@ where
     S: SmallNumber,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
-        if bool::arbitrary(u)? {
-            Ok(Self(Decoded::Small(
-                <S as arbitrary::Arbitrary>::arbitrary(u)?,
-            )))
+        Ok(if bool::arbitrary(u)? {
+            Self::from_small(<S as arbitrary::Arbitrary>::arbitrary(u)?)
         } else {
-            Ok(Self(Decoded::Big(
-                <S::Big as arbitrary::Arbitrary>::arbitrary(u)?,
-            )))
-        }
+            Self::from_big(<S::Big as arbitrary::Arbitrary>::arbitrary(u)?)
+        })
     }
 }

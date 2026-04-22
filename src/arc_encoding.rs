@@ -14,6 +14,41 @@ const _: () = {
     assert!(size_of::<Arc<BigUint>>() == size_of::<usize>());
 };
 
+union ArcEncodedRepr<S: SmallNumber> {
+    small: Shifted<S>,
+    big: ManuallyDrop<Arc<S::Big>>,
+}
+
+impl<S> Clone for ArcEncodedRepr<S>
+where
+    S: SmallNumber,
+{
+    fn clone(&self) -> Self {
+        unsafe {
+            if self.small.validate().is_some() {
+                ArcEncodedRepr { small: self.small }
+            } else {
+                ArcEncodedRepr {
+                    big: ManuallyDrop::new(Arc::clone(&self.big)),
+                }
+            }
+        }
+    }
+}
+
+impl<S> Drop for ArcEncodedRepr<S>
+where
+    S: SmallNumber,
+{
+    fn drop(&mut self) {
+        unsafe {
+            if self.small.validate().is_none() {
+                ManuallyDrop::drop(&mut self.big);
+            }
+        }
+    }
+}
+
 /// An encoding that uses `Arc` for big values, and a small value with the LSB
 /// set to 1 for small values.  This encoding is used for `ArcBigInt` and
 /// `ArcBigUint`.
@@ -26,7 +61,6 @@ impl<S> ArcEncoding<S>
 where
     S: SmallNumber,
 {
-    #[allow(unused)]
     fn from_shifted(shifted: Shifted<S>) -> Self {
         Self(ArcEncodedRepr { small: shifted })
     }
@@ -132,53 +166,11 @@ impl<'enc, S> EncodingMut<'enc> for ArcEncoding<S>
 where
     S: SmallNumber,
 {
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
-        let mut decoded = unsafe {
-            if let Some(s) = self.0.small.validate() {
-                Decoded::Small(s)
-            } else {
-                Decoded::Big(Cow::Borrowed(Arc::as_ref(&self.0.big)))
-            }
-        };
-        f(&mut decoded);
-        match decoded {
-            Decoded::Small(s) => *self = Self::from_small(s),
-            Decoded::Big(Cow::Owned(b)) => *self = Self::from_big(b),
-            Decoded::Big(Cow::Borrowed(b)) => *self = Self::from_big_ref(b),
-        };
-    }
-}
-
-union ArcEncodedRepr<S: SmallNumber> {
-    small: Shifted<S>,
-    big: ManuallyDrop<Arc<S::Big>>,
-}
-
-impl<S> Clone for ArcEncodedRepr<S>
-where
-    S: SmallNumber,
-{
-    fn clone(&self) -> Self {
+    fn decode_mut(&mut self) -> Decoded<S, &mut Self::Big> {
         unsafe {
-            if self.small.validate().is_some() {
-                ArcEncodedRepr { small: self.small }
-            } else {
-                ArcEncodedRepr {
-                    big: ManuallyDrop::new(Arc::clone(&self.big)),
-                }
-            }
-        }
-    }
-}
-
-impl<S> Drop for ArcEncodedRepr<S>
-where
-    S: SmallNumber,
-{
-    fn drop(&mut self) {
-        unsafe {
-            if self.small.validate().is_none() {
-                ManuallyDrop::drop(&mut self.big);
+            match self.0.small.validate() {
+                Some(s) => Decoded::Small(s),
+                None => Decoded::Big(Arc::make_mut(&mut *self.0.big)),
             }
         }
     }

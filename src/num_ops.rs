@@ -62,30 +62,30 @@ where
         E: EncodingMut<'enc>,
         R: Decode<'rhs, E::Small>,
     {
-        lhs.update_encoding(|encoding| match encoding {
+        match lhs.decode_mut() {
             Decoded::Small(small_lhs) => match rhs.decode() {
-                Decoded::Small(small_rhs) => match Self::on_small(*small_lhs, small_rhs) {
-                    Some(out) => *encoding = Decoded::Small(out),
+                Decoded::Small(small_rhs) => match Self::on_small(small_lhs, small_rhs) {
+                    Some(out) => *lhs = E::from_small(out),
                     None => {
-                        *encoding = Decoded::Big(Cow::Owned(Self::on_small_big(
-                            *small_lhs,
+                        *lhs = E::from_big(Self::on_small_big(
+                            small_lhs,
                             Cow::Owned(small_rhs.to_big()),
-                        )));
+                        ));
                     }
                 },
                 Decoded::Big(big_rhs) => {
-                    *encoding = Decoded::Big(Cow::Owned(Self::on_small_big(*small_lhs, big_rhs)));
+                    *lhs = E::from_big(Self::on_small_big(small_lhs, big_rhs));
                 }
             },
             Decoded::Big(big_lhs) => match rhs.decode() {
                 Decoded::Small(small_rhs) => {
-                    Self::update_small(big_lhs.to_mut(), small_rhs);
+                    Self::update_small(big_lhs, small_rhs);
                 }
                 Decoded::Big(big_rhs) => {
-                    Self::update_big(big_lhs.to_mut(), big_rhs);
+                    Self::update_big(big_lhs, big_rhs);
                 }
             },
-        });
+        }
     }
 }
 
@@ -109,17 +109,14 @@ where
         E: EncodingMut<'enc>,
         R: Decode<'rhs, E::Small>,
     {
-        lhs.update_encoding(|encoding| match encoding {
+        match lhs.decode_mut() {
             Decoded::Small(small_lhs) => {
-                *encoding = Decoded::Big(Cow::Owned(Self::on_big(
-                    Cow::Owned(small_lhs.to_big()),
-                    rhs.big_cow(),
-                )));
+                *lhs = E::from_big(Self::on_big(Cow::Owned(small_lhs.to_big()), rhs.big_cow()));
             }
             Decoded::Big(big_lhs) => {
-                Self::update_big(big_lhs.to_mut(), rhs.big_cow());
+                Self::update_big(big_lhs, rhs.big_cow());
             }
-        });
+        }
     }
 }
 trait ShiftOp<'enc, E>
@@ -143,17 +140,17 @@ where
             where
                 E: EncodingMut<'enc>,
             {
-                lhs.update_encoding(|encoding| match encoding {
+                match lhs.decode_mut() {
                     Decoded::Small(small_lhs) => {
-                        *encoding = Decoded::Big(Cow::Owned(Self::[<on_big_ prim>](
+                        *lhs = E::from_big(Self::[<on_big_ prim>](
                             Cow::Owned(small_lhs.to_big()),
                             rhs,
-                        )));
+                        ));
                     }
                     Decoded::Big(big_lhs) => {
-                        Self::[<update_big_ prim>](big_lhs.to_mut(), rhs);
+                        Self::[<update_big_ prim>](big_lhs, rhs);
                     }
-                });
+                }
             }
         }
     }

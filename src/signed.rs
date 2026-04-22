@@ -80,12 +80,12 @@ where
     where
         E: EncodingMut<'enc>,
     {
-        self.0.update_encoding(|enc| match enc {
-            Decoded::Small(_) => *enc = Decoded::Big(Cow::Owned(E::Big::from_slice(sign, slice))),
+        match self.0.decode_mut() {
+            Decoded::Small(_) => self.0 = E::from_big(E::Big::from_slice(sign, slice)),
             Decoded::Big(b) => {
-                b.to_mut().assign_from_slice(sign, slice);
+                b.assign_from_slice(sign, slice);
             }
-        });
+        }
     }
 
     /// Creates and initializes a bigint.

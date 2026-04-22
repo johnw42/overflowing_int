@@ -7,7 +7,7 @@ import json
 
 TOP_DIR = os.path.dirname(__file__)
 
-REVISIONS = ["xzw", "out", "msu", "tns", "xmr", "oot", "kmo"]
+REVISIONS = ["xzw", "out", "msu", "tns", "xmr", "oot", "kmo", "puk"]
 
 DEFAULT_BASELINE = REVISIONS[0]
 

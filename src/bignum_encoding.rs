@@ -56,14 +56,8 @@ impl<'enc> Encoding<'enc> for BigInt {
 }
 
 impl<'enc> EncodingMut<'enc> for BigInt {
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
-        let mut decoded = Decoded::Big(Cow::Owned(std::mem::take(self)));
-        f(&mut decoded);
-        *self = match decoded {
-            Decoded::Small(s) => s.into(),
-            Decoded::Big(Cow::Borrowed(b)) => b.clone(),
-            Decoded::Big(Cow::Owned(o)) => o,
-        };
+    fn decode_mut(&mut self) -> Decoded<i128, &mut Self> {
+        Decoded::Big(self)
     }
 }
 
@@ -129,14 +123,8 @@ impl<'enc> Encoding<'enc> for BigUint {
 }
 
 impl<'enc> EncodingMut<'enc> for BigUint {
-    fn update_encoding(&mut self, f: impl FnOnce(&mut Decoded<Self::Small, Cow<Self::Big>>)) {
-        let mut decoded = Decoded::Big(Cow::Owned(std::mem::take(self)));
-        f(&mut decoded);
-        match decoded {
-            Decoded::Big(Cow::Borrowed(b)) => debug_assert_eq!(self, b),
-            Decoded::Big(Cow::Owned(o)) => *self = o,
-            Decoded::Small(s) => *self = s.into(),
-        };
+    fn decode_mut(&mut self) -> Decoded<u128, &mut Self> {
+        Decoded::Big(self)
     }
 }
 

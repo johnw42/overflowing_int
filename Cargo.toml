@@ -94,3 +94,7 @@ harness = false
 [[bench]]
 name = "pi"
 harness = false
+
+[[bench]]
+name = "pi_unsigned"
+harness = false
