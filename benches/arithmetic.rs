@@ -10,8 +10,8 @@ use std::hint::black_box;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub};
 use std::time::Duration;
 
-use compact_bigint::bench::*;
-use compact_bigint::*;
+use overflowing_int::bench::*;
+use overflowing_int::*;
 
 macro_rules! duplicate_bigint_types {
     ($($body:tt)*) => {

@@ -3,7 +3,7 @@
 
 use std::env::args;
 
-use compact_bigint::CowBigInt;
+use overflowing_int::CowBigInt;
 use num_traits::Zero;
 
 fn pi_atan<'a>(k: CowBigInt<'a>, n: CowBigInt<'a>) -> CowBigInt<'a> {

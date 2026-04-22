@@ -126,7 +126,7 @@ def main():
                     print(f"Benchmarking revision {rev}...")
                     system(f"jj edit --ignore-immutable {rev}")
                     cargo(
-                        f"bench -p compact_bigint --bench={opts.bench} -- --save-baseline={rev} {bench_pattern}"
+                        f"bench -p overflowing_int --bench={opts.bench} -- --save-baseline={rev} {bench_pattern}"
                     )
                 system(
                     f"rsync -a {workspace_dir}/target/criterion/ {target_dir}/criterion/"
@@ -178,7 +178,7 @@ def main():
             print(f"Saved profile data to {data_path}")
         case "run" | None:
             system(
-                f"cargo bench -p compact_bigint --bench={opts.bench} -- --save-baseline={opts.save_baseline} {bench_pattern}"
+                f"cargo bench -p overflowing_int --bench={opts.bench} -- --save-baseline={opts.save_baseline} {bench_pattern}"
             )
 
 

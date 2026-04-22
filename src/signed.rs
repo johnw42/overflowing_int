@@ -95,7 +95,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt, Sign};
+    /// use overflowing_int::{EnumBigInt, Sign};
     ///
     /// assert_eq!(EnumBigInt::from_bytes_be(Sign::Plus, b"A"),
     ///            EnumBigInt::parse_bytes(b"65", 10).unwrap());
@@ -165,7 +165,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt};
+    /// use overflowing_int::{EnumBigInt};
     ///
     /// assert_eq!(EnumBigInt::parse_bytes(b"1234", 10), Some(EnumBigInt::from(1234)));
     /// assert_eq!(EnumBigInt::parse_bytes(b"ABCD", 16), Some(EnumBigInt::from(0xABCD)));
@@ -186,7 +186,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt, Sign};
+    /// use overflowing_int::{EnumBigInt, Sign};
     ///
     /// let inbase190 = vec![15, 33, 125, 12, 14];
     /// let a = EnumBigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
@@ -209,7 +209,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt, Sign};
+    /// use overflowing_int::{EnumBigInt, Sign};
     ///
     /// let inbase190 = vec![14, 12, 125, 33, 15];
     /// let a = EnumBigInt::from_radix_le(Sign::Minus, &inbase190, 190).unwrap();
@@ -227,7 +227,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt, Sign};
+    /// use overflowing_int::{EnumBigInt, Sign};
     ///
     /// let i = EnumBigInt::from(-1125);
     /// assert_eq!(i.to_bytes_be(), (Sign::Minus, vec![4, 101]));
@@ -242,7 +242,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt, Sign};
+    /// use overflowing_int::{EnumBigInt, Sign};
     ///
     /// let i = EnumBigInt::from(-1125);
     /// assert_eq!(i.to_bytes_le(), (Sign::Minus, vec![101, 4]));
@@ -258,7 +258,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use crate::compact_bigint::{EnumBigInt, Sign};
+    /// use crate::overflowing_int::{EnumBigInt, Sign};
     ///
     /// assert_eq!(EnumBigInt::from(-1125).to_u32_digits(), (Sign::Minus, vec![1125]));
     /// assert_eq!(EnumBigInt::from(4294967295u32).to_u32_digits(), (Sign::Plus, vec![4294967295]));
@@ -277,7 +277,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use crate::compact_bigint::{EnumBigInt, Sign};
+    /// use crate::overflowing_int::{EnumBigInt, Sign};
     ///
     /// assert_eq!(EnumBigInt::from(-1125).to_u64_digits(), (Sign::Minus, vec![1125]));
     /// assert_eq!(EnumBigInt::from(4294967295u32).to_u64_digits(), (Sign::Plus, vec![4294967295]));
@@ -297,7 +297,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigInt;
+    /// use overflowing_int::EnumBigInt;
     ///
     /// assert_eq!(EnumBigInt::from(-1125).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
     /// assert_eq!(EnumBigInt::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
@@ -316,7 +316,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigInt;
+    /// use overflowing_int::EnumBigInt;
     ///
     /// assert_eq!(EnumBigInt::from(-1125).iter_u64_digits().collect::<Vec<u64>>(), vec![1125u64]);
     /// assert_eq!(EnumBigInt::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295u64]);
@@ -335,7 +335,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt};
+    /// use overflowing_int::{EnumBigInt};
     ///
     /// let i = EnumBigInt::from(-1125);
     /// assert_eq!(i.to_signed_bytes_be(), vec![251, 155]);
@@ -350,7 +350,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt};
+    /// use overflowing_int::{EnumBigInt};
     ///
     /// let i = EnumBigInt::from(-1125);
     /// assert_eq!(i.to_signed_bytes_le(), vec![155, 251]);
@@ -366,7 +366,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt};
+    /// use overflowing_int::{EnumBigInt};
     ///
     /// let i = EnumBigInt::parse_bytes(b"ff", 16).unwrap();
     /// assert_eq!(i.to_str_radix(16), "ff");
@@ -384,7 +384,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt, Sign};
+    /// use overflowing_int::{EnumBigInt, Sign};
     ///
     /// assert_eq!(EnumBigInt::from(-0xFFFFi64).to_radix_be(159),
     ///            (Sign::Minus, vec![2, 94, 27]));
@@ -403,7 +403,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt, Sign};
+    /// use overflowing_int::{EnumBigInt, Sign};
     ///
     /// assert_eq!(EnumBigInt::from(-0xFFFFi64).to_radix_le(159),
     ///            (Sign::Minus, vec![27, 94, 2]));
@@ -419,7 +419,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt, EnumBigUint};
+    /// use overflowing_int::{EnumBigInt, EnumBigUint};
     /// use num_traits::Zero;
     ///
     /// assert_eq!(EnumBigInt::from(1234).magnitude(), EnumBigUint::from(1234u32));
@@ -450,7 +450,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::{EnumBigInt, Sign};
+    /// use overflowing_int::{EnumBigInt, Sign};
     /// use num_bigint::BigUint;
     ///
     /// assert_eq!(EnumBigInt::from(1234).into_parts(), (Sign::Plus, BigUint::from(1234u32)));
@@ -527,7 +527,7 @@ where
     /// and it exists if and only if `gcd(self, modulus) == 1`.
     ///
     /// ```
-    /// use compact_bigint::EnumBigInt;
+    /// use overflowing_int::EnumBigInt;
     /// use num_integer::Integer;
     /// use num_traits::{One, Zero};
     ///

@@ -369,7 +369,7 @@ duplicate_arith_ops! {
             }
         }
 
-        impl<'enc, 'lhs, 'rhs, T, E> OpTrait<T> for &'lhs EncodedType<E>
+        impl<'enc, 'rhs, T, E> OpTrait<T> for &EncodedType<E>
         where
             E: Encoding<'enc, Big = ImplType>,
             T: Decode<'rhs, E::Small>,
@@ -407,7 +407,7 @@ duplicate_arith_ops! {
                 }
             }
 
-            impl<'enc, 'lhs, E> OpTrait<EncodedType<E>> for &'lhs prim
+            impl<'enc, E> OpTrait<EncodedType<E>> for &prim
             where
                 E: Encoding<'enc, Big = ImplType>,
                 E::Big: BigSigned,
@@ -509,7 +509,7 @@ duplicate_bit_ops! {
             }
         }
 
-        impl<'enc, 'lhs, 'rhs, R, E> OpTrait<R> for &'lhs EncodedType<E>
+        impl<'enc, 'rhs, R, E> OpTrait<R> for &EncodedType<E>
         where
             E: Encoding<'enc, Big = ImplType>,
             R: Decode<'rhs, E::Small>,
@@ -558,7 +558,7 @@ duplicate_shift_ops! {
                 }
             }
 
-            impl<'enc, 'lhs, E> OpTrait<prim> for &'lhs EncodedType<E>
+            impl<'enc, E> OpTrait<prim> for &EncodedType<E>
             where
                 E: Encoding<'enc, Big = ImplType>,
             {
@@ -569,7 +569,7 @@ duplicate_shift_ops! {
                 }
             }
 
-            impl<'enc, 'lhs, E> OpTrait<&prim> for &'lhs EncodedType<E>
+            impl<'enc, E> OpTrait<&prim> for &EncodedType<E>
             where
                 E: Encoding<'enc, Big = ImplType>,
             {
@@ -629,7 +629,7 @@ where
     }
 }
 
-impl<'enc, 'lhs, E> Pow<Uint<E::Unsigned>> for &'lhs EncodedType<E>
+impl<'enc, E> Pow<Uint<E::Unsigned>> for &EncodedType<E>
 where
     E: Encoding<'enc, Big = ImplType>,
 {
@@ -640,7 +640,7 @@ where
     }
 }
 
-impl<'enc,'lhs, 'rhs, E> Pow<&'rhs Uint<E::Unsigned>> for &'lhs EncodedType<E>
+impl<'enc, 'rhs, E> Pow<&'rhs Uint<E::Unsigned>> for &EncodedType<E>
 where
     E: Encoding<'enc, Big = ImplType>,
 {
@@ -811,10 +811,6 @@ mod test {
                         #[allow(irrefutable_let_patterns)]
                         if let Ok(rhs) = prim::try_from(rhs) {
                             let big_lhs = &ImplType::from(lhs.clone());
-
-                            #[allow(unused_comparisons)]
-                            let nonnegative_rhs = rhs >= 0;
-                            assert!(nonnegative_rhs, "shift amount must be non-negative");
 
                             let expected = OpTrait::op_fn(big_lhs, rhs);
                             let actual = OpTrait::op_fn(lhs.clone(), rhs).into();

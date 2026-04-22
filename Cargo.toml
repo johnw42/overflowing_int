@@ -1,8 +1,11 @@
 [package]
-name = "compact_bigint"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
+name = "overflowing_int"
+rust-version = "1.95"
+version = "0.1.0"
+edition = "2024"
+authors = [
+  "John Williams <jrw@pobox.com>",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -76,7 +79,6 @@ arbitrary = "^1"
 criterion = { version = "^0.8.2", features = [
   "html_reports",
 ] }
-if_tokens = { path = "../if_tokens" }
 num-bigint = { version = "^0.4.0", features = [
   "rand",
   "quickcheck",

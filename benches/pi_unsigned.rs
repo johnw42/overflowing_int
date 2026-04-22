@@ -7,9 +7,9 @@ use criterion::{
     AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group, criterion_main,
 };
 
-use compact_bigint::{ArcBigUint, ArcBigUsize, CowBigUint, EnumBigUint, bench::IdentityBigUint};
 use num_bigint::BigUint;
 use num_traits::Zero;
+use overflowing_int::{ArcBigUint, ArcBigUsize, CowBigUint, EnumBigUint, bench::IdentityBigUint};
 use paste::paste;
 
 macro_rules! duplicate_bigint_types {

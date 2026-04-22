@@ -71,7 +71,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// assert_eq!(EnumBigUint::from_bytes_be(b"A"),
     ///            EnumBigUint::parse_bytes(b"65", 10).unwrap());
@@ -111,7 +111,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// assert_eq!(EnumBigUint::parse_bytes(b"1234", 10), Some(EnumBigUint::from(1234u32)));
     /// assert_eq!(EnumBigUint::parse_bytes(b"ABCD", 16), Some(EnumBigUint::from(0xABCDu32)));
@@ -132,7 +132,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// let inbase190 = &[15, 33, 125, 12, 14];
     /// let a = EnumBigUint::from_radix_be(inbase190, 190).unwrap();
@@ -152,7 +152,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// let inbase190 = &[14, 12, 125, 33, 15];
     /// let a = EnumBigUint::from_radix_le(inbase190, 190).unwrap();
@@ -167,7 +167,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// let i = EnumBigUint::parse_bytes(b"1125", 10).unwrap();
     /// assert_eq!(i.to_bytes_be(), vec![4, 101]);
@@ -182,7 +182,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// let i = EnumBigUint::parse_bytes(b"1125", 10).unwrap();
     /// assert_eq!(i.to_bytes_le(), vec![101, 4]);
@@ -198,7 +198,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// assert_eq!(EnumBigUint::from(1125u32).to_u32_digits(), vec![1125]);
     /// assert_eq!(EnumBigUint::from(4294967295u32).to_u32_digits(), vec![4294967295]);
@@ -216,7 +216,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// assert_eq!(EnumBigUint::from(1125u32).to_u64_digits(), vec![1125]);
     /// assert_eq!(EnumBigUint::from(4294967295u32).to_u64_digits(), vec![4294967295]);
@@ -235,7 +235,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// assert_eq!(EnumBigUint::from(1125u32).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
     /// assert_eq!(EnumBigUint::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
@@ -253,7 +253,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// assert_eq!(EnumBigUint::from(1125u32).iter_u64_digits().collect::<Vec<u64>>(), vec![1125]);
     /// assert_eq!(EnumBigUint::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295]);
@@ -272,7 +272,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// let i = EnumBigUint::parse_bytes(b"ff", 16).unwrap();
     /// assert_eq!(i.to_str_radix(16), "ff");
@@ -290,7 +290,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// assert_eq!(EnumBigUint::from(0xFFFFu64).to_radix_be(159),
     ///            vec![2, 94, 27]);
@@ -309,7 +309,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     ///
     /// assert_eq!(EnumBigUint::from(0xFFFFu64).to_radix_le(159),
     ///            vec![27, 94, 2]);
@@ -344,7 +344,7 @@ where
     /// The solution exists if and only if `gcd(self, modulus) == 1`.
     ///
     /// ```
-    /// use compact_bigint::EnumBigUint;
+    /// use overflowing_int::EnumBigUint;
     /// use num_traits::{One, Zero};
     ///
     /// let m = EnumBigUint::from(383_u32);

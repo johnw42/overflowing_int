@@ -366,7 +366,6 @@ pub mod tag {
 
 #[cfg(test)]
 mod test {
-    use if_tokens::if_tokens;
     use quickcheck_macros::quickcheck;
 
     use crate::duplicate_encoded_types;
@@ -443,6 +442,7 @@ mod test {
                 #[quickcheck]
                 fn [<test_ SourceType:lower _to_ encoding_tag>](value: SourceType) {
                     let converted: EncodedType = EncodedType::from(value.clone());
+                    #[allow(clippy::unnecessary_fallible_conversions)]
                     let round_trip: Option<SourceType> = SourceType::try_from(converted).ok();
                     assert_eq!(Some(value), round_trip);
                 }

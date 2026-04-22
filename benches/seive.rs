@@ -1,5 +1,5 @@
-use compact_bigint::CowBigInt;
 use num_traits::Zero;
+use overflowing_int::CowBigInt;
 
 fn main() {
     let mut primes = vec![CowBigInt::from(2)];
