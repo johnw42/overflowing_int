@@ -1,4 +1,4 @@
-use crate::encoding::{Decode, Decoded, Encode, Encoding, EncodingMut};
+use crate::encoding::{Decode, Decoded, Encode, Encoding};
 use crate::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
@@ -160,12 +160,7 @@ where
     fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         self.clone()
     }
-}
 
-impl<'enc, S> EncodingMut<'enc> for ArcEncoding<S>
-where
-    S: SmallNumber,
-{
     fn decode_mut(&mut self) -> Decoded<S, &mut Self::Big> {
         unsafe {
             match self.0.small.validate() {

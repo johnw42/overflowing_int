@@ -2,7 +2,6 @@ use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encode;
 use crate::encoding::Encoding;
-use crate::encoding::EncodingMut;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -80,12 +79,7 @@ where
     fn into_owned(self) -> Self::Owned {
         self
     }
-}
 
-impl<'enc, S> EncodingMut<'enc> for EnumEncoding<S>
-where
-    S: SmallNumber,
-{
     fn decode_mut(&mut self) -> Decoded<S, &mut <S as SmallNumber>::Big> {
         match &mut self.0 {
             Decoded::Small(s) => Decoded::Small(*s),

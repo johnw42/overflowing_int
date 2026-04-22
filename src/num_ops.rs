@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 use crate::big_number::{BigNumber, BigSigned};
-use crate::encoding::{Decode, Decoded, Encoding, EncodingMut};
+use crate::encoding::{Decode, Decoded, Encoding};
 use crate::signed::Int;
 use crate::small_num::SmallNumber as _;
 use crate::unsigned::Uint;
@@ -59,7 +59,7 @@ where
     /// Calls a version of the binary operator that updates a bigint argument in place.
     fn call_update<'rhs, R>(lhs: &mut E, rhs: R)
     where
-        E: EncodingMut<'enc>,
+        E: Encoding<'enc>,
         R: Decode<'rhs, E::Small>,
     {
         match lhs.decode_mut() {
@@ -106,7 +106,7 @@ where
 
     fn call_update<'rhs, R>(lhs: &mut E, rhs: R)
     where
-        E: EncodingMut<'enc>,
+        E: Encoding<'enc>,
         R: Decode<'rhs, E::Small>,
     {
         match lhs.decode_mut() {
@@ -138,7 +138,7 @@ where
             #[inline]
             fn [<call_update_big_ prim>](lhs: &mut E, rhs: prim)
             where
-                E: EncodingMut<'enc>,
+                E: Encoding<'enc>,
             {
                 match lhs.decode_mut() {
                     Decoded::Small(small_lhs) => {
@@ -383,7 +383,7 @@ duplicate_arith_ops! {
 
         impl<'enc, 'rhs, T, E> [<OpTrait  Assign>]<T> for EncodedType<E>
         where
-            E: EncodingMut<'enc, Big = ImplType>,
+            E: Encoding<'enc, Big = ImplType>,
             T: Decode<'rhs, E::Small>,
         {
             fn [<op_fn _assign>](&mut self, rhs: T) {
@@ -523,7 +523,7 @@ duplicate_bit_ops! {
 
         impl<'enc, 'rhs, R, E> [<OpTrait  Assign>]<R> for EncodedType<E>
         where
-            E: EncodingMut<'enc, Big = ImplType>,
+            E: Encoding<'enc, Big = ImplType>,
             R: Decode<'rhs, E::Small>
         {
             fn [<op_fn _assign>](&mut self, rhs: R) {
@@ -582,7 +582,7 @@ duplicate_shift_ops! {
 
             impl<'enc, E> [<OpTrait  Assign>]<prim> for EncodedType<E>
             where
-                E: EncodingMut<'enc, Big = ImplType>,
+                E: Encoding<'enc, Big = ImplType>,
             {
                 fn [<op_fn _assign>](&mut self, rhs: prim) {
                     [<OpTrait Op>]::[<call_update_big_ prim>](&mut self.0, rhs);
@@ -591,7 +591,7 @@ duplicate_shift_ops! {
 
             impl<'enc, E> [<OpTrait  Assign>]<&prim> for EncodedType<E>
             where
-                E: EncodingMut<'enc, Big = ImplType>,
+                E: Encoding<'enc, Big = ImplType>,
             {
                 fn [<op_fn _assign>](&mut self, rhs: &prim) {
                     self.[<op_fn _assign>](*rhs);

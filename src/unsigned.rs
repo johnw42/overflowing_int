@@ -1,5 +1,5 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{Decode, Decoded, Encoding, EncodingMut};
+use crate::encoding::{Decode, Decoded, Encoding};
 use crate::small_num::SmallNumber;
 use num_bigint::BigUint;
 use num_traits::{Pow, PrimInt as _};
@@ -416,7 +416,7 @@ where
     /// to store the new digits
     pub fn set_bit(&mut self, bit: u64, value: bool)
     where
-        E: EncodingMut<'enc>,
+        E: Encoding<'enc>,
     {
         self.0.set_bit(bit, value)
     }

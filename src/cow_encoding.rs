@@ -2,7 +2,6 @@ use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encode;
 use crate::encoding::Encoding;
-use crate::encoding::EncodingMut;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -97,12 +96,7 @@ where
             Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Borrowed(b.as_ref()))),
         }
     }
-}
 
-impl<'enc, S> EncodingMut<'enc> for CowEncoding<'enc, S>
-where
-    S: SmallNumber,
-{
     fn decode_mut(&mut self) -> Decoded<S, &mut S::Big> {
         match &mut self.0 {
             Decoded::Small(s) => Decoded::Small(*s),

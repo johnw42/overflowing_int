@@ -270,9 +270,7 @@ where
     fn modinv(&self, modulus: &Self) -> Option<Self> {
         Some(Self::from_big(self.big_cow().modinv(&modulus.big_cow())?))
     }
-}
 
-pub trait EncodingMut<'enc>: Encoding<'enc> {
     fn decode_mut(&mut self) -> Decoded<Self::Small, &mut Self::Big>;
 
     fn set_bit(&mut self, bit: u64, value: bool) {

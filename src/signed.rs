@@ -1,5 +1,5 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{Decode, Decoded, Encoding, EncodingMut};
+use crate::encoding::{Decode, Decoded, Encoding};
 use crate::small_num::SmallNumber;
 use crate::unsigned::Uint;
 use num_bigint::{BigInt, BigUint, Sign};
@@ -78,7 +78,7 @@ where
     #[inline]
     pub fn assign_from_slice(&mut self, sign: Sign, slice: &[u32])
     where
-        E: EncodingMut<'enc>,
+        E: Encoding<'enc>,
     {
         match self.0.decode_mut() {
             Decoded::Small(_) => self.0 = E::from_big(E::Big::from_slice(sign, slice)),
@@ -612,7 +612,7 @@ where
     #[inline]
     pub fn set_bit(&mut self, bit: u64, value: bool)
     where
-        E: EncodingMut<'enc>,
+        E: Encoding<'enc>,
     {
         self.0.set_bit(bit, value);
     }

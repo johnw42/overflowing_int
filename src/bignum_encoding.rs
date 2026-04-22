@@ -1,6 +1,6 @@
 use crate::{
     cow_encoding::CowEncoding,
-    encoding::{Decode, Decoded, Encode, Encoding, EncodingMut},
+    encoding::{Decode, Decoded, Encode, Encoding},
     small_num::SmallNumber,
 };
 use num_bigint::{BigInt, BigUint};
@@ -53,9 +53,7 @@ impl<'enc> Encoding<'enc> for BigInt {
     fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         CowEncoding::from_big_ref(self)
     }
-}
 
-impl<'enc> EncodingMut<'enc> for BigInt {
     fn decode_mut(&mut self) -> Decoded<i128, &mut Self> {
         Decoded::Big(self)
     }
@@ -120,9 +118,7 @@ impl<'enc> Encoding<'enc> for BigUint {
     fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         CowEncoding::from_big_ref(self)
     }
-}
 
-impl<'enc> EncodingMut<'enc> for BigUint {
     fn decode_mut(&mut self) -> Decoded<u128, &mut Self> {
         Decoded::Big(self)
     }
