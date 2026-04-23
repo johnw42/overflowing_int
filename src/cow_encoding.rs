@@ -1,6 +1,5 @@
 use crate::encoding::Decode;
 use crate::encoding::Decoded;
-use crate::encoding::Encode;
 use crate::encoding::Encoding;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
@@ -47,10 +46,21 @@ where
     }
 }
 
-impl<'enc, S> Encode<'enc, S> for CowEncoding<'enc, S>
+impl<'enc, S> Encoding<'enc> for CowEncoding<'enc, S>
 where
     S: SmallNumber,
 {
+    type Small = S;
+    type Big = S::Big;
+    type Unsigned = CowEncoding<'enc, S::Unsigned>;
+    type Owned = CowEncoding<'static, S>;
+    type Borrowed<'a>
+        = CowEncoding<'a, S>
+    where
+        Self: 'a;
+
+    const ZERO: Self = Self(Decoded::Small(S::ZERO));
+
     fn from_small(s: S) -> Self {
         Self(Decoded::Small(s))
     }
@@ -66,22 +76,6 @@ where
         this.normalize();
         this
     }
-}
-
-impl<'enc, S> Encoding<'enc> for CowEncoding<'enc, S>
-where
-    S: SmallNumber,
-{
-    type Small = S;
-    type Big = S::Big;
-    type Unsigned = CowEncoding<'enc, S::Unsigned>;
-    type Owned = CowEncoding<'static, S>;
-    type Borrowed<'a>
-        = CowEncoding<'a, S>
-    where
-        Self: 'a;
-
-    const ZERO: Self = Self(Decoded::Small(S::ZERO));
 
     fn into_owned(self) -> Self::Owned {
         match self.0 {

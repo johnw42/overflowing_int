@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-use crate::encoding::{Decode, Decode as _, Decoded, Encode, Encoding};
+use crate::encoding::{Decode, Decode as _, Decoded, Encoding};
 use crate::signed::Int;
 use crate::small_num::SmallNumber;
 use crate::unsigned::Uint;

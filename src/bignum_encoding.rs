@@ -1,6 +1,6 @@
 use crate::{
     cow_encoding::CowEncoding,
-    encoding::{Decode, Decoded, Encode, Encoding},
+    encoding::{Decode, Decoded, Encoding},
     small_num::SmallNumber,
 };
 use num_bigint::{BigInt, BigUint};
@@ -20,20 +20,6 @@ impl<'enc> Decode<'enc, i128> for BigInt {
     }
 }
 
-impl<'enc> Encode<'enc, i128> for BigInt {
-    fn from_small(s: i128) -> Self {
-        s.into()
-    }
-
-    fn from_big(b: <i128 as SmallNumber>::Big) -> Self {
-        b
-    }
-
-    fn from_big_ref(b: &'enc <i128 as SmallNumber>::Big) -> Self {
-        b.clone()
-    }
-}
-
 impl<'enc> Encoding<'enc> for BigInt {
     type Small = i128;
     type Big = Self;
@@ -45,6 +31,18 @@ impl<'enc> Encoding<'enc> for BigInt {
         Self: 'a;
 
     const ZERO: Self = BigInt::ZERO;
+
+    fn from_small(s: i128) -> Self {
+        s.into()
+    }
+
+    fn from_big(b: <i128 as SmallNumber>::Big) -> Self {
+        b
+    }
+
+    fn from_big_ref(b: &'enc <i128 as SmallNumber>::Big) -> Self {
+        b.clone()
+    }
 
     fn into_owned(self) -> Self::Owned {
         self
@@ -85,20 +83,6 @@ impl<'enc> Decode<'enc, u128> for BigUint {
     }
 }
 
-impl<'enc> Encode<'enc, u128> for BigUint {
-    fn from_small(s: u128) -> Self {
-        s.into()
-    }
-
-    fn from_big(b: <u128 as SmallNumber>::Big) -> Self {
-        b
-    }
-
-    fn from_big_ref(b: &'enc <u128 as SmallNumber>::Big) -> Self {
-        b.clone()
-    }
-}
-
 impl<'enc> Encoding<'enc> for BigUint {
     type Small = u128;
     type Big = Self;
@@ -110,6 +94,18 @@ impl<'enc> Encoding<'enc> for BigUint {
         Self: 'a;
 
     const ZERO: Self = BigUint::ZERO;
+
+    fn from_small(s: u128) -> Self {
+        s.into()
+    }
+
+    fn from_big(b: <u128 as SmallNumber>::Big) -> Self {
+        b
+    }
+
+    fn from_big_ref(b: &'enc <u128 as SmallNumber>::Big) -> Self {
+        b.clone()
+    }
 
     fn into_owned(self) -> Self::Owned {
         self

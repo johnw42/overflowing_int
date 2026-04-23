@@ -1,4 +1,4 @@
-use crate::encoding::{Decode, Decoded, Encode, Encoding};
+use crate::encoding::{Decode, Decoded, Encoding};
 use crate::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
@@ -94,10 +94,20 @@ where
     }
 }
 
-impl<'enc, S> Encode<'enc, S> for ArcEncoding<S>
+impl<'enc, S> Encoding<'enc> for ArcEncoding<S>
 where
     S: SmallNumber,
 {
+    type Small = S;
+    type Big = S::Big;
+    type Unsigned = ArcEncoding<S::Unsigned>;
+    type Owned = Self;
+    type Borrowed<'a> = Self;
+
+    const ZERO: Self = Self(ArcEncodedRepr {
+        small: Shifted::ZERO,
+    });
+
     fn from_small(s: S) -> Self {
         if let Some(shifted) = Shifted::try_new(s) {
             Self(ArcEncodedRepr { small: shifted })
@@ -137,21 +147,6 @@ where
             },
         )
     }
-}
-
-impl<'enc, S> Encoding<'enc> for ArcEncoding<S>
-where
-    S: SmallNumber,
-{
-    type Small = S;
-    type Big = S::Big;
-    type Unsigned = ArcEncoding<S::Unsigned>;
-    type Owned = Self;
-    type Borrowed<'a> = Self;
-
-    const ZERO: Self = Self(ArcEncodedRepr {
-        small: Shifted::ZERO,
-    });
 
     fn into_owned(self) -> Self::Owned {
         self

@@ -1,6 +1,5 @@
 use crate::encoding::Decode;
 use crate::encoding::Decoded;
-use crate::encoding::Encode;
 use crate::encoding::Encoding;
 use crate::small_num::SmallNumber;
 use std::borrow::Cow;
@@ -37,10 +36,18 @@ where
     }
 }
 
-impl<'enc, S> Encode<'enc, S> for EnumEncoding<S>
+impl<'enc, S> Encoding<'enc> for EnumEncoding<S>
 where
     S: SmallNumber,
 {
+    type Small = S;
+    type Big = S::Big;
+    type Unsigned = EnumEncoding<S::Unsigned>;
+    type Owned = Self;
+    type Borrowed<'a> = Self;
+
+    const ZERO: Self = Self(Decoded::Small(S::ZERO));
+
     fn from_small(s: S) -> Self {
         Self(Decoded::Small(s))
     }
@@ -58,19 +65,6 @@ where
     fn from_big_ref(b: &'enc S::Big) -> Self {
         Self::from_big(b.clone())
     }
-}
-
-impl<'enc, S> Encoding<'enc> for EnumEncoding<S>
-where
-    S: SmallNumber,
-{
-    type Small = S;
-    type Big = S::Big;
-    type Unsigned = EnumEncoding<S::Unsigned>;
-    type Owned = Self;
-    type Borrowed<'a> = Self;
-
-    const ZERO: Self = Self(Decoded::Small(S::ZERO));
 
     fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         self.clone()

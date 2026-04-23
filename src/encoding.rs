@@ -60,20 +60,6 @@ where
     }
 }
 
-pub trait Encode<'enc, S>: Sized + Clone
-where
-    S: SmallNumber,
-{
-    /// Encodes a small value.
-    fn from_small(s: S) -> Self;
-
-    /// Encodes an owned big value.
-    fn from_big(b: S::Big) -> Self;
-
-    /// Encodes a big value from a `Cow`.
-    fn from_big_ref(b: &'enc S::Big) -> Self;
-}
-
 #[inline(always)]
 fn checked_op<'enc, E>(
     lhs: &E,
@@ -104,7 +90,7 @@ where
 /// representation, and big values are encoded as a separate big type.  The
 /// encoding must be able to be updated in place, and must be able to be
 /// compared for equality and hashed without decoding.
-pub trait Encoding<'enc>: Decode<'enc, Self::Small> + Encode<'enc, Self::Small>
+pub trait Encoding<'enc>: Decode<'enc, Self::Small>
 where
     Self: 'enc,
     Self: Eq,
@@ -131,6 +117,15 @@ where
         Self: 'a;
 
     const ZERO: Self;
+
+    /// Encodes a small value.    
+    fn from_small(s: Self::Small) -> Self;
+
+    /// Encodes an owned big value.
+    fn from_big(b: Self::Big) -> Self;
+
+    /// Encodes a big value by reference.
+    fn from_big_ref(b: &'enc Self::Big) -> Self;
 
     /// Converts an encoding of one type into an encoding of another type with the same big representation.
     fn reencode_from<'e2, E2>(other: E2) -> Self
