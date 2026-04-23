@@ -285,42 +285,8 @@ where
 }
 
 // =============================================================================
-// Implementations of `Decode` for various foreign and built-in types
+// Implementations of `Decode` for primitive types
 // =============================================================================
-
-impl<'enc, S> Decode<'enc, S> for Cow<'enc, S::Big>
-where
-    S: SmallNumber,
-{
-    fn into_decoded(self) -> Decoded<S, Cow<'enc, S::Big>> {
-        Decoded::Big(self)
-    }
-
-    fn decode<'a>(&'a self) -> Decoded<S, Cow<'a, S::Big>> {
-        Decoded::Big(Cow::Borrowed(self.as_ref()))
-    }
-
-    fn big_cow<'a>(&'a self) -> Cow<'a, S::Big> {
-        Cow::Borrowed(self.as_ref())
-    }
-}
-
-impl<'enc, S> Decode<'enc, S> for Rc<S::Big>
-where
-    S: SmallNumber,
-{
-    fn into_decoded(self) -> Decoded<S, Cow<'enc, S::Big>> {
-        Decoded::Big(Cow::Owned((*self).clone()))
-    }
-
-    fn decode<'a>(&'a self) -> Decoded<S, Cow<'a, <S as SmallNumber>::Big>> {
-        Decoded::Big(Cow::Borrowed(self.as_ref()))
-    }
-
-    fn big_cow<'a>(&'a self) -> Cow<'a, <S as SmallNumber>::Big> {
-        Cow::Borrowed(self.as_ref())
-    }
-}
 
 duplicate_prims! {
     impl<'enc, S> Decode<'enc, S> for prim
