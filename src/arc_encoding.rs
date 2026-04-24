@@ -1,4 +1,4 @@
-use crate::encoding::{Decode, Decoded, Encoding};
+use crate::encoding::{Decode, Decoded, Encoding, OwnedEncoding};
 use crate::shifted::Shifted;
 use crate::small_num::SmallNumber;
 use num_bigint::{BigInt, BigUint};
@@ -10,8 +10,8 @@ use std::{borrow::Cow, fmt::Debug};
 const _: () = {
     assert!(align_of::<Arc<BigInt>>() > 1);
     assert!(align_of::<Arc<BigUint>>() > 1);
-    assert!(size_of::<Arc<BigInt>>() == size_of::<isize>());
-    assert!(size_of::<Arc<BigUint>>() == size_of::<usize>());
+    assert!(size_of::<Arc<BigInt>>() == size_of::<i64>());
+    assert!(size_of::<Arc<BigUint>>() == size_of::<u64>());
 };
 
 union ArcEncodedRepr<S: SmallNumber> {
@@ -155,8 +155,13 @@ where
     fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         self.clone()
     }
+}
 
-    fn decode_mut(&mut self) -> Decoded<S, &mut Self::Big> {
+impl<'enc, S> OwnedEncoding<'enc> for ArcEncoding<S>
+where
+    S: SmallNumber,
+{
+    fn decode_mut(&mut self) -> Decoded<S, &mut S::Big> {
         unsafe {
             match self.0.small.validate() {
                 Some(s) => Decoded::Small(s),

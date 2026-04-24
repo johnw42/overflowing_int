@@ -1,10 +1,10 @@
 use num_traits::Zero;
-use overflowing_int::CowBigInt;
+use overflowing_int::ArcInt64 as BigInt;
 
 fn main() {
-    let mut primes = vec![CowBigInt::from(2)];
-    let mut i = CowBigInt::from(1);
-    let mut i_squared = CowBigInt::from(1);
+    let mut primes = vec![BigInt::from(2)];
+    let mut i = BigInt::from(1);
+    let mut i_squared = BigInt::from(1);
     loop {
         i += 2;
         i_squared += 2 * i.clone() + 1; // Update i_squared to (i+1)^2

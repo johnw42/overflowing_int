@@ -1,10 +1,10 @@
 use crate::big_number::BigNumberDigits;
-use crate::small_num::SmallNumber;
+use crate::small_num::{SmallNumber, Widen};
 use crate::{big_number::BigNumber, duplicate_prims};
 use num_bigint::{BigInt, BigUint};
 use num_integer::Roots;
 use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, One, PrimInt, Zero};
-use std::{borrow::Cow, hash::Hash, rc::Rc};
+use std::{borrow::Cow, hash::Hash};
 
 /// A decoded big number, which may be either small or big.  Also used to
 /// represent various other decoded values, such as the pairs of numbers.
@@ -68,7 +68,7 @@ fn checked_op<'enc, E>(
     f_big: impl FnOnce(&E::Big, &E::Big) -> Option<E::Big>,
 ) -> Option<E>
 where
-    E: Encoding<'enc>,
+    E: OwnedEncoding<'enc>,
 {
     let same_size = match (lhs.decode(), rhs.decode()) {
         (Decoded::Small(s1), Decoded::Small(s2)) => Decoded::Small((s1, s2)),
@@ -110,7 +110,7 @@ where
     /// A version of this encoding that uses an unsigned representation.
     type Unsigned: Encoding<'enc, Small = <Self::Small as SmallNumber>::Unsigned, Big = BigUint>;
 
-    type Owned: Encoding<'static, Small = Self::Small, Big = Self::Big, Owned = Self::Owned>;
+    type Owned: OwnedEncoding<'enc, Small = Self::Small, Big = Self::Big> + 'enc;
 
     type Borrowed<'a>: Encoding<'a, Small = Self::Small, Big = Self::Big>
     where
@@ -118,20 +118,21 @@ where
 
     const ZERO: Self;
 
-    /// Encodes a small value.    
-    fn from_small(s: Self::Small) -> Self;
+    /// Encodes a small value.
+    fn from_small(s: Self::Small) -> Self::Owned;
 
     /// Encodes an owned big value.
-    fn from_big(b: Self::Big) -> Self;
+    fn from_big(b: Self::Big) -> Self::Owned;
 
     /// Encodes a big value by reference.
     fn from_big_ref(b: &'enc Self::Big) -> Self;
 
     /// Converts an encoding of one type into an encoding of another type with the same big representation.
-    fn reencode_from<'e2, E2>(other: E2) -> Self
+    fn reencode_from<'e2, E2>(other: E2) -> Self::Owned
     where
         E2: Encoding<'e2, Big = Self::Big>,
-        E2::Small: SmallNumber<Wide = <Self::Small as SmallNumber>::Wide>,
+        E2::Small: Widen<Self::Small>,
+        Self::Small: TryFrom<<E2::Small as Widen<Self::Small>>::Output>,
         'e2: 'enc,
     {
         match other.into_decoded() {
@@ -139,8 +140,7 @@ where
                 Some(s) => Self::from_small(s),
                 None => Self::from_big(s.to_big()),
             },
-            Decoded::Big(Cow::Owned(b)) => Self::from_big(b),
-            Decoded::Big(Cow::Borrowed(b)) => Self::from_big_ref(b),
+            Decoded::Big(b) => Self::from_big(b.into_owned()),
         }
     }
 
@@ -150,7 +150,7 @@ where
     /// Converts this encoding into a version with a shorter lifetime.
     fn borrow<'a>(&'a self) -> Self::Borrowed<'a>;
 
-    fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
+    fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self::Owned> {
         Self::Big::parse_bytes(buf, radix).map(Self::from_big)
     }
 
@@ -185,46 +185,56 @@ where
         }
     }
 
-    fn checked_add(&self, v: &Self) -> Option<Self> {
+    fn checked_add(&self, v: &Self) -> Option<Self>
+    where
+        Self: OwnedEncoding<'enc>,
+    {
         checked_op(self, v, CheckedAdd::checked_add, CheckedAdd::checked_add)
     }
 
-    fn checked_sub(&self, v: &Self) -> Option<Self> {
+    fn checked_sub(&self, v: &Self) -> Option<Self>
+    where
+        Self: OwnedEncoding<'enc>,
+    {
         checked_op(self, v, CheckedSub::checked_sub, CheckedSub::checked_sub)
     }
 
-    fn checked_mul(&self, v: &Self) -> Option<Self> {
+    fn checked_mul(&self, v: &Self) -> Option<Self>
+    where
+        Self: OwnedEncoding<'enc>,
+    {
         checked_op(self, v, CheckedMul::checked_mul, CheckedMul::checked_mul)
     }
 
-    fn checked_div(&self, v: &Self) -> Option<Self> {
+    fn checked_div(&self, v: &Self) -> Option<Self>
+    where
+        Self: OwnedEncoding<'enc>,
+    {
         checked_op(self, v, CheckedDiv::checked_div, CheckedDiv::checked_div)
     }
 
-    // TODO: Add `checked_rem` and `checked_pow` when those methods are added to `BigNumber`.
-
-    fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
+    fn modpow(&self, exponent: &Self, modulus: &Self) -> Self::Owned {
         Self::from_big(
             self.big_cow()
                 .modpow(&exponent.big_cow(), &modulus.big_cow()),
         )
     }
 
-    fn sqrt(&self) -> Self {
+    fn sqrt(&self) -> Self::Owned {
         match self.decode() {
             Decoded::Small(n) => Self::from_small(n.sqrt()),
             Decoded::Big(n) => Self::from_big(Roots::sqrt(&n)),
         }
     }
 
-    fn cbrt(&self) -> Self {
+    fn cbrt(&self) -> Self::Owned {
         match self.decode() {
             Decoded::Small(n) => Self::from_small(n.cbrt()),
             Decoded::Big(n) => Self::from_big(Roots::cbrt(&n)),
         }
     }
 
-    fn nth_root(&self, n: u32) -> Self {
+    fn nth_root(&self, n: u32) -> Self::Owned {
         match self.decode() {
             Decoded::Small(x) => {
                 // Corner case: Computing the nth root of the minimum value of a
@@ -262,10 +272,15 @@ where
             .into_iter()
     }
 
-    fn modinv(&self, modulus: &Self) -> Option<Self> {
+    fn modinv(&self, modulus: &Self) -> Option<Self::Owned> {
         Some(Self::from_big(self.big_cow().modinv(&modulus.big_cow())?))
     }
+}
 
+pub trait OwnedEncoding<'enc>: Encoding<'enc>
+where
+    Self: Encoding<'enc, Owned = Self>,
+{
     fn decode_mut(&mut self) -> Decoded<Self::Small, &mut Self::Big>;
 
     fn set_bit(&mut self, bit: u64, value: bool) {
@@ -281,6 +296,19 @@ where
             }
             Decoded::Big(n) => n.set_bit(bit, value),
         }
+    }
+}
+
+impl<'enc, E> Decode<'enc, E::Small> for &'enc E
+where
+    E: Encoding<'enc>,
+{
+    fn decode<'a>(&'a self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
+        (*self).decode()
+    }
+
+    fn into_decoded(self) -> Decoded<E::Small, Cow<'enc, <E::Small as SmallNumber>::Big>> {
+        self.clone().into_decoded()
     }
 }
 

@@ -68,28 +68,19 @@ pub trait SmallNumber:
     + TryFrom<u128>
     + TryFrom<usize>
     + TryFrom<Self::Unsigned>
-    + TryFrom<Self::Wide>
     + for<'a> TryFrom<&'a Self::Big>
     + TryInto<BigUint>
     + TryInto<u32>
-    + TryInto<Self::Wide>
     + QuickcheckBounds
     + UpperHex
     + Zero
 {
     type Big: BigNumber;
     type Unsigned: SmallNumber<Big = BigUint> + Unsigned;
-    type Wide;
 
     const BITS: u32;
     const MIN: Self;
     const MINUS_ONE: Self;
-
-    fn widen(self) -> Self::Wide {
-        self.try_into()
-            .ok()
-            .expect("widening conversion should never fail")
-    }
 
     fn try_from_unsigned(u: Self::Unsigned) -> Option<Self> {
         Self::try_from(u).ok()
@@ -184,7 +175,6 @@ macro_rules! impl_small_num {
         impl SmallNumber for $signed {
             type Big = BigInt;
             type Unsigned = $unsigned;
-            type Wide = i128;
 
             const BITS: u32 = <$signed>::BITS;
             const MIN: Self = <$signed>::MIN;
@@ -232,7 +222,6 @@ macro_rules! impl_small_num {
         impl SmallNumber for $unsigned {
             type Big = BigUint;
             type Unsigned = $unsigned;
-            type Wide = u128;
 
             const BITS: u32 = <$unsigned>::BITS;
             const MIN: Self = <$unsigned>::MIN;
@@ -272,34 +261,67 @@ macro_rules! impl_small_num {
 }
 
 impl_small_num!(i128, u128);
-impl_small_num!(isize, usize);
+impl_small_num!(i64, u64);
+
+pub trait Widen<T> {
+    type Output;
+    fn widen(self) -> Self::Output;
+}
+
+impl<T> Widen<T> for T {
+    type Output = T;
+    fn widen(self) -> Self::Output {
+        self
+    }
+}
+
+macro_rules! impl_widen {
+    ($Small:ty, $Big:ty) => {
+        impl Widen<$Small> for $Big {
+            type Output = $Big;
+            fn widen(self) -> Self::Output {
+                self
+            }
+        }
+
+        impl Widen<$Big> for $Small {
+            type Output = $Big;
+            fn widen(self) -> Self::Output {
+                self.into()
+            }
+        }
+    };
+}
+
+impl_widen!(i64, i128);
+impl_widen!(u64, u128);
 
 #[test]
 fn test_bytes_to_uint_be() {
-    assert_eq!(SmallNumber::from_bytes_be(&[0x00, 0x01]), Some(0x01usize));
-    assert_eq!(SmallNumber::from_bytes_be(&[0x01, 0x00]), Some(0x0100usize));
-    assert_eq!(SmallNumber::from_bytes_be(&[0x12, 0x34]), Some(0x1234usize));
+    assert_eq!(SmallNumber::from_bytes_be(&[0x00, 0x01]), Some(0x01u64));
+    assert_eq!(SmallNumber::from_bytes_be(&[0x01, 0x00]), Some(0x0100u64));
+    assert_eq!(SmallNumber::from_bytes_be(&[0x12, 0x34]), Some(0x1234u64));
     assert_eq!(
-        SmallNumber::from_bytes_be(&[0xFF; size_of::<usize>()]),
-        Some(usize::MAX)
+        SmallNumber::from_bytes_be(&[0xFF; size_of::<u64>()]),
+        Some(u64::MAX)
     );
     assert_eq!(
-        SmallNumber::from_bytes_be(&[0xFF; size_of::<usize>() + 1]),
-        None::<usize>
+        SmallNumber::from_bytes_be(&[0xFF; size_of::<u64>() + 1]),
+        None::<u64>
     );
 }
 
 #[test]
 fn test_bytes_to_uint_le() {
-    assert_eq!(SmallNumber::from_bytes_le(&[0x01, 0x00]), Some(0x01usize));
-    assert_eq!(SmallNumber::from_bytes_le(&[0x00, 0x01]), Some(0x0100usize));
-    assert_eq!(SmallNumber::from_bytes_le(&[0x34, 0x12]), Some(0x1234usize));
+    assert_eq!(SmallNumber::from_bytes_le(&[0x01, 0x00]), Some(0x01u64));
+    assert_eq!(SmallNumber::from_bytes_le(&[0x00, 0x01]), Some(0x0100u64));
+    assert_eq!(SmallNumber::from_bytes_le(&[0x34, 0x12]), Some(0x1234u64));
     assert_eq!(
-        SmallNumber::from_bytes_le(&[0xFF; size_of::<usize>()]),
-        Some(usize::MAX)
+        SmallNumber::from_bytes_le(&[0xFF; size_of::<u64>()]),
+        Some(u64::MAX)
     );
     assert_eq!(
-        SmallNumber::from_bytes_le(&[0xFF; size_of::<usize>() + 1]),
-        None::<usize>
+        SmallNumber::from_bytes_le(&[0xFF; size_of::<u64>() + 1]),
+        None::<u64>
     );
 }

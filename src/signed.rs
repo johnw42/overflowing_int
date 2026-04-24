@@ -1,31 +1,37 @@
 use crate::big_number::BigNumberDigits;
-use crate::encoding::{Decode, Decoded, Encoding};
-use crate::small_num::SmallNumber;
+use crate::encoding::{Decode, Decoded, Encoding, OwnedEncoding};
+use crate::small_num::{SmallNumber, Widen};
 use crate::unsigned::Uint;
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Pow, Zero};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
+use std::marker::PhantomData;
 use std::ops::Neg;
 
 /// A signed overflowing integer type that can be used with any encoding that
 /// implements `Encoding` with `Big = BigInt`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Int<E>(pub(crate) E);
+pub struct Int<'enc, E>(pub(crate) E, PhantomData<&'enc ()>);
 
-impl<'enc, E> Int<E>
+impl<'enc, E> Int<'enc, E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
+    pub(crate) fn from_encoding(encoding: E) -> Self {
+        Self(encoding, PhantomData)
+    }
+
     /// Converts self into an `Int` with different encoding.
     ///
     /// This cannot be implemented using the standard `From` trait because it would overlap
     /// with the blanket implementation of `T: From<T>`.
-    pub fn reencode_into<'e2, E2>(self) -> Int<E2>
+    pub fn reencode_into<'e2, E2>(self) -> Int<'enc, E2::Owned>
     where
+        E::Small: Widen<E2::Small>,
         E2: Encoding<'e2, Big = BigInt>,
-        E2::Small: SmallNumber<Wide = <E::Small as SmallNumber>::Wide>,
+        E2::Small: TryFrom<<E::Small as Widen<E2::Small>>::Output>,
         'enc: 'e2,
     {
         Int::<E2>::reencode_from(self)
@@ -35,35 +41,36 @@ where
     ///
     /// This cannot be implemented using the standard `From` trait because it would overlap
     /// with the blanket implementation of `T: From<T>`.
-    pub fn reencode_from<'e2, E2>(other: Int<E2>) -> Self
+    pub fn reencode_from<'e2, E2>(other: Int<'e2, E2>) -> Int<'e2, E::Owned>
     where
+        E::Small: TryFrom<<E2::Small as Widen<E::Small>>::Output>,
         E2: Encoding<'e2, Big = BigInt>,
-        E2::Small: SmallNumber<Wide = <E::Small as SmallNumber>::Wide>,
+        E2::Small: Widen<E::Small>,
         'e2: 'enc,
     {
-        Self(E::reencode_from(other.0))
+        Int(E::reencode_from(other.0), PhantomData)
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
-    pub fn into_owned(self) -> Int<E::Owned> {
-        Int(self.0.into_owned())
+    pub fn into_owned(self) -> Int<'enc, E::Owned> {
+        Int::from_encoding(self.0.into_owned())
     }
 
     /// Creates a big integer that borrows from this one's data, if possible.
     /// If the encoding does not support borrowing, this will simply clone self.
-    pub fn borrow<'a>(&'a self) -> Int<E::Borrowed<'a>> {
-        Int(self.0.borrow())
+    pub fn borrow<'a>(&'a self) -> Int<'a, E::Borrowed<'a>> {
+        Int::from_encoding(self.0.borrow())
     }
 
     /// A constant bigint with value 0, useful for static initialization.
-    pub const ZERO: Self = Self(E::ZERO);
+    pub const ZERO: Self = Self(E::ZERO, PhantomData);
 
     /// Creates and initializes a bigint.
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn new(sign: Sign, digits: Vec<u32>) -> Self {
-        Self(if sign == Sign::NoSign {
+    pub fn new(sign: Sign, digits: Vec<u32>) -> Int<'enc, E::Owned> {
+        Int::from_encoding(if sign == Sign::NoSign {
             E::from_small(E::Small::zero())
         } else {
             E::from_big(E::Big::new(sign, digits))
@@ -74,7 +81,7 @@ where
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn from_biguint(sign: Sign, data: Uint<E::Unsigned>) -> Self {
+    pub fn from_biguint(sign: Sign, data: Uint<'enc, E::Unsigned>) -> Int<'enc, E::Owned> {
         BigInt::from_biguint(sign, BigUint::from(data)).into()
     }
 
@@ -82,8 +89,8 @@ where
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn from_slice(sign: Sign, slice: &[u32]) -> Self {
-        Self(E::from_big(E::Big::from_slice(sign, slice)))
+    pub fn from_slice(sign: Sign, slice: &[u32]) -> Int<'enc, E::Owned> {
+        Int::from_encoding(E::from_big(E::Big::from_slice(sign, slice)))
     }
 
     /// Reinitializes a bigint.
@@ -92,7 +99,7 @@ where
     #[inline]
     pub fn assign_from_slice(&mut self, sign: Sign, slice: &[u32])
     where
-        E: Encoding<'enc>,
+        E: OwnedEncoding<'enc>,
     {
         match self.0.decode_mut() {
             Decoded::Small(_) => self.0 = E::from_big(E::Big::from_slice(sign, slice)),
@@ -121,19 +128,19 @@ where
     ///            EnumBigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     #[inline]
-    pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self
+    pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Int<'enc, E::Owned>
     where
         E::Small: Neg<Output = E::Small>,
     {
         if let Some(from_bytes) = SmallNumber::from_bytes_be(bytes) {
-            let unsigned = Self(E::from_small(from_bytes));
+            let unsigned = Int::from_encoding(E::from_small(from_bytes));
             match sign {
                 Sign::Plus => unsigned,
                 Sign::Minus => -unsigned,
-                Sign::NoSign => Self::ZERO,
+                Sign::NoSign => Int::ZERO,
             }
         } else {
-            Self(E::from_big(E::Big::from_bytes_be(sign, bytes)))
+            Int::from_encoding(E::from_big(E::Big::from_bytes_be(sign, bytes)))
         }
     }
 
@@ -141,19 +148,19 @@ where
     ///
     /// The bytes are in little-endian byte order.
     #[inline]
-    pub fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self
+    pub fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Int<'enc, E::Owned>
     where
         E::Small: Neg<Output = E::Small>,
     {
         if let Some(from_bytes) = SmallNumber::from_bytes_le(bytes) {
-            let unsigned = Self(E::from_small(from_bytes));
+            let unsigned = Int::from_encoding(E::from_small(from_bytes));
             match sign {
                 Sign::Plus => unsigned,
                 Sign::Minus => -unsigned,
-                Sign::NoSign => Self::ZERO,
+                Sign::NoSign => Int::ZERO,
             }
         } else {
-            Self(E::from_big(E::Big::from_bytes_le(sign, bytes)))
+            Int::from_encoding(E::from_big(E::Big::from_bytes_le(sign, bytes)))
         }
     }
 
@@ -162,16 +169,16 @@ where
     ///
     /// The digits are in big-endian base 2<sup>8</sup>.
     #[inline]
-    pub fn from_signed_bytes_be(digits: &[u8]) -> Self {
-        Self(E::from_big(E::Big::from_signed_bytes_be(digits)))
+    pub fn from_signed_bytes_be(digits: &[u8]) -> Int<'enc, E::Owned> {
+        Int::from_encoding(E::from_big(E::Big::from_signed_bytes_be(digits)))
     }
 
     /// Creates and initializes a bigint from an array of bytes in two's complement.
     ///
     /// The digits are in little-endian base 2<sup>8</sup>.
     #[inline]
-    pub fn from_signed_bytes_le(digits: &[u8]) -> Self {
-        Self(E::from_big(E::Big::from_signed_bytes_le(digits)))
+    pub fn from_signed_bytes_le(digits: &[u8]) -> Int<'enc, E::Owned> {
+        Int::from_encoding(E::from_big(E::Big::from_signed_bytes_le(digits)))
     }
 
     /// Creates and initializes a bigint.
@@ -186,8 +193,11 @@ where
     /// assert_eq!(EnumBigInt::parse_bytes(b"G", 16), None);
     /// ```
     #[inline]
-    pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
-        E::parse_bytes(buf, radix).map(Self)
+    pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self>
+    where
+        E: OwnedEncoding<'enc>,
+    {
+        Some(Self::from_encoding(E::parse_bytes(buf, radix)?))
     }
 
     /// Creates and initializes a bigint. Each u8 of the input slice is
@@ -207,10 +217,10 @@ where
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
     #[inline]
-    pub fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
-        E::Big::from_radix_be(sign, buf, radix)
-            .map(E::from_big)
-            .map(Self)
+    pub fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Int<'enc, E::Owned>> {
+        Some(Int::from_encoding(E::from_big(E::Big::from_radix_be(
+            sign, buf, radix,
+        )?)))
     }
 
     /// Creates and initializes a bigint. Each u8 of the input slice is
@@ -230,10 +240,13 @@ where
     /// assert_eq!(a.to_radix_le(190), (Sign::Minus, inbase190));
     /// ```
     #[inline]
-    pub fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
-        E::Big::from_radix_le(sign, buf, radix)
-            .map(E::from_big)
-            .map(Self)
+    pub fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Int<'enc, E::Owned>>
+    where
+        E: OwnedEncoding<'enc>,
+    {
+        Some(Int::from_encoding(E::from_big(E::Big::from_radix_le(
+            sign, buf, radix,
+        )?)))
     }
 
     /// Returns the sign and the byte representation of the bigint in big-endian byte order.
@@ -441,7 +454,7 @@ where
     /// assert!(EnumBigInt::ZERO.clone().magnitude().is_zero());
     /// ```
     #[inline]
-    pub fn magnitude(self) -> Uint<E::Unsigned> {
+    pub fn magnitude(self) -> Uint<'enc, <E::Unsigned as Encoding<'enc>>::Owned> {
         Uint::from(self.into_parts().1)
     }
 
@@ -485,7 +498,7 @@ where
 
     /// Converts this bigint into a an unsigned bigint, if it's not negative.
     #[inline]
-    pub fn to_biguint(&self) -> Option<Uint<E::Unsigned>> {
+    pub fn to_biguint(&'enc self) -> Option<Uint<'enc, <E::Unsigned as Encoding<'enc>>::Owned>> {
         match self.sign() {
             Sign::Minus => None,
             _ => Some(self.clone().magnitude()),
@@ -493,28 +506,40 @@ where
     }
 
     #[inline]
-    pub fn checked_add(&self, v: &Self) -> Option<Self> {
+    pub fn checked_add(&self, v: &Self) -> Option<Self>
+    where
+        E: OwnedEncoding<'enc>,
+    {
         CheckedAdd::checked_add(self, v)
     }
 
     #[inline]
-    pub fn checked_sub(&self, v: &Self) -> Option<Self> {
+    pub fn checked_sub(&self, v: &Self) -> Option<Self>
+    where
+        E: OwnedEncoding<'enc>,
+    {
         CheckedSub::checked_sub(self, v)
     }
 
     #[inline]
-    pub fn checked_mul(&self, v: &Self) -> Option<Self> {
+    pub fn checked_mul(&self, v: &Self) -> Option<Self>
+    where
+        E: OwnedEncoding<'enc>,
+    {
         CheckedMul::checked_mul(self, v)
     }
 
     #[inline]
-    pub fn checked_div(&self, v: &Self) -> Option<Self> {
+    pub fn checked_div(&self, v: &Self) -> Option<Self>
+    where
+        E: OwnedEncoding<'enc>,
+    {
         CheckedDiv::checked_div(self, v)
     }
 
     /// Returns `self ^ exponent`.
     #[inline]
-    pub fn pow(&self, exponent: u32) -> Self {
+    pub fn pow(&self, exponent: u32) -> Int<'enc, E::Owned> {
         Pow::pow(self, exponent)
     }
 
@@ -527,8 +552,8 @@ where
     ///
     /// Panics if the exponent is negative or the modulus is zero.
     #[inline]
-    pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
-        Self(self.0.modpow(&exponent.0, &modulus.0))
+    pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Int<'enc, E::Owned> {
+        Int::from_encoding(self.0.modpow(&exponent.0, &modulus.0))
     }
 
     /// Returns the modular multiplicative inverse if it exists, otherwise `None`.
@@ -578,29 +603,29 @@ where
     /// assert_eq!((&b * x).mod_floor(&n), &n + 1);
     /// ```
     #[inline]
-    pub fn modinv(&self, modulus: &Self) -> Option<Self> {
-        self.0.modinv(&modulus.0).map(Self)
+    pub fn modinv(&self, modulus: &Self) -> Option<Int<'enc, E::Owned>> {
+        Some(Int::from_encoding(self.0.modinv(&modulus.0)?))
     }
 
     /// Returns the truncated principal square root of `self` --
     /// see [`num_integer::Roots::sqrt()`].
     #[inline]
-    pub fn sqrt(&self) -> Self {
-        Self(self.0.sqrt())
+    pub fn sqrt(&self) -> Int<'enc, E::Owned> {
+        Int::from_encoding(self.0.sqrt())
     }
 
     /// Returns the truncated principal cube root of `self` --
     /// see [`num_integer::Roots::cbrt()`].
     #[inline]
-    pub fn cbrt(&self) -> Self {
-        Self(self.0.cbrt())
+    pub fn cbrt(&self) -> Int<'enc, E::Owned> {
+        Int::from_encoding(self.0.cbrt())
     }
 
     /// Returns the truncated principal `n`th root of `self` --
     /// See [`num_integer::Roots::nth_root()`].
     #[inline]
-    pub fn nth_root(&self, n: u32) -> Self {
-        Self(self.0.nth_root(n))
+    pub fn nth_root(&self, n: u32) -> Int<'enc, E::Owned> {
+        Int::from_encoding(self.0.nth_root(n))
     }
 
     /// Returns the number of least-significant bits that are zero,
@@ -626,22 +651,22 @@ where
     #[inline]
     pub fn set_bit(&mut self, bit: u64, value: bool)
     where
-        E: Encoding<'enc>,
+        E: OwnedEncoding<'enc>,
     {
         self.0.set_bit(bit, value);
     }
 }
 
-impl<'enc, E> Default for Int<E>
+impl<'enc, E> Default for Int<'enc, E>
 where
-    E: Encoding<'enc, Big = BigInt>,
+    E: OwnedEncoding<'enc, Big = BigInt>,
 {
     fn default() -> Self {
         Self::zero()
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for Int<E>
+impl<'enc, E> Decode<'enc, E::Small> for Int<'enc, E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -654,7 +679,7 @@ where
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for &Int<E>
+impl<'enc, E> Decode<'enc, E::Small> for &Int<'enc, E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {

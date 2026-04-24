@@ -18,11 +18,11 @@ macro_rules! duplicate_bigint_types {
         duplicate::duplicate! {
             [
                 label         Encoded;
-                [Arc]         [ArcBigInt];
-                [ArcSize]     [ArcBigIsize];
-                [Cow]         [CowBigInt::<'static>];
+                [Arc]         [ArcInt128];
+                [ArcSize]     [ArcInt64];
+                [Cow]         [CowInt128::<'static>];
                 [Identity]    [IdentityBigInt];
-                [Enum]        [EnumBigInt];
+                [Enum]        [EnumInt128];
                 [Control]     [BigInt];
             ]
             $($body)*

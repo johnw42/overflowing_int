@@ -3,11 +3,11 @@
 
 use std::env::args;
 
-use overflowing_int::CowBigInt;
+use overflowing_int::CowInt128;
 use num_traits::Zero;
 
-fn pi_atan<'a>(k: CowBigInt<'a>, n: CowBigInt<'a>) -> CowBigInt<'a> {
-    let mut a = CowBigInt::zero();
+fn pi_atan<'a>(k: CowInt128<'a>, n: CowInt128<'a>) -> CowInt128<'a> {
+    let mut a = CowInt128::zero();
     let mut w = n * &k;
     let k2 = &k * &k;
     let mut i = -1;
@@ -22,13 +22,13 @@ fn pi_atan<'a>(k: CowBigInt<'a>, n: CowBigInt<'a>) -> CowBigInt<'a> {
     a
 }
 
-fn calc_pi_atan(digits: u32) -> CowBigInt<'static> {
+fn calc_pi_atan(digits: u32) -> CowInt128<'static> {
     let n = digits;
     let m = n + 3;
-    let tenpower = CowBigInt::from(10).pow(m);
-    pi_atan(18.into(), &tenpower * CowBigInt::from(48))
-        + pi_atan(57.into(), &tenpower * CowBigInt::from(32))
-        - pi_atan(239.into(), &tenpower * CowBigInt::from(20))
+    let tenpower = CowInt128::from(10).pow(m);
+    pi_atan(18.into(), &tenpower * CowInt128::from(48))
+        + pi_atan(57.into(), &tenpower * CowInt128::from(32))
+        - pi_atan(239.into(), &tenpower * CowInt128::from(20))
 }
 
 fn main() {

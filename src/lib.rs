@@ -64,20 +64,20 @@ mod trait_impl_tests;
 mod trait_impls;
 pub mod unsigned;
 
-pub type ArcBigInt = Int<ArcEncoding<i128>>;
-pub type ArcBigUint = Uint<ArcEncoding<u128>>;
-pub type ArcBigIsize = Int<ArcEncoding<isize>>;
-pub type ArcBigUsize = Uint<ArcEncoding<usize>>;
-pub type CowBigInt<'a> = Int<CowEncoding<'a, i128>>;
-pub type CowBigUint<'a> = Uint<CowEncoding<'a, u128>>;
-pub type EnumBigInt = Int<EnumEncoding<i128>>;
-pub type EnumBigUint = Uint<EnumEncoding<u128>>;
+pub type ArcInt128 = Int<'static, ArcEncoding<i128>>;
+pub type ArcUint128 = Uint<'static, ArcEncoding<u128>>;
+pub type ArcInt64 = Int<'static, ArcEncoding<i64>>;
+pub type ArcUint64 = Uint<'static, ArcEncoding<u64>>;
+pub type CowInt128<'a> = Int<'a, CowEncoding<'a, i128>>;
+pub type CowUint128<'a> = Uint<'a, CowEncoding<'a, u128>>;
+pub type EnumInt128 = Int<'static, EnumEncoding<i128>>;
+pub type EnumUint128 = Uint<'static, EnumEncoding<u128>>;
 
 // Only for benchmarking, not for general use.
 #[doc(hidden)]
 pub mod bench {
     use super::*;
 
-    pub type IdentityBigInt = Int<BigInt>;
-    pub type IdentityBigUint = Uint<BigUint>;
+    pub type IdentityBigInt = Int<'static, BigInt>;
+    pub type IdentityBigUint = Uint<'static, BigUint>;
 }

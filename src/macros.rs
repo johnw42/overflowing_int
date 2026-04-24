@@ -6,10 +6,10 @@ macro_rules! duplicate_unsigned_encoded_types {
         duplicate::duplicate! {
             [
                 IS_SIGNED  signedness  ImplType   $encoding_tag       $EncodedType;
-                [false]    [unsigned]  [BigUint]  [cow_unsigned]      [$crate::CowBigUint::<'static>];
-                [false]    [unsigned]  [BigUint]  [arc_unsigned]      [$crate::ArcBigUint];
+                [false]    [unsigned]  [BigUint]  [cow_unsigned]      [$crate::CowUint128::<'static>];
+                [false]    [unsigned]  [BigUint]  [arc_unsigned]      [$crate::ArcUint128];
                 [false]    [unsigned]  [BigUint]  [identity_unsigned] [$crate::bench::IdentityBigUint];
-                [false]    [unsigned]  [BigUint]  [enum_unsigned]     [$crate::EnumBigUint];
+                [false]    [unsigned]  [BigUint]  [enum_unsigned]     [$crate::EnumUint128];
             ]
             $($body)*
         }
@@ -25,10 +25,10 @@ macro_rules! duplicate_signed_encoded_types {
         duplicate::duplicate! {
             [
                 IS_SIGNED  signedness  ImplType  $encoding_tag     $EncodedType;
-                [true]     [signed]    [BigInt]  [cow_signed]      [$crate::CowBigInt::<'static>];
-                [true]     [signed]    [BigInt]  [arc_signed]      [$crate::ArcBigInt];
+                [true]     [signed]    [BigInt]  [cow_signed]      [$crate::CowInt128::<'static>];
+                [true]     [signed]    [BigInt]  [arc_signed]      [$crate::ArcInt128];
                 [true]     [signed]    [BigInt]  [identity_signed] [$crate::bench::IdentityBigInt];
-                [true]     [signed]    [BigInt]  [enum_signed]     [$crate::EnumBigInt];
+                [true]     [signed]    [BigInt]  [enum_signed]     [$crate::EnumInt128];
             ]
             $($body)*
         }
@@ -41,8 +41,8 @@ macro_rules! duplicate_signed_encoded_types {
 #[macro_export]
 macro_rules! duplicate_encoded_types {
     ($($body:tt)*) => {
-        crate::duplicate_signed_encoded_types! { $($body)* }
-        crate::duplicate_unsigned_encoded_types! { $($body)* }
+        $crate::duplicate_signed_encoded_types! { $($body)* }
+        $crate::duplicate_unsigned_encoded_types! { $($body)* }
     };
 }
 
