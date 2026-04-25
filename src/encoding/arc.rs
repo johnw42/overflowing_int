@@ -1,6 +1,5 @@
-use crate::encoding::{Decode, Decoded, Encoding, OwnedEncoding};
-use crate::shifted::Shifted;
-use crate::small_num::SmallNumber;
+use crate::encoding::{Decode, Decoded, Encoding, OwnedEncoding, shifted::Shifted};
+use crate::num_traits::small_number::SmallNumber;
 use num_bigint::{BigInt, BigUint};
 use std::hash::Hash;
 use std::mem::ManuallyDrop;

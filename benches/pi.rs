@@ -9,7 +9,7 @@ use criterion::{
 
 use num_bigint::BigInt;
 use num_traits::Zero;
-use overflowing_int::{ArcInt64, ArcInt128, CowInt128, EnumInt128, bench::IdentityBigInt};
+use overflowing_int::{ArcInt64, ArcInt128, CowInt128, OverflowingInt128, bench::IdentityBigInt};
 use paste::paste;
 
 macro_rules! duplicate_bigint_types {
@@ -21,7 +21,7 @@ macro_rules! duplicate_bigint_types {
                 [ArcSize]     [ArcInt64];
                 [Cow]         [CowInt128::<lifetime>];
                 [Identity]    [IdentityBigInt];
-                [Enum]        [EnumInt128];
+                [Enum]        [OverflowingInt128];
                 [Control]     [BigInt];
             ]
             $($body)*

@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{encoding::Encoding, signed::Int, unsigned::Uint};
+use crate::{encoding::Encoding, wrappers::int::Int, wrappers::uint::Uint};
 use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Pow, Zero};

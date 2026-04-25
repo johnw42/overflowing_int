@@ -1,4 +1,4 @@
-use crate::small_num::SmallNumber;
+use crate::num_traits::small_number::SmallNumber;
 
 // A number that is stored shifted left by one bit, with the least significant
 // bit set to 1.  This allows us to distinguish between small numbers (which

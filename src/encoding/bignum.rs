@@ -1,7 +1,7 @@
 use crate::{
-    cow_encoding::CowEncoding,
+    encoding::cow::CowEncoding,
     encoding::{Decode, Decoded, Encoding, OwnedEncoding},
-    small_num::SmallNumber,
+    num_traits::small_number::SmallNumber,
 };
 use num_bigint::{BigInt, BigUint};
 use std::borrow::Cow;

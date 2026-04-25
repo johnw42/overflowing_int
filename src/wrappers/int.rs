@@ -1,7 +1,7 @@
-use crate::big_number::BigNumberDigits;
 use crate::encoding::{Decode, Decoded, Encoding, OwnedEncoding};
-use crate::small_num::{SmallNumber, Widen};
-use crate::unsigned::Uint;
+use crate::num_traits::big_number::BigNumberDigits;
+use crate::num_traits::small_number::{SmallNumber, Widen};
+use crate::wrappers::uint::Uint;
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Pow, Zero};
 use std::borrow::Cow;

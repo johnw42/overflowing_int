@@ -2,65 +2,61 @@ use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encoding;
 use crate::encoding::OwnedEncoding;
-use crate::small_num::SmallNumber;
+use crate::num_traits::small_number::SmallNumber;
 use std::borrow::Cow;
-use std::fmt::Debug;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct EnumEncoding<S>(Decoded<S, S::Big>)
-where
-    S: SmallNumber;
+pub type DecodedEncoding<S> = Decoded<S, <S as SmallNumber>::Big>;
 
-impl<'enc, S> Decode<'enc, S> for EnumEncoding<S>
+impl<'enc, S> Decode<'enc, S> for DecodedEncoding<S>
 where
     S: SmallNumber,
 {
     fn into_decoded(self) -> Decoded<S, Cow<'enc, S::Big>> {
-        match self.0 {
+        match self {
             Decoded::Small(s) => Decoded::Small(s),
             Decoded::Big(b) => Decoded::Big(Cow::Owned(b)),
         }
     }
 
     fn decode<'a>(&'a self) -> Decoded<S, Cow<'a, <S as SmallNumber>::Big>> {
-        match &self.0 {
+        match self {
             Decoded::Small(s) => Decoded::Small(*s),
             Decoded::Big(b) => Decoded::Big(Cow::Borrowed(b)),
         }
     }
 
     fn big_cow<'a>(&'a self) -> Cow<'a, <S as SmallNumber>::Big> {
-        match &self.0 {
+        match self {
             Decoded::Small(s) => Cow::Owned(S::to_big(*s)),
             Decoded::Big(b) => Cow::Borrowed(b),
         }
     }
 }
 
-impl<'enc, S> Encoding<'enc> for EnumEncoding<S>
+impl<'enc, S> Encoding<'enc> for DecodedEncoding<S>
 where
     S: SmallNumber,
 {
     type Small = S;
     type Big = S::Big;
-    type Unsigned = EnumEncoding<S::Unsigned>;
+    type Unsigned = DecodedEncoding<S::Unsigned>;
     type Owned = Self;
     type Borrowed<'a> = Self;
 
-    const ZERO: Self = Self(Decoded::Small(S::ZERO));
+    const ZERO: Self = Decoded::Small(S::ZERO);
 
     fn from_small(s: S) -> Self {
-        Self(Decoded::Small(s))
+        Decoded::Small(s)
     }
 
     fn from_big(b: S::Big) -> Self {
-        let mut r = Self(Decoded::Big(b));
-        if let Decoded::Big(big) = &r.0
+        let mut this = Decoded::Big(b);
+        if let Decoded::Big(big) = &this
             && let Some(small) = S::try_from(big).ok()
         {
-            r.0 = Decoded::Small(small);
+            this = Decoded::Small(small);
         }
-        r
+        this
     }
 
     fn from_big_ref(b: &'enc S::Big) -> Self {
@@ -76,12 +72,12 @@ where
     }
 }
 
-impl<'enc, S> OwnedEncoding<'enc> for EnumEncoding<S>
+impl<'enc, S> OwnedEncoding<'enc> for DecodedEncoding<S>
 where
     S: SmallNumber,
 {
     fn decode_mut(&mut self) -> Decoded<S, &mut <S as SmallNumber>::Big> {
-        match &mut self.0 {
+        match self {
             Decoded::Small(s) => Decoded::Small(*s),
             Decoded::Big(b) => Decoded::Big(b),
         }
@@ -89,7 +85,7 @@ where
 }
 
 #[cfg(any(test, feature = "quickcheck"))]
-impl<S> quickcheck::Arbitrary for EnumEncoding<S>
+impl<S> quickcheck::Arbitrary for DecodedEncoding<S>
 where
     S: SmallNumber,
 {
@@ -103,7 +99,7 @@ where
 }
 
 #[cfg(feature = "arbitrary")]
-impl<S> arbitrary::Arbitrary<'_> for EnumEncoding<S>
+impl<S> arbitrary::Arbitrary<'_> for DecodedEncoding<S>
 where
     S: SmallNumber,
 {

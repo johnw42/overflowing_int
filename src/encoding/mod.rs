@@ -1,10 +1,20 @@
-use crate::big_number::BigNumberDigits;
-use crate::small_num::{SmallNumber, Widen};
-use crate::{big_number::BigNumber, duplicate_prims};
+use crate::{
+    duplicate_prims,
+    num_traits::{
+        big_number::{BigNumber, BigNumberDigits},
+        small_number::{SmallNumber, Widen},
+    },
+};
 use num_bigint::{BigInt, BigUint};
 use num_integer::Roots;
 use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, One, PrimInt, Zero};
 use std::{borrow::Cow, hash::Hash};
+
+pub mod arc;
+pub mod bignum;
+pub mod cow;
+pub mod decoded;
+mod shifted;
 
 /// A decoded big number, which may be either small or big.  Also used to
 /// represent various other decoded values, such as the pairs of numbers.

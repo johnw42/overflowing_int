@@ -2,7 +2,7 @@ use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encoding;
 use crate::encoding::OwnedEncoding;
-use crate::small_num::SmallNumber;
+use crate::num_traits::small_number::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
 

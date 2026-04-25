@@ -8,7 +8,7 @@ use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint};
 use num_integer::{Integer, Roots};
 use num_traits::{
     CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, ConstZero, Euclid, FromBytes,
-    FromPrimitive, Num, One, Signed, ToBytes, ToPrimitive, Zero,
+    FromPrimitive, Num, One, ToBytes, ToPrimitive, Zero,
 };
 
 use std::fmt::{Binary, Debug, Display, LowerHex, Octal, UpperHex};
@@ -21,7 +21,7 @@ use std::ops::{
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::str::FromStr;
 
-use crate::bounds::{ArbitraryBounds, QuickcheckBounds, RandBounds, SerdeBounds};
+use crate::num_traits::bounds::{ArbitraryBounds, QuickcheckBounds, RandBounds, SerdeBounds};
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_iprims, duplicate_prims, duplicate_shift_ops,
     duplicate_uprims,

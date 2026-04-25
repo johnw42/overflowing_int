@@ -42,36 +42,32 @@ pub use crate::{convert::TryFromBigIntError, encoding::Encoding};
 pub use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint};
 
 use crate::{
-    arc_encoding::ArcEncoding, cow_encoding::CowEncoding, enum_encoding::EnumEncoding, signed::Int,
-    unsigned::Uint,
+    encoding::arc::ArcEncoding, encoding::cow::CowEncoding, encoding::decoded::DecodedEncoding,
+    wrappers::int::Int, wrappers::uint::Uint,
 };
 
-pub mod arc_encoding;
-pub mod big_number;
-mod bignum_encoding;
-mod bounds;
 mod convert;
-pub mod cow_encoding;
-pub mod encoding;
-mod enum_encoding;
+mod encoding;
 mod macros;
 mod num_ops;
 mod num_tests;
-mod shifted;
-pub mod signed;
-mod small_num;
+mod num_traits;
 mod trait_impl_tests;
 mod trait_impls;
-pub mod unsigned;
+pub mod wrappers;
 
 pub type ArcInt128 = Int<'static, ArcEncoding<i128>>;
 pub type ArcUint128 = Uint<'static, ArcEncoding<u128>>;
 pub type ArcInt64 = Int<'static, ArcEncoding<i64>>;
 pub type ArcUint64 = Uint<'static, ArcEncoding<u64>>;
+pub type CowInt64<'a> = Int<'a, CowEncoding<'a, i64>>;
+pub type CowUint64<'a> = Uint<'a, CowEncoding<'a, u64>>;
 pub type CowInt128<'a> = Int<'a, CowEncoding<'a, i128>>;
 pub type CowUint128<'a> = Uint<'a, CowEncoding<'a, u128>>;
-pub type EnumInt128 = Int<'static, EnumEncoding<i128>>;
-pub type EnumUint128 = Uint<'static, EnumEncoding<u128>>;
+pub type OverflowingInt64 = Int<'static, DecodedEncoding<i64>>;
+pub type OverflowingUint64 = Uint<'static, DecodedEncoding<u64>>;
+pub type OverflowingInt128 = Int<'static, DecodedEncoding<i128>>;
+pub type OverflowingUint128 = Uint<'static, DecodedEncoding<u128>>;
 
 // Only for benchmarking, not for general use.
 #[doc(hidden)]

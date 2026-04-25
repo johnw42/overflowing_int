@@ -13,9 +13,9 @@ use num_traits::{
 use paste::paste;
 
 use crate::{
-    big_number::BigNumber,
-    bounds::{ArbitraryBounds, QuickcheckBounds},
     duplicate_arith_ops,
+    num_traits::big_number::BigNumber,
+    num_traits::bounds::{ArbitraryBounds, QuickcheckBounds},
 };
 
 /// A trait implemented by primitive integer types that can be used as the

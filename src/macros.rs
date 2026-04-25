@@ -9,7 +9,7 @@ macro_rules! duplicate_unsigned_encoded_types {
                 [false]    [unsigned]  [BigUint]  [cow_unsigned]      [$crate::CowUint128::<'static>];
                 [false]    [unsigned]  [BigUint]  [arc_unsigned]      [$crate::ArcUint128];
                 [false]    [unsigned]  [BigUint]  [identity_unsigned] [$crate::bench::IdentityBigUint];
-                [false]    [unsigned]  [BigUint]  [enum_unsigned]     [$crate::EnumUint128];
+                [false]    [unsigned]  [BigUint]  [enum_unsigned]     [$crate::OverflowingUint128];
             ]
             $($body)*
         }
@@ -28,7 +28,7 @@ macro_rules! duplicate_signed_encoded_types {
                 [true]     [signed]    [BigInt]  [cow_signed]      [$crate::CowInt128::<'static>];
                 [true]     [signed]    [BigInt]  [arc_signed]      [$crate::ArcInt128];
                 [true]     [signed]    [BigInt]  [identity_signed] [$crate::bench::IdentityBigInt];
-                [true]     [signed]    [BigInt]  [enum_signed]     [$crate::EnumInt128];
+                [true]     [signed]    [BigInt]  [enum_signed]     [$crate::OverflowingInt128];
             ]
             $($body)*
         }

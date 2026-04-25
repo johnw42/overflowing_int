@@ -1,6 +1,6 @@
-use crate::big_number::BigNumberDigits;
 use crate::encoding::{Decode, Decoded, Encoding, OwnedEncoding};
-use crate::small_num::{SmallNumber, Widen};
+use crate::num_traits::big_number::BigNumberDigits;
+use crate::num_traits::small_number::{SmallNumber, Widen};
 use num_bigint::BigUint;
 use num_traits::{Pow, PrimInt as _};
 use std::borrow::Cow;

@@ -26,9 +26,9 @@ use {
 use crate::{
     duplicate_iprims, duplicate_prims, duplicate_uprims,
     encoding::{Decode, Decoded, Encoding, OwnedEncoding},
-    signed::Int,
-    small_num::SmallNumber,
-    unsigned::Uint,
+    num_traits::small_number::SmallNumber,
+    wrappers::uint::Uint,
+    wrappers::int::Int,
 };
 
 #[allow(unused_imports)]

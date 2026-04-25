@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
 use crate::encoding::{Decoded, Encoding, OwnedEncoding};
-use crate::signed::Int;
-use crate::small_num::SmallNumber;
-use crate::unsigned::Uint;
+use crate::num_traits::small_number::SmallNumber;
+use crate::wrappers::int::Int;
+use crate::wrappers::uint::Uint;
 use crate::{
     CowInt128, CowUint128, duplicate_generic_bignum, duplicate_iprims,
     duplicate_iprims_if_unsigned, duplicate_prims, duplicate_signed_encoded_types,
