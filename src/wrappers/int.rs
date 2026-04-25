@@ -15,40 +15,30 @@ use std::ops::Neg;
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Int<'enc, E>(pub(crate) E, PhantomData<&'enc ()>);
 
+/// A wrapper around an encoding of a signed big integer.  It exposes all the
+/// same methods as `BigInt` with mostly identical signatures, and implements
+/// the same traits, allowing it to be used as a drop-in replacement for
+/// `BigInt` in most cases, but with better performance for small values.
 impl<'enc, E> Int<'enc, E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
-    pub(crate) fn from_encoding(encoding: E) -> Self {
+    pub(crate) const fn from_encoding(encoding: E) -> Self {
         Self(encoding, PhantomData)
-    }
-
-    /// Converts self into an `Int` with different encoding.
-    ///
-    /// This cannot be implemented using the standard `From` trait because it would overlap
-    /// with the blanket implementation of `T: From<T>`.
-    pub fn reencode_into<'e2, E2>(self) -> Int<'enc, E2::Owned>
-    where
-        E::Small: Widen<E2::Small>,
-        E2: Encoding<'e2, Big = BigInt>,
-        E2::Small: TryFrom<<E::Small as Widen<E2::Small>>::Output>,
-        'enc: 'e2,
-    {
-        Int::<E2>::reencode_from(self)
     }
 
     /// Converts an `Int` with one encoding into an `Int` with another encoding.
     ///
     /// This cannot be implemented using the standard `From` trait because it would overlap
     /// with the blanket implementation of `T: From<T>`.
-    pub fn reencode_from<'e2, E2>(other: Int<'e2, E2>) -> Int<'e2, E::Owned>
+    pub fn reencode_from<'e2, E2>(other: Int<'e2, E2>) -> Int<'enc, E::Owned>
     where
         E::Small: TryFrom<<E2::Small as Widen<E::Small>>::Output>,
         E2: Encoding<'e2, Big = BigInt>,
         E2::Small: Widen<E::Small>,
         'e2: 'enc,
     {
-        Int(E::reencode_from(other.0), PhantomData)
+        Int::from_encoding(E::reencode_from(other.0))
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
@@ -62,8 +52,12 @@ where
         Int::from_encoding(self.0.borrow())
     }
 
+    // =========================================================================
+    // Everything below this point is the same as BigInt's API, to the extent possible.
+    // =========================================================================
+
     /// A constant bigint with value 0, useful for static initialization.
-    pub const ZERO: Self = Self(E::ZERO, PhantomData);
+    pub const ZERO: Int<'enc, E::Owned> = Int::from_encoding(E::Owned::ZERO);
 
     /// Creates and initializes a bigint.
     ///
@@ -116,16 +110,16 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt, Sign};
+    /// use overflowing_int::{ArcInt128, Sign};
     ///
-    /// assert_eq!(EnumBigInt::from_bytes_be(Sign::Plus, b"A"),
-    ///            EnumBigInt::parse_bytes(b"65", 10).unwrap());
-    /// assert_eq!(EnumBigInt::from_bytes_be(Sign::Plus, b"AA"),
-    ///            EnumBigInt::parse_bytes(b"16705", 10).unwrap());
-    /// assert_eq!(EnumBigInt::from_bytes_be(Sign::Plus, b"AB"),
-    ///            EnumBigInt::parse_bytes(b"16706", 10).unwrap());
-    /// assert_eq!(EnumBigInt::from_bytes_be(Sign::Plus, b"Hello world!"),
-    ///            EnumBigInt::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
+    /// assert_eq!(ArcInt128::from_bytes_be(Sign::Plus, b"A"),
+    ///            ArcInt128::parse_bytes(b"65", 10).unwrap());
+    /// assert_eq!(ArcInt128::from_bytes_be(Sign::Plus, b"AA"),
+    ///            ArcInt128::parse_bytes(b"16705", 10).unwrap());
+    /// assert_eq!(ArcInt128::from_bytes_be(Sign::Plus, b"AB"),
+    ///            ArcInt128::parse_bytes(b"16706", 10).unwrap());
+    /// assert_eq!(ArcInt128::from_bytes_be(Sign::Plus, b"Hello world!"),
+    ///            ArcInt128::parse_bytes(b"22405534230753963835153736737", 10).unwrap());
     /// ```
     #[inline]
     pub fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Int<'enc, E::Owned>
@@ -133,11 +127,11 @@ where
         E::Small: Neg<Output = E::Small>,
     {
         if let Some(from_bytes) = SmallNumber::from_bytes_be(bytes) {
-            let unsigned = Int::from_encoding(E::from_small(from_bytes));
+            let nonnegative = Int::from_encoding(E::from_small(from_bytes));
             match sign {
-                Sign::Plus => unsigned,
-                Sign::Minus => -unsigned,
-                Sign::NoSign => Int::ZERO,
+                Sign::Plus => nonnegative,
+                Sign::Minus => -nonnegative,
+                Sign::NoSign => Self::ZERO,
             }
         } else {
             Int::from_encoding(E::from_big(E::Big::from_bytes_be(sign, bytes)))
@@ -153,11 +147,11 @@ where
         E::Small: Neg<Output = E::Small>,
     {
         if let Some(from_bytes) = SmallNumber::from_bytes_le(bytes) {
-            let unsigned = Int::from_encoding(E::from_small(from_bytes));
+            let nonnegative = Int::from_encoding(E::from_small(from_bytes));
             match sign {
-                Sign::Plus => unsigned,
-                Sign::Minus => -unsigned,
-                Sign::NoSign => Int::ZERO,
+                Sign::Plus => nonnegative,
+                Sign::Minus => -nonnegative,
+                Sign::NoSign => Self::ZERO,
             }
         } else {
             Int::from_encoding(E::from_big(E::Big::from_bytes_le(sign, bytes)))
@@ -186,11 +180,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt};
+    /// use overflowing_int::{ArcInt128};
     ///
-    /// assert_eq!(EnumBigInt::parse_bytes(b"1234", 10), Some(EnumBigInt::from(1234)));
-    /// assert_eq!(EnumBigInt::parse_bytes(b"ABCD", 16), Some(EnumBigInt::from(0xABCD)));
-    /// assert_eq!(EnumBigInt::parse_bytes(b"G", 16), None);
+    /// assert_eq!(ArcInt128::parse_bytes(b"1234", 10), Some(ArcInt128::from(1234)));
+    /// assert_eq!(ArcInt128::parse_bytes(b"ABCD", 16), Some(ArcInt128::from(0xABCD)));
+    /// assert_eq!(ArcInt128::parse_bytes(b"G", 16), None);
     /// ```
     #[inline]
     pub fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self>
@@ -210,10 +204,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt, Sign};
+    /// use overflowing_int::{ArcInt128, Sign};
     ///
     /// let inbase190 = vec![15, 33, 125, 12, 14];
-    /// let a = EnumBigInt::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
+    /// let a = ArcInt128::from_radix_be(Sign::Minus, &inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_be(190), (Sign::Minus, inbase190));
     /// ```
     #[inline]
@@ -233,10 +227,10 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt, Sign};
+    /// use overflowing_int::{ArcInt128, Sign};
     ///
     /// let inbase190 = vec![14, 12, 125, 33, 15];
-    /// let a = EnumBigInt::from_radix_le(Sign::Minus, &inbase190, 190).unwrap();
+    /// let a = ArcInt128::from_radix_le(Sign::Minus, &inbase190, 190).unwrap();
     /// assert_eq!(a.to_radix_le(190), (Sign::Minus, inbase190));
     /// ```
     #[inline]
@@ -254,9 +248,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt, Sign};
+    /// use overflowing_int::{ArcInt128, Sign};
     ///
-    /// let i = EnumBigInt::from(-1125);
+    /// let i = ArcInt128::from(-1125);
     /// assert_eq!(i.to_bytes_be(), (Sign::Minus, vec![4, 101]));
     /// ```
     #[inline]
@@ -269,9 +263,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt, Sign};
+    /// use overflowing_int::{ArcInt128, Sign};
     ///
-    /// let i = EnumBigInt::from(-1125);
+    /// let i = ArcInt128::from(-1125);
     /// assert_eq!(i.to_bytes_le(), (Sign::Minus, vec![101, 4]));
     /// ```
     #[inline]
@@ -285,13 +279,13 @@ where
     /// # Examples
     ///
     /// ```
-    /// use crate::overflowing_int::{EnumBigInt, Sign};
+    /// use crate::overflowing_int::{ArcInt128, Sign};
     ///
-    /// assert_eq!(EnumBigInt::from(-1125).to_u32_digits(), (Sign::Minus, vec![1125]));
-    /// assert_eq!(EnumBigInt::from(4294967295u32).to_u32_digits(), (Sign::Plus, vec![4294967295]));
-    /// assert_eq!(EnumBigInt::from(4294967296u64).to_u32_digits(), (Sign::Plus, vec![0, 1]));
-    /// assert_eq!(EnumBigInt::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
-    /// assert_eq!(EnumBigInt::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
+    /// assert_eq!(ArcInt128::from(-1125).to_u32_digits(), (Sign::Minus, vec![1125]));
+    /// assert_eq!(ArcInt128::from(4294967295u32).to_u32_digits(), (Sign::Plus, vec![4294967295]));
+    /// assert_eq!(ArcInt128::from(4294967296u64).to_u32_digits(), (Sign::Plus, vec![0, 1]));
+    /// assert_eq!(ArcInt128::from(-112500000000i64).to_u32_digits(), (Sign::Minus, vec![830850304, 26]));
+    /// assert_eq!(ArcInt128::from(112500000000i64).to_u32_digits(), (Sign::Plus, vec![830850304, 26]));
     /// ```
     #[inline]
     pub fn to_u32_digits(&self) -> (Sign, Vec<u32>) {
@@ -304,14 +298,14 @@ where
     /// # Examples
     ///
     /// ```
-    /// use crate::overflowing_int::{EnumBigInt, Sign};
+    /// use crate::overflowing_int::{ArcInt128, Sign};
     ///
-    /// assert_eq!(EnumBigInt::from(-1125).to_u64_digits(), (Sign::Minus, vec![1125]));
-    /// assert_eq!(EnumBigInt::from(4294967295u32).to_u64_digits(), (Sign::Plus, vec![4294967295]));
-    /// assert_eq!(EnumBigInt::from(4294967296u64).to_u64_digits(), (Sign::Plus, vec![4294967296]));
-    /// assert_eq!(EnumBigInt::from(-112500000000i64).to_u64_digits(), (Sign::Minus, vec![112500000000]));
-    /// assert_eq!(EnumBigInt::from(112500000000i64).to_u64_digits(), (Sign::Plus, vec![112500000000]));
-    /// assert_eq!(EnumBigInt::from(1u128 << 64).to_u64_digits(), (Sign::Plus, vec![0, 1]));
+    /// assert_eq!(ArcInt128::from(-1125).to_u64_digits(), (Sign::Minus, vec![1125]));
+    /// assert_eq!(ArcInt128::from(4294967295u32).to_u64_digits(), (Sign::Plus, vec![4294967295]));
+    /// assert_eq!(ArcInt128::from(4294967296u64).to_u64_digits(), (Sign::Plus, vec![4294967296]));
+    /// assert_eq!(ArcInt128::from(-112500000000i64).to_u64_digits(), (Sign::Minus, vec![112500000000]));
+    /// assert_eq!(ArcInt128::from(112500000000i64).to_u64_digits(), (Sign::Plus, vec![112500000000]));
+    /// assert_eq!(ArcInt128::from(1u128 << 64).to_u64_digits(), (Sign::Plus, vec![0, 1]));
     /// ```
     #[inline]
     pub fn to_u64_digits(&self) -> (Sign, Vec<u64>) {
@@ -324,13 +318,13 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::EnumBigInt;
+    /// use overflowing_int::ArcInt128;
     ///
-    /// assert_eq!(EnumBigInt::from(-1125).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
-    /// assert_eq!(EnumBigInt::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
-    /// assert_eq!(EnumBigInt::from(4294967296u64).iter_u32_digits().collect::<Vec<u32>>(), vec![0, 1]);
-    /// assert_eq!(EnumBigInt::from(-112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
-    /// assert_eq!(EnumBigInt::from(112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
+    /// assert_eq!(ArcInt128::from(-1125).iter_u32_digits().collect::<Vec<u32>>(), vec![1125]);
+    /// assert_eq!(ArcInt128::from(4294967295u32).iter_u32_digits().collect::<Vec<u32>>(), vec![4294967295]);
+    /// assert_eq!(ArcInt128::from(4294967296u64).iter_u32_digits().collect::<Vec<u32>>(), vec![0, 1]);
+    /// assert_eq!(ArcInt128::from(-112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
+    /// assert_eq!(ArcInt128::from(112500000000i64).iter_u32_digits().collect::<Vec<u32>>(), vec![830850304, 26]);
     /// ```
     #[inline]
     pub fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
@@ -343,14 +337,14 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::EnumBigInt;
+    /// use overflowing_int::ArcInt128;
     ///
-    /// assert_eq!(EnumBigInt::from(-1125).iter_u64_digits().collect::<Vec<u64>>(), vec![1125u64]);
-    /// assert_eq!(EnumBigInt::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295u64]);
-    /// assert_eq!(EnumBigInt::from(4294967296u64).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967296u64]);
-    /// assert_eq!(EnumBigInt::from(-112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
-    /// assert_eq!(EnumBigInt::from(112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
-    /// assert_eq!(EnumBigInt::from(1u128 << 64).iter_u64_digits().collect::<Vec<u64>>(), vec![0, 1]);
+    /// assert_eq!(ArcInt128::from(-1125).iter_u64_digits().collect::<Vec<u64>>(), vec![1125u64]);
+    /// assert_eq!(ArcInt128::from(4294967295u32).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967295u64]);
+    /// assert_eq!(ArcInt128::from(4294967296u64).iter_u64_digits().collect::<Vec<u64>>(), vec![4294967296u64]);
+    /// assert_eq!(ArcInt128::from(-112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
+    /// assert_eq!(ArcInt128::from(112500000000i64).iter_u64_digits().collect::<Vec<u64>>(), vec![112500000000u64]);
+    /// assert_eq!(ArcInt128::from(1u128 << 64).iter_u64_digits().collect::<Vec<u64>>(), vec![0, 1]);
     /// ```
     #[inline]
     pub fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
@@ -362,9 +356,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt};
+    /// use overflowing_int::{ArcInt128};
     ///
-    /// let i = EnumBigInt::from(-1125);
+    /// let i = ArcInt128::from(-1125);
     /// assert_eq!(i.to_signed_bytes_be(), vec![251, 155]);
     /// ```
     #[inline]
@@ -377,9 +371,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt};
+    /// use overflowing_int::{ArcInt128};
     ///
-    /// let i = EnumBigInt::from(-1125);
+    /// let i = ArcInt128::from(-1125);
     /// assert_eq!(i.to_signed_bytes_le(), vec![155, 251]);
     /// ```
     #[inline]
@@ -393,9 +387,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt};
+    /// use overflowing_int::{ArcInt128};
     ///
-    /// let i = EnumBigInt::parse_bytes(b"ff", 16).unwrap();
+    /// let i = ArcInt128::parse_bytes(b"ff", 16).unwrap();
     /// assert_eq!(i.to_str_radix(16), "ff");
     /// ```
     #[inline]
@@ -411,9 +405,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt, Sign};
+    /// use overflowing_int::{ArcInt128, Sign};
     ///
-    /// assert_eq!(EnumBigInt::from(-0xFFFFi64).to_radix_be(159),
+    /// assert_eq!(ArcInt128::from(-0xFFFFi64).to_radix_be(159),
     ///            (Sign::Minus, vec![2, 94, 27]));
     /// // 0xFFFF = 65535 = 2*(159^2) + 94*159 + 27
     /// ```
@@ -430,9 +424,9 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt, Sign};
+    /// use overflowing_int::{ArcInt128, Sign};
     ///
-    /// assert_eq!(EnumBigInt::from(-0xFFFFi64).to_radix_le(159),
+    /// assert_eq!(ArcInt128::from(-0xFFFFi64).to_radix_le(159),
     ///            (Sign::Minus, vec![27, 94, 2]));
     /// // 0xFFFF = 65535 = 27 + 94*159 + 2*(159^2)
     /// ```
@@ -446,12 +440,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt, EnumBigUint};
+    /// use overflowing_int::{ArcInt128, ArcUint128};
     /// use num_traits::Zero;
     ///
-    /// assert_eq!(EnumBigInt::from(1234).magnitude(), EnumBigUint::from(1234u32));
-    /// assert_eq!(EnumBigInt::from(-4321).magnitude(), EnumBigUint::from(4321u32));
-    /// assert!(EnumBigInt::ZERO.clone().magnitude().is_zero());
+    /// assert_eq!(ArcInt128::from(1234).magnitude(), ArcUint128::from(1234u32));
+    /// assert_eq!(ArcInt128::from(-4321).magnitude(), ArcUint128::from(4321u32));
+    /// assert!(ArcInt128::ZERO.clone().magnitude().is_zero());
     /// ```
     #[inline]
     pub fn magnitude(self) -> Uint<'enc, <E::Unsigned as Encoding<'enc>>::Owned> {
@@ -477,12 +471,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use overflowing_int::{EnumBigInt, Sign};
+    /// use overflowing_int::{ArcInt128, Sign};
     /// use num_bigint::BigUint;
     ///
-    /// assert_eq!(EnumBigInt::from(1234).into_parts(), (Sign::Plus, BigUint::from(1234u32)));
-    /// assert_eq!(EnumBigInt::from(-4321).into_parts(), (Sign::Minus, BigUint::from(4321u32)));
-    /// assert_eq!(EnumBigInt::ZERO.into_parts(), (Sign::NoSign, BigUint::ZERO));
+    /// assert_eq!(ArcInt128::from(1234).into_parts(), (Sign::Plus, BigUint::from(1234u32)));
+    /// assert_eq!(ArcInt128::from(-4321).into_parts(), (Sign::Minus, BigUint::from(4321u32)));
+    /// assert_eq!(ArcInt128::ZERO.into_parts(), (Sign::NoSign, BigUint::ZERO));
     /// ```
     #[inline]
     pub fn into_parts(self) -> (Sign, BigUint) {
@@ -566,40 +560,40 @@ where
     /// and it exists if and only if `gcd(self, modulus) == 1`.
     ///
     /// ```
-    /// use overflowing_int::EnumBigInt;
+    /// use overflowing_int::ArcInt128;
     /// use num_integer::Integer;
     /// use num_traits::{One, Zero};
     ///
-    /// let m = EnumBigInt::from(383);
+    /// let m = ArcInt128::from(383);
     ///
     /// // Trivial cases
-    /// assert_eq!(EnumBigInt::zero().modinv(&m), None);
-    /// assert_eq!(EnumBigInt::one().modinv(&m), Some(EnumBigInt::one()));
+    /// assert_eq!(ArcInt128::zero().modinv(&m), None);
+    /// assert_eq!(ArcInt128::one().modinv(&m), Some(ArcInt128::one()));
     /// let neg1 = &m - 1u32;
     /// assert_eq!(neg1.modinv(&m), Some(neg1));
     ///
     /// // Positive self and modulus
-    /// let a = EnumBigInt::from(271);
+    /// let a = ArcInt128::from(271);
     /// let x = a.modinv(&m).unwrap();
-    /// assert_eq!(x, EnumBigInt::from(106));
+    /// assert_eq!(x, ArcInt128::from(106));
     /// assert_eq!(x.modinv(&m).unwrap(), a);
-    /// assert_eq!((&a * x).mod_floor(&m), EnumBigInt::one());
+    /// assert_eq!((&a * x).mod_floor(&m), ArcInt128::one());
     ///
     /// // Negative self and positive modulus
     /// let b = -&a;
     /// let x = b.modinv(&m).unwrap();
-    /// assert_eq!(x, EnumBigInt::from(277));
-    /// assert_eq!((&b * x).mod_floor(&m), EnumBigInt::one());
+    /// assert_eq!(x, ArcInt128::from(277));
+    /// assert_eq!((&b * x).mod_floor(&m), ArcInt128::one());
     ///
     /// // Positive self and negative modulus
     /// let n = -&m;
     /// let x = a.modinv(&n).unwrap();
-    /// assert_eq!(x, EnumBigInt::from(-277));
+    /// assert_eq!(x, ArcInt128::from(-277));
     /// assert_eq!((&a * x).mod_floor(&n), &n + 1);
     ///
     /// // Negative self and modulus
     /// let x = b.modinv(&n).unwrap();
-    /// assert_eq!(x, EnumBigInt::from(-106));
+    /// assert_eq!(x, ArcInt128::from(-106));
     /// assert_eq!((&b * x).mod_floor(&n), &n + 1);
     /// ```
     #[inline]

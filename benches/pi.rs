@@ -32,6 +32,7 @@ macro_rules! duplicate_bigint_types {
 duplicate_bigint_types! {
     paste! {
         fn [<calc_pi_atan_ label:lower>](digits: u32) -> BigInt(['static]) {
+            #[allow(clippy::extra_unused_lifetimes)]
             fn pi_atan_rc<'a>(k: BigInt(['a]), n: BigInt(['a])) -> BigInt(['static]) {
                 let mut a = BigInt(['static])::zero();
                 let mut w = n * &k;

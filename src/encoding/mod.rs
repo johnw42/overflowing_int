@@ -126,7 +126,7 @@ where
     where
         Self: 'a;
 
-    const ZERO: Self;
+    const ZERO: Self::Owned;
 
     /// Encodes a small value.
     fn from_small(s: Self::Small) -> Self::Owned;
@@ -135,7 +135,7 @@ where
     fn from_big(b: Self::Big) -> Self::Owned;
 
     /// Encodes a big value by reference.
-    fn from_big_ref(b: &'enc Self::Big) -> Self;
+    fn from_big_ref(b: &'enc Self::Big) -> Self::Borrowed<'enc>;
 
     /// Converts an encoding of one type into an encoding of another type with the same big representation.
     fn reencode_from<'e2, E2>(other: E2) -> Self::Owned
@@ -319,6 +319,43 @@ where
 
     fn into_decoded(self) -> Decoded<E::Small, Cow<'enc, <E::Small as SmallNumber>::Big>> {
         self.clone().into_decoded()
+    }
+}
+
+impl<'enc, E> Encoding<'enc> for &'enc E
+where
+    E: OwnedEncoding<'enc>,
+{
+    type Small = E::Small;
+    type Big = E::Big;
+    type Unsigned = E::Unsigned;
+    type Owned = E;
+
+    type Borrowed<'a>
+        = E::Borrowed<'a>
+    where
+        Self: 'a;
+
+    const ZERO: E = E::ZERO;
+
+    fn from_small(s: Self::Small) -> E {
+        E::from_small(s)
+    }
+
+    fn from_big(b: Self::Big) -> E {
+        E::from_big(b)
+    }
+
+    fn from_big_ref(b: &'enc Self::Big) -> Self::Borrowed<'enc> {
+        E::from_big_ref(b)
+    }
+
+    fn into_owned(self) -> E {
+        E::into_owned(self.clone())
+    }
+
+    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
+        E::borrow(self)
     }
 }
 

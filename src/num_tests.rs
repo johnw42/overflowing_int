@@ -329,13 +329,6 @@ mod signed {
         }
         crate::duplicate_signed_encoded_types! { [SourceType, source_tag]
             paste! {
-                // TODO
-                // #[quickcheck]
-                // fn [<test_reencode_into_ encoding_tag _from source_tag>](value: SourceType) {
-                //     let reencoded: EncodedType = value.clone().reencode_into();
-                //     assert_eq!(BigInt::from(value), BigInt::from(reencoded));
-                // }
-
                 #[quickcheck]
                 fn [<test_reencode_from_ source_tag _to_ encoding_tag>](value: SourceType) {
                     assert_eq!(BigInt::from(value.clone()), BigInt::from(EncodedType::reencode_from(value)));
