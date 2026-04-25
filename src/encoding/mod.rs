@@ -120,8 +120,14 @@ where
     /// A version of this encoding that uses an unsigned representation.
     type Unsigned: Encoding<'enc, Small = <Self::Small as SmallNumber>::Unsigned, Big = BigUint>;
 
-    type Owned: OwnedEncoding<'enc, Small = Self::Small, Big = Self::Big> + 'enc;
+    /// A version of this encoding that is capable of owning its bigint value.
+    type Owned: OwnedEncoding<'enc, Small = Self::Small, Big = Self::Big>;
 
+    /// A version of this encoding that has a static lifetime.
+    type Static: OwnedEncoding<'static, Small = Self::Small, Big = Self::Big>;
+
+    /// A variant of this encoding that can be cloned cleaply because it shares
+    /// data with another encoding instance.
     type Borrowed<'a>: Encoding<'a, Small = Self::Small, Big = Self::Big>
     where
         Self: 'a;
@@ -155,6 +161,9 @@ where
     }
 
     /// Converts this encoding to a version with a static lifetime.
+    fn into_static(self) -> Self::Static;
+
+    /// Converts this encoding into an owned version of the same encoding.
     fn into_owned(self) -> Self::Owned;
 
     /// Converts this encoding into a version with a shorter lifetime.
@@ -329,6 +338,7 @@ where
     type Small = E::Small;
     type Big = E::Big;
     type Unsigned = E::Unsigned;
+    type Static = E::Static;
     type Owned = E;
 
     type Borrowed<'a>
@@ -348,6 +358,10 @@ where
 
     fn from_big_ref(b: &'enc Self::Big) -> Self::Borrowed<'enc> {
         E::from_big_ref(b)
+    }
+
+    fn into_static(self) -> Self::Static {
+        E::into_static(self.clone())
     }
 
     fn into_owned(self) -> E {

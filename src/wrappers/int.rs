@@ -42,6 +42,11 @@ where
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
+    pub fn into_static(self) -> Int<'static, E::Static> {
+        Int::from_encoding(self.0.into_static())
+    }
+
+    /// Converts this big integer to a type that is capable of owning its `BigInt` data.
     pub fn into_owned(self) -> Int<'enc, E::Owned> {
         Int::from_encoding(self.0.into_owned())
     }

@@ -101,6 +101,7 @@ where
     type Big = S::Big;
     type Unsigned = ArcEncoding<S::Unsigned>;
     type Owned = Self;
+    type Static = Self;
     type Borrowed<'a> = Self;
 
     const ZERO: Self = Self(ArcEncodedRepr {
@@ -145,6 +146,10 @@ where
                 }
             },
         )
+    }
+
+    fn into_static(self) -> Self::Static {
+        self
     }
 
     fn into_owned(self) -> Self::Owned {

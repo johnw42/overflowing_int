@@ -54,6 +54,7 @@ where
     type Small = S;
     type Big = S::Big;
     type Unsigned = CowEncoding<'enc, S::Unsigned>;
+    type Static = CowEncoding<'static, S>;
     type Owned = CowEncoding<'enc, S>;
     type Borrowed<'a>
         = CowEncoding<'a, S>
@@ -78,11 +79,15 @@ where
         this
     }
 
+    fn into_static(self) -> Self::Static {
+        CowEncoding(match self.0 {
+            Decoded::Small(s) => Decoded::Small(s),
+            Decoded::Big(b) => Decoded::Big(Cow::Owned(b.into_owned())),
+        })
+    }
+
     fn into_owned(self) -> Self::Owned {
-        match self.0 {
-            Decoded::Small(s) => CowEncoding(Decoded::Small(s)),
-            Decoded::Big(b) => CowEncoding::from_big(b.into_owned()),
-        }
+        self.into_static()
     }
 
     fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {

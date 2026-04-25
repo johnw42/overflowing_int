@@ -40,6 +40,7 @@ where
     type Small = S;
     type Big = S::Big;
     type Unsigned = DecodedEncoding<S::Unsigned>;
+    type Static = Self;
     type Owned = Self;
     type Borrowed<'a> = Self;
 
@@ -65,6 +66,10 @@ where
 
     fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
         self.clone()
+    }
+
+    fn into_static(self) -> Self::Static {
+        self
     }
 
     fn into_owned(self) -> Self::Owned {

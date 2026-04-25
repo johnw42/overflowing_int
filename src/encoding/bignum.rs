@@ -23,6 +23,7 @@ impl<'enc> Encoding<'enc> for BigInt {
     type Small = i64;
     type Big = Self;
     type Unsigned = BigUint;
+    type Static = Self;
     type Owned = Self;
     type Borrowed<'a>
         = &'a BigInt
@@ -41,6 +42,10 @@ impl<'enc> Encoding<'enc> for BigInt {
 
     fn from_big_ref(b: &'enc <i64 as SmallNumber>::Big) -> Self::Borrowed<'enc> {
         b
+    }
+
+    fn into_static(self) -> Self::Static {
+        self
     }
 
     fn into_owned(self) -> Self::Owned {
@@ -76,6 +81,7 @@ impl<'enc> Encoding<'enc> for BigUint {
     type Small = u64;
     type Big = Self;
     type Unsigned = BigUint;
+    type Static = Self;
     type Owned = Self;
     type Borrowed<'a>
         = &'a BigUint
@@ -94,6 +100,10 @@ impl<'enc> Encoding<'enc> for BigUint {
 
     fn from_big_ref(b: &'enc <u64 as SmallNumber>::Big) -> Self::Borrowed<'enc> {
         b
+    }
+
+    fn into_static(self) -> Self::Static {
+        self
     }
 
     fn into_owned(self) -> Self::Owned {
