@@ -1,3 +1,6 @@
+//! This module defines a bunch of traits that are dependenct on which feature are enabled.
+//! This is a workaround for the fact that Rust doesn't support conditional trait bounds.
+
 #[cfg(feature = "arbitrary")]
 pub trait ArbitraryBounds: for<'a> arbitrary::Arbitrary<'a> {}
 

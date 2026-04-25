@@ -1,10 +1,14 @@
-#![allow(unused_imports)]
+//! This file defines the [`BigNumber`] trait, which is a common supertrait of
+//! [`BigInt`] and [`BigUint`].
+//!
+//! Unlike the types themselves, the trait exposes all available operators as
+//! methods with systematic names that are used in [`crate::num_ops`].
 
 use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint};
 use num_integer::{Integer, Roots};
 use num_traits::{
     CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, ConstZero, Euclid, FromBytes,
-    FromPrimitive, Num, One, Pow, Signed, ToBytes, ToPrimitive, Unsigned, Zero,
+    FromPrimitive, Num, One, Signed, ToBytes, ToPrimitive, Zero,
 };
 
 use std::fmt::{Binary, Debug, Display, LowerHex, Octal, UpperHex};
@@ -12,7 +16,7 @@ use std::hash::Hash;
 use std::iter::FusedIterator;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
-    Mul, MulAssign, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+    Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
 };
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::str::FromStr;
@@ -108,6 +112,7 @@ macro_rules! impl_binary_assign_ref_op {
     };
 }
 
+/// Common trait implemented by both [`BigInt`] and [`BigUint`].
 pub trait BigNumber
 where
     Self: Binary,
@@ -196,12 +201,6 @@ where
         }
     }
 
-    /// Casts self to a BigUint.  This is only implemented for BigUint, and will panic if called on a BigInt.
-    fn into_biguint(self) -> BigUint;
-
-    /// Casts self to a reference to a BigUint.  This is only implemented for BigUint, and will panic if called on a BigInt.
-    fn to_ref_biguint(&self) -> &BigUint;
-
     /// Returns true if the value is -1.  This is used to optimize exponentiation by small unsigned integers.
     fn is_minus_one(&self) -> bool;
 
@@ -225,7 +224,9 @@ where
     fn set_bit(&mut self, bit: u64, value: bool);
 }
 
-pub trait BigSigned: BigNumber + Signed
+/// Trait adding extra methods to `BigInt`.  This is needed to give systematic names
+/// to operators definte by other trait.
+pub trait BigSigned: BigNumber
 where
     // From bounds
     Self: From<BigInt>,
@@ -248,40 +249,6 @@ where
         declare_binary_ops!(op_fn, prim, Self);
         declare_binary_assign_op!(op_fn, prim);
     } } }
-
-    fn new(sign: Sign, digits: Vec<u32>) -> Self;
-    fn from_biguint(sign: Sign, data: BigUint) -> Self;
-    fn from_slice(sign: Sign, slice: &[u32]) -> Self;
-    fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]);
-    fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self;
-    fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self;
-    fn from_signed_bytes_be(digits: &[u8]) -> Self;
-    fn from_signed_bytes_le(digits: &[u8]) -> Self;
-    fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self>;
-    fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self>;
-    fn to_bytes_be(&self) -> (Sign, Vec<u8>);
-    fn to_bytes_le(&self) -> (Sign, Vec<u8>);
-    fn to_signed_bytes_be(&self) -> Vec<u8>;
-    fn to_signed_bytes_le(&self) -> Vec<u8>;
-    fn sign(&self) -> Sign;
-    fn magnitude(&self) -> &BigUint;
-    fn into_parts(self) -> (Sign, BigUint);
-}
-
-pub trait BigUnsigned: BigNumber + Unsigned {
-    fn new(digits: Vec<u32>) -> Self;
-    fn from_slice(slice: &[u32]) -> Self;
-    fn assign_from_slice(&mut self, slice: &[u32]);
-    fn from_bytes_be(bytes: &[u8]) -> Self;
-    fn from_bytes_le(bytes: &[u8]) -> Self;
-    fn from_radix_be(buf: &[u8], radix: u32) -> Option<Self>;
-    fn from_radix_le(buf: &[u8], radix: u32) -> Option<Self>;
-    fn to_bytes_be(&self) -> Vec<u8>;
-    fn to_bytes_le(&self) -> Vec<u8>;
-    fn to_radix_be(&self, radix: u32) -> Vec<u8>;
-    fn to_radix_le(&self, radix: u32) -> Vec<u8>;
-    fn trailing_ones(&self) -> u64;
-    fn count_ones(&self) -> u64;
 }
 
 #[macro_export]
@@ -394,16 +361,6 @@ impl BigNumber for BigInt {
     impl_big_number_body!();
 
     #[inline]
-    fn into_biguint(self) -> BigUint {
-        unreachable!()
-    }
-
-    #[inline]
-    fn to_ref_biguint(&self) -> &BigUint {
-        unreachable!()
-    }
-
-    #[inline]
     fn is_minus_one(&self) -> bool {
         self.sign() == Sign::Minus && self.magnitude().is_one()
     }
@@ -416,16 +373,6 @@ impl BigNumber for BigInt {
 
 impl BigNumber for BigUint {
     impl_big_number_body!();
-
-    #[inline]
-    fn into_biguint(self) -> BigUint {
-        self
-    }
-
-    #[inline]
-    fn to_ref_biguint(&self) -> &BigUint {
-        self
-    }
 
     #[inline]
     fn is_minus_one(&self) -> bool {
@@ -444,156 +391,4 @@ impl BigSigned for BigInt {
         impl_binary_ops!(op_fn, prim, Self);
         impl_binary_assign_op!(op_fn, prim);
     } } }
-
-    #[inline]
-    fn new(sign: Sign, digits: Vec<u32>) -> Self {
-        Self::new(sign, digits)
-    }
-
-    #[inline]
-    fn from_biguint(sign: Sign, data: BigUint) -> Self {
-        Self::from_biguint(sign, data)
-    }
-
-    #[inline]
-    fn from_slice(sign: Sign, slice: &[u32]) -> Self {
-        Self::from_slice(sign, slice)
-    }
-
-    #[inline]
-    fn assign_from_slice(&mut self, sign: Sign, slice: &[u32]) {
-        self.assign_from_slice(sign, slice)
-    }
-
-    #[inline]
-    fn from_bytes_be(sign: Sign, bytes: &[u8]) -> Self {
-        Self::from_bytes_be(sign, bytes)
-    }
-
-    #[inline]
-    fn from_bytes_le(sign: Sign, bytes: &[u8]) -> Self {
-        Self::from_bytes_le(sign, bytes)
-    }
-
-    #[inline]
-    fn from_signed_bytes_be(digits: &[u8]) -> Self {
-        Self::from_signed_bytes_be(digits)
-    }
-
-    #[inline]
-    fn from_signed_bytes_le(digits: &[u8]) -> Self {
-        Self::from_signed_bytes_le(digits)
-    }
-
-    #[inline]
-    fn from_radix_be(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
-        Self::from_radix_be(sign, buf, radix)
-    }
-
-    #[inline]
-    fn from_radix_le(sign: Sign, buf: &[u8], radix: u32) -> Option<Self> {
-        Self::from_radix_le(sign, buf, radix)
-    }
-
-    #[inline]
-    fn to_bytes_be(&self) -> (Sign, Vec<u8>) {
-        self.to_bytes_be()
-    }
-
-    #[inline]
-    fn to_bytes_le(&self) -> (Sign, Vec<u8>) {
-        self.to_bytes_le()
-    }
-
-    #[inline]
-    fn to_signed_bytes_be(&self) -> Vec<u8> {
-        self.to_signed_bytes_be()
-    }
-
-    #[inline]
-    fn to_signed_bytes_le(&self) -> Vec<u8> {
-        self.to_signed_bytes_le()
-    }
-
-    #[inline]
-    fn sign(&self) -> Sign {
-        self.sign()
-    }
-
-    #[inline]
-    fn magnitude(&self) -> &BigUint {
-        self.magnitude()
-    }
-
-    #[inline]
-    fn into_parts(self) -> (Sign, BigUint) {
-        self.into_parts()
-    }
-}
-
-impl BigUnsigned for BigUint {
-    #[inline]
-    fn new(digits: Vec<u32>) -> Self {
-        Self::new(digits)
-    }
-
-    #[inline]
-    fn from_slice(slice: &[u32]) -> Self {
-        Self::from_slice(slice)
-    }
-
-    #[inline]
-    fn assign_from_slice(&mut self, slice: &[u32]) {
-        self.assign_from_slice(slice)
-    }
-
-    #[inline]
-    fn from_bytes_be(bytes: &[u8]) -> Self {
-        Self::from_bytes_be(bytes)
-    }
-
-    #[inline]
-    fn from_bytes_le(bytes: &[u8]) -> Self {
-        Self::from_bytes_le(bytes)
-    }
-
-    #[inline]
-    fn from_radix_be(buf: &[u8], radix: u32) -> Option<Self> {
-        Self::from_radix_be(buf, radix)
-    }
-
-    #[inline]
-    fn from_radix_le(buf: &[u8], radix: u32) -> Option<Self> {
-        Self::from_radix_le(buf, radix)
-    }
-
-    #[inline]
-    fn to_bytes_be(&self) -> Vec<u8> {
-        self.to_bytes_be()
-    }
-
-    #[inline]
-    fn to_bytes_le(&self) -> Vec<u8> {
-        self.to_bytes_le()
-    }
-
-    #[inline]
-    fn to_radix_be(&self, radix: u32) -> Vec<u8> {
-        self.to_radix_be(radix)
-    }
-
-    #[inline]
-    fn to_radix_le(&self, radix: u32) -> Vec<u8> {
-        self.to_radix_le(radix)
-    }
-
-    #[inline]
-    fn trailing_ones(&self) -> u64 {
-        self.trailing_ones()
-    }
-
-    #[inline]
-    fn count_ones(&self) -> u64 {
-        self.count_ones()
-    }
 }

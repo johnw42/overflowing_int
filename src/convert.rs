@@ -394,6 +394,7 @@ mod test {
             paste! {
                 #[quickcheck]
                 fn [<test_ ForeignType:lower _to_ encoding_tag>](value: ForeignType) {
+                    #[allow(clippy::clone_on_copy)]
                     let converted: EncodedType = EncodedType::from(value.clone());
                     #[allow(clippy::unnecessary_fallible_conversions)]
                     let round_trip: Option<ForeignType> = ForeignType::try_from(converted).ok();
