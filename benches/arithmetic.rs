@@ -22,7 +22,7 @@ macro_rules! duplicate_bigint_types {
                 [ArcSize]     [ArcInt64];
                 [Cow]         [CowInt128::<'static>];
                 [Identity]    [IdentityBigInt];
-                [Enum]        [OverflowingInt128];
+                [Enum]        [OverflowingI128];
                 [Control]     [BigInt];
             ]
             $($body)*
