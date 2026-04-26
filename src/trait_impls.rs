@@ -25,10 +25,10 @@ use {
 
 use crate::{
     duplicate_iprims, duplicate_prims, duplicate_uprims,
-    encoding::{Decode, Decoded, Encoding, OwnedEncoding},
+    encoding::{Decode, Decoded, Encoding},
     num_traits::small_number::SmallNumber,
-    wrappers::uint::Uint,
     wrappers::int::Int,
+    wrappers::uint::Uint,
 };
 
 #[allow(unused_imports)]
@@ -45,8 +45,6 @@ pub mod mod_name {
 
     use num_traits::ConstZero;
 
-    use crate::encoding::OwnedEncoding;
-
     use super::*;
 
     //
@@ -56,7 +54,7 @@ pub mod mod_name {
     #[cfg(any(test, feature = "quickcheck"))]
     impl<E> quickcheck::Arbitrary for GenericBigNumType<'static, E>
     where
-        E: OwnedEncoding<'static, Big = ImplType> + 'static,
+        E: Encoding<'static, Big = ImplType> + 'static,
     {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             Self::from_encoding(match bool::arbitrary(g) {
@@ -84,7 +82,7 @@ pub mod mod_name {
     #[cfg(feature = "arbitrary")]
     impl<'enc, E> arbitrary::Arbitrary<'_> for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn arbitrary(g: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
             Ok(match bool::arbitrary(g)? {
@@ -113,7 +111,7 @@ pub mod mod_name {
 
     impl<'enc, E> CheckedAdd for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn checked_add(&self, v: &Self) -> Option<Self> {
             Some(Self::from_encoding(self.0.checked_add(&v.0)?))
@@ -126,7 +124,7 @@ pub mod mod_name {
 
     impl<'enc, E> CheckedDiv for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn checked_div(&self, v: &Self) -> Option<Self> {
             Some(Self::from_encoding(self.0.checked_div(&v.0)?))
@@ -139,7 +137,7 @@ pub mod mod_name {
 
     impl<'enc, E> CheckedMul for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn checked_mul(&self, v: &Self) -> Option<Self> {
             Some(Self::from_encoding(self.0.checked_mul(&v.0)?))
@@ -152,7 +150,7 @@ pub mod mod_name {
 
     impl<'enc, E> CheckedSub for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn checked_sub(&self, v: &Self) -> Option<Self> {
             Some(Self::from_encoding(self.0.checked_sub(&v.0)?))
@@ -165,7 +163,7 @@ pub mod mod_name {
 
     impl<'enc, E> ConstZero for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         const ZERO: Self = Self::ZERO;
     }
@@ -190,7 +188,7 @@ pub mod mod_name {
     #[cfg(any(test, feature = "serde"))]
     impl<'enc, 'de, E> Deserialize<'de> for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
@@ -220,7 +218,7 @@ pub mod mod_name {
     #[cfg(any(test, feature = "rand"))]
     impl<'enc, E> Distribution<GenericBigNumType<'enc, E>> for RandomBits
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> GenericBigNumType<'enc, E> {
             <RandomBits as Distribution<ImplType>>::sample(self, rng).into()
@@ -233,7 +231,7 @@ pub mod mod_name {
 
     impl<'enc, E> FromStr for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         type Err = num_bigint::ParseBigIntError;
 
@@ -248,7 +246,7 @@ pub mod mod_name {
 
     impl<'enc, E> Integer for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn div_floor(&self, other: &Self) -> Self {
             if let Some(lhs) = self.small()
@@ -364,7 +362,7 @@ pub mod mod_name {
 
     impl<'enc, E> Num for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         type FromStrRadixErr = ParseBigIntError;
 
@@ -379,7 +377,7 @@ pub mod mod_name {
 
     impl<'enc, E> One for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn one() -> Self {
             Self::from_encoding(E::from_small(E::Small::one()))
@@ -412,7 +410,7 @@ pub mod mod_name {
 
     impl<'enc, E> Roots for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn nth_root(&self, n: u32) -> Self {
             Self::from_encoding(match self.decode() {
@@ -429,7 +427,7 @@ pub mod mod_name {
     #[cfg(any(test, feature = "rand"))]
     impl<'enc, E> SampleUniform for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType> + 'enc,
+        E: Encoding<'enc, Big = ImplType> + 'enc,
     {
         type Sampler = UniformSamplerImpl<'enc, E>;
     }
@@ -441,7 +439,7 @@ pub mod mod_name {
         #[cfg(any(test, feature = "rand"))]
         impl<'enc, E> UniformSampler for UniformSamplerImpl<'enc, E>
         where
-            E: OwnedEncoding<'enc, Big = ImplType>,
+            E: Encoding<'enc, Big = ImplType>,
         {
             type X = GenericBigNumType<'enc, E>;
 
@@ -584,7 +582,7 @@ pub mod mod_name {
 
     impl<'enc, E> Zero for GenericBigNumType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn zero() -> Self {
             Self::ZERO
@@ -605,7 +603,7 @@ pub mod mod_name {
 
 impl<'enc, E> CheckedEuclid for Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     fn checked_rem_euclid(&self, v: &Self) -> Option<Self> {
         Some(Self::from_encoding(E::from_big(
@@ -626,7 +624,7 @@ where
 
 impl<'enc, E> Euclid for Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     fn rem_euclid(&self, v: &Self) -> Self {
         Self::from_encoding(E::from_big(self.big_cow().rem_euclid(&v.big_cow())))
@@ -643,7 +641,7 @@ where
 
 impl<'enc, E> FromBytes for Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     type Bytes = [u8];
 
@@ -658,7 +656,7 @@ where
 
 impl<'enc, E> FromBytes for Uint<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigUint>,
+    E: Encoding<'enc, Big = BigUint>,
 {
     type Bytes = [u8];
 
@@ -677,7 +675,7 @@ where
 
 impl<'enc, E> FromPrimitive for Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     duplicate_prims! { paste! {
         fn [<from_ prim>](n: prim) -> Option<Self> {
@@ -692,7 +690,7 @@ where
 
 impl<'enc, E> FromPrimitive for Uint<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigUint>,
+    E: Encoding<'enc, Big = BigUint>,
 {
     duplicate_iprims! { paste! {
         fn [<from_ prim>](n: prim) -> Option<Self> {
@@ -715,7 +713,7 @@ where
 
 impl<'enc, E> Neg for Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     type Output = Int<'enc, E>;
 
@@ -733,7 +731,7 @@ where
 
 impl<'enc, E> Neg for &Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     type Output = Int<'enc, E>;
 
@@ -757,7 +755,7 @@ where
 
 impl<'enc, E> Not for Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     type Output = Int<'enc, E>;
 
@@ -771,7 +769,7 @@ where
 
 impl<'enc, E> Not for &Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     type Output = Int<'enc, E>;
 
@@ -840,7 +838,7 @@ where
 
 impl<'enc, E> Signed for Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     fn abs(&self) -> Self {
         Self::from_encoding(match self.decode() {

@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-use crate::encoding::{Decoded, Encoding, OwnedEncoding};
+use crate::encoding::{Decoded, Encoding};
 use crate::num_traits::small_number::SmallNumber;
 use crate::wrappers::int::Int;
 use crate::wrappers::uint::Uint;
@@ -77,7 +77,7 @@ duplicate_generic_bignum! {
 
 impl<'enc, E> TryFrom<BigInt> for Uint<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigUint>,
+    E: Encoding<'enc, Big = BigUint>,
 {
     type Error = TryFromBigIntError<BigInt>;
 
@@ -92,7 +92,7 @@ where
 
 impl<'enc, E> TryFrom<&BigInt> for Uint<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigUint>,
+    E: Encoding<'enc, Big = BigUint>,
 {
     type Error = TryFromBigIntError<()>;
 
@@ -120,7 +120,7 @@ where
 
 impl<'enc, E> TryFrom<&Int<'enc, E>> for BigUint
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     type Error = TryFromBigIntError<()>;
 
@@ -134,7 +134,7 @@ where
 impl<'e1, 'e2, E1, E2> TryFrom<Int<'e1, E1>> for Uint<'e2, E2>
 where
     E1: Encoding<'e1, Big = BigInt>,
-    E2: OwnedEncoding<'e2, Big = BigUint>,
+    E2: Encoding<'e2, Big = BigUint>,
     E2::Small: TryFrom<E1::Small>,
 {
     type Error = TryFromBigIntError<Int<'e1, E1>>;
@@ -155,7 +155,7 @@ duplicate_iprims! {
     paste! {
         impl<'enc, E> TryFrom<prim> for Uint<'enc, E>
         where
-            E: OwnedEncoding<'enc, Big = BigUint>,
+            E: Encoding<'enc, Big = BigUint>,
         {
             type Error = TryFromBigIntError<()>;
 
@@ -181,7 +181,7 @@ duplicate_iprims! {
 
 impl<'enc, E> From<BigUint> for Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     fn from(value: BigUint) -> Self {
         Self::from_encoding(E::from_big(value.into()))
@@ -190,7 +190,7 @@ where
 
 impl<'enc, E> From<&BigUint> for Int<'enc, E>
 where
-    E: OwnedEncoding<'enc, Big = BigInt>,
+    E: Encoding<'enc, Big = BigInt>,
 {
     fn from(value: &BigUint) -> Self {
         Self::from_encoding(E::from_big(value.clone().into()))
@@ -218,7 +218,7 @@ where
 impl<'e1, 'e2, E1, E2> From<Uint<'e1, E1>> for Int<'e2, E2>
 where
     E1: Encoding<'e1, Big = BigUint>,
-    E2: OwnedEncoding<'e2, Big = BigInt>,
+    E2: Encoding<'e2, Big = BigInt>,
     E2::Small: TryFrom<E1::Small>,
 {
     fn from(value: Uint<'e1, E1>) -> Self {
@@ -235,7 +235,7 @@ where
 duplicate_uprims! {
     impl<'enc, E> From<prim> for Int<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = BigInt>,
+        E: Encoding<'enc, Big = BigInt>,
     {
         fn from(value: prim) -> Self {
             #[allow(clippy::unnecessary_fallible_conversions)]
@@ -257,13 +257,13 @@ duplicate_uprims! {
     [biguint] [unsigned]  [BigUint]   [Uint];
 )]
 pub mod tag {
-    use crate::{duplicate_prims_with_signedness, encoding::OwnedEncoding};
+    use crate::duplicate_prims_with_signedness;
 
     use super::*;
 
     impl<'enc, E> From<ImplType> for EncodedType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn from(value: ImplType) -> Self {
             Self::from_encoding(E::from_big(value))
@@ -272,7 +272,7 @@ pub mod tag {
 
     impl<'enc, E> From<&ImplType> for EncodedType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn from(value: &ImplType) -> Self {
             Self::from_encoding(E::from_big(value.clone()))
@@ -299,7 +299,7 @@ pub mod tag {
 
     impl<'enc, E> From<bool> for EncodedType<'enc, E>
     where
-        E: OwnedEncoding<'enc, Big = ImplType>,
+        E: Encoding<'enc, Big = ImplType>,
     {
         fn from(value: bool) -> Self {
             u8::from(value).into()
@@ -310,7 +310,7 @@ pub mod tag {
         paste! {
             impl<'enc, E> From<prim> for EncodedType<'enc, E>
             where
-                E: OwnedEncoding<'enc, Big = ImplType>,
+                E: Encoding<'enc, Big = ImplType>,
             {
                 fn from(value: prim) -> Self {
                     #[allow(irrefutable_let_patterns)]

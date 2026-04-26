@@ -78,7 +78,7 @@ fn checked_op<'enc, E>(
     f_big: impl FnOnce(&E::Big, &E::Big) -> Option<E::Big>,
 ) -> Option<E>
 where
-    E: OwnedEncoding<'enc>,
+    E: Encoding<'enc>,
 {
     let same_size = match (lhs.decode(), rhs.decode()) {
         (Decoded::Small(s1), Decoded::Small(s2)) => Decoded::Small((s1, s2)),
@@ -120,31 +120,27 @@ where
     /// A version of this encoding that uses an unsigned representation.
     type Unsigned: Encoding<'enc, Small = <Self::Small as SmallNumber>::Unsigned, Big = BigUint>;
 
-    /// A version of this encoding that is capable of owning its bigint value.
-    type Owned: OwnedEncoding<'enc, Small = Self::Small, Big = Self::Big>;
-
     /// A version of this encoding that has a static lifetime.
-    type Static: OwnedEncoding<'static, Small = Self::Small, Big = Self::Big>;
+    type Static: Encoding<'static, Small = Self::Small, Big = Self::Big>;
 
-    /// A variant of this encoding that can be cloned cleaply because it shares
-    /// data with another encoding instance.
-    type Borrowed<'a>: Encoding<'a, Small = Self::Small, Big = Self::Big>
-    where
-        Self: 'a;
-
-    const ZERO: Self::Owned;
+    const ZERO: Self;
 
     /// Encodes a small value.
-    fn from_small(s: Self::Small) -> Self::Owned;
+    fn from_small(s: Self::Small) -> Self;
 
     /// Encodes an owned big value.
-    fn from_big(b: Self::Big) -> Self::Owned;
+    fn from_big(b: Self::Big) -> Self;
 
     /// Encodes a big value by reference.
-    fn from_big_ref(b: &'enc Self::Big) -> Self::Borrowed<'enc>;
+    fn from_big_ref(b: &'enc Self::Big) -> Self;
+
+    /// Mutable version of `Decode::decode`, which allows for more efficient
+    /// implementations of methods like `set_bit` that need to update the value
+    /// in place.
+    fn decode_mut(&mut self) -> Decoded<Self::Small, &mut Self::Big>;
 
     /// Converts an encoding of one type into an encoding of another type with the same big representation.
-    fn reencode_from<'e2, E2>(other: E2) -> Self::Owned
+    fn reencode_from<'e2, E2>(other: E2) -> Self
     where
         E2: Encoding<'e2, Big = Self::Big>,
         E2::Small: Widen<Self::Small>,
@@ -163,13 +159,7 @@ where
     /// Converts this encoding to a version with a static lifetime.
     fn into_static(self) -> Self::Static;
 
-    /// Converts this encoding into an owned version of the same encoding.
-    fn into_owned(self) -> Self::Owned;
-
-    /// Converts this encoding into a version with a shorter lifetime.
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a>;
-
-    fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self::Owned> {
+    fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
         Self::Big::parse_bytes(buf, radix).map(Self::from_big)
     }
 
@@ -204,56 +194,44 @@ where
         }
     }
 
-    fn checked_add(&self, v: &Self) -> Option<Self>
-    where
-        Self: OwnedEncoding<'enc>,
-    {
+    fn checked_add(&self, v: &Self) -> Option<Self> {
         checked_op(self, v, CheckedAdd::checked_add, CheckedAdd::checked_add)
     }
 
-    fn checked_sub(&self, v: &Self) -> Option<Self>
-    where
-        Self: OwnedEncoding<'enc>,
-    {
+    fn checked_sub(&self, v: &Self) -> Option<Self> {
         checked_op(self, v, CheckedSub::checked_sub, CheckedSub::checked_sub)
     }
 
-    fn checked_mul(&self, v: &Self) -> Option<Self>
-    where
-        Self: OwnedEncoding<'enc>,
-    {
+    fn checked_mul(&self, v: &Self) -> Option<Self> {
         checked_op(self, v, CheckedMul::checked_mul, CheckedMul::checked_mul)
     }
 
-    fn checked_div(&self, v: &Self) -> Option<Self>
-    where
-        Self: OwnedEncoding<'enc>,
-    {
+    fn checked_div(&self, v: &Self) -> Option<Self> {
         checked_op(self, v, CheckedDiv::checked_div, CheckedDiv::checked_div)
     }
 
-    fn modpow(&self, exponent: &Self, modulus: &Self) -> Self::Owned {
+    fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         Self::from_big(
             self.big_cow()
                 .modpow(&exponent.big_cow(), &modulus.big_cow()),
         )
     }
 
-    fn sqrt(&self) -> Self::Owned {
+    fn sqrt(&self) -> Self {
         match self.decode() {
             Decoded::Small(n) => Self::from_small(n.sqrt()),
             Decoded::Big(n) => Self::from_big(Roots::sqrt(&n)),
         }
     }
 
-    fn cbrt(&self) -> Self::Owned {
+    fn cbrt(&self) -> Self {
         match self.decode() {
             Decoded::Small(n) => Self::from_small(n.cbrt()),
             Decoded::Big(n) => Self::from_big(Roots::cbrt(&n)),
         }
     }
 
-    fn nth_root(&self, n: u32) -> Self::Owned {
+    fn nth_root(&self, n: u32) -> Self {
         match self.decode() {
             Decoded::Small(x) => {
                 // Corner case: Computing the nth root of the minimum value of a
@@ -291,16 +269,9 @@ where
             .into_iter()
     }
 
-    fn modinv(&self, modulus: &Self) -> Option<Self::Owned> {
+    fn modinv(&self, modulus: &Self) -> Option<Self> {
         Some(Self::from_big(self.big_cow().modinv(&modulus.big_cow())?))
     }
-}
-
-pub trait OwnedEncoding<'enc>: Encoding<'enc>
-where
-    Self: Encoding<'enc, Owned = Self>,
-{
-    fn decode_mut(&mut self) -> Decoded<Self::Small, &mut Self::Big>;
 
     fn set_bit(&mut self, bit: u64, value: bool) {
         match self.decode_mut() {
@@ -318,9 +289,11 @@ where
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for &'enc E
+// TODO Why doesn't this conflict with other impls for reference types?
+impl<'enc, 'r, E> Decode<'enc, E::Small> for &'r E
 where
     E: Encoding<'enc>,
+    'r: 'enc,
 {
     fn decode<'a>(&'a self) -> Decoded<E::Small, Cow<'a, <E::Small as SmallNumber>::Big>> {
         (*self).decode()
@@ -328,48 +301,6 @@ where
 
     fn into_decoded(self) -> Decoded<E::Small, Cow<'enc, <E::Small as SmallNumber>::Big>> {
         self.clone().into_decoded()
-    }
-}
-
-impl<'enc, E> Encoding<'enc> for &'enc E
-where
-    E: OwnedEncoding<'enc>,
-{
-    type Small = E::Small;
-    type Big = E::Big;
-    type Unsigned = E::Unsigned;
-    type Static = E::Static;
-    type Owned = E;
-
-    type Borrowed<'a>
-        = E::Borrowed<'a>
-    where
-        Self: 'a;
-
-    const ZERO: E = E::ZERO;
-
-    fn from_small(s: Self::Small) -> E {
-        E::from_small(s)
-    }
-
-    fn from_big(b: Self::Big) -> E {
-        E::from_big(b)
-    }
-
-    fn from_big_ref(b: &'enc Self::Big) -> Self::Borrowed<'enc> {
-        E::from_big_ref(b)
-    }
-
-    fn into_static(self) -> Self::Static {
-        E::into_static(self.clone())
-    }
-
-    fn into_owned(self) -> E {
-        E::into_owned(self.clone())
-    }
-
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
-        E::borrow(self)
     }
 }
 

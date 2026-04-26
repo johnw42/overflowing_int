@@ -1,4 +1,4 @@
-use crate::encoding::{Decode, Decoded, Encoding, OwnedEncoding, shifted::Shifted};
+use crate::encoding::{Decode, Decoded, Encoding, shifted::Shifted};
 use crate::num_traits::small_number::SmallNumber;
 use num_bigint::{BigInt, BigUint};
 use std::hash::Hash;
@@ -100,9 +100,7 @@ where
     type Small = S;
     type Big = S::Big;
     type Unsigned = ArcEncoding<S::Unsigned>;
-    type Owned = Self;
     type Static = Self;
-    type Borrowed<'a> = Self;
 
     const ZERO: Self = Self(ArcEncodedRepr {
         small: Shifted::ZERO,
@@ -152,19 +150,6 @@ where
         self
     }
 
-    fn into_owned(self) -> Self::Owned {
-        self
-    }
-
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
-        self.clone()
-    }
-}
-
-impl<'enc, S> OwnedEncoding<'enc> for ArcEncoding<S>
-where
-    S: SmallNumber,
-{
     fn decode_mut(&mut self) -> Decoded<S, &mut S::Big> {
         unsafe {
             match self.0.small.validate() {

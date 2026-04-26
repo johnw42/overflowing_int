@@ -115,13 +115,8 @@ mod encoding_tag {
     }
 
     #[quickcheck]
-    fn test_into_owned(a: EncodedType) {
-        assert_eq!(a.clone(), a.into_owned());
-    }
-
-    #[quickcheck]
-    fn test_borrow(a: EncodedType) {
-        assert_eq!(ImplType::from(a.clone()), ImplType::from(a.borrow()));
+    fn test_into_static(a: EncodedType) {
+        assert_eq!(a.clone(), a.into_static());
     }
 
     #[test]

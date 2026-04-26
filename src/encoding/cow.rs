@@ -1,7 +1,6 @@
 use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encoding;
-use crate::encoding::OwnedEncoding;
 use crate::num_traits::small_number::SmallNumber;
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -55,19 +54,14 @@ where
     type Big = S::Big;
     type Unsigned = CowEncoding<'enc, S::Unsigned>;
     type Static = CowEncoding<'static, S>;
-    type Owned = CowEncoding<'enc, S>;
-    type Borrowed<'a>
-        = CowEncoding<'a, S>
-    where
-        Self: 'a;
 
     const ZERO: Self = Self(Decoded::Small(S::ZERO));
 
-    fn from_small(s: S) -> Self::Owned {
+    fn from_small(s: S) -> Self {
         CowEncoding(Decoded::Small(s))
     }
 
-    fn from_big(b: S::Big) -> Self::Owned {
+    fn from_big(b: S::Big) -> Self {
         let mut this = CowEncoding(Decoded::Big(Cow::Owned(b)));
         this.normalize();
         this
@@ -86,22 +80,6 @@ where
         })
     }
 
-    fn into_owned(self) -> Self::Owned {
-        self.into_static()
-    }
-
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
-        match &self.0 {
-            Decoded::Small(s) => CowEncoding(Decoded::Small(*s)),
-            Decoded::Big(b) => CowEncoding(Decoded::Big(Cow::Borrowed(b.as_ref()))),
-        }
-    }
-}
-
-impl<'enc, S> OwnedEncoding<'enc> for CowEncoding<'enc, S>
-where
-    S: SmallNumber,
-{
     fn decode_mut(&mut self) -> Decoded<S, &mut S::Big> {
         match &mut self.0 {
             Decoded::Small(s) => Decoded::Small(*s),

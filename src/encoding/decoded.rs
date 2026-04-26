@@ -1,7 +1,6 @@
 use crate::encoding::Decode;
 use crate::encoding::Decoded;
 use crate::encoding::Encoding;
-use crate::encoding::OwnedEncoding;
 use crate::num_traits::small_number::SmallNumber;
 use std::borrow::Cow;
 
@@ -41,8 +40,6 @@ where
     type Big = S::Big;
     type Unsigned = DecodedEncoding<S::Unsigned>;
     type Static = Self;
-    type Owned = Self;
-    type Borrowed<'a> = Self;
 
     const ZERO: Self = Decoded::Small(S::ZERO);
 
@@ -64,23 +61,10 @@ where
         Self::from_big(b.clone())
     }
 
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
-        self.clone()
-    }
-
     fn into_static(self) -> Self::Static {
         self
     }
 
-    fn into_owned(self) -> Self::Owned {
-        self
-    }
-}
-
-impl<'enc, S> OwnedEncoding<'enc> for DecodedEncoding<S>
-where
-    S: SmallNumber,
-{
     fn decode_mut(&mut self) -> Decoded<S, &mut <S as SmallNumber>::Big> {
         match self {
             Decoded::Small(s) => Decoded::Small(*s),

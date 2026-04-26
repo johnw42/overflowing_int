@@ -1,5 +1,5 @@
 use crate::{
-    encoding::{Decode, Decoded, Encoding, OwnedEncoding},
+    encoding::{Decode, Decoded, Encoding},
     num_traits::small_number::SmallNumber,
 };
 use num_bigint::{BigInt, BigUint};
@@ -24,11 +24,6 @@ impl<'enc> Encoding<'enc> for BigInt {
     type Big = Self;
     type Unsigned = BigUint;
     type Static = Self;
-    type Owned = Self;
-    type Borrowed<'a>
-        = &'a BigInt
-    where
-        Self: 'a;
 
     const ZERO: Self = BigInt::ZERO;
 
@@ -40,24 +35,14 @@ impl<'enc> Encoding<'enc> for BigInt {
         b
     }
 
-    fn from_big_ref(b: &'enc <i64 as SmallNumber>::Big) -> Self::Borrowed<'enc> {
-        b
+    fn from_big_ref(b: &'enc <i64 as SmallNumber>::Big) -> Self {
+        b.clone()
     }
 
     fn into_static(self) -> Self::Static {
         self
     }
 
-    fn into_owned(self) -> Self::Owned {
-        self
-    }
-
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
-        self
-    }
-}
-
-impl<'enc> OwnedEncoding<'enc> for BigInt {
     fn decode_mut(&mut self) -> Decoded<i64, &mut Self> {
         Decoded::Big(self)
     }
@@ -82,11 +67,6 @@ impl<'enc> Encoding<'enc> for BigUint {
     type Big = Self;
     type Unsigned = BigUint;
     type Static = Self;
-    type Owned = Self;
-    type Borrowed<'a>
-        = &'a BigUint
-    where
-        Self: 'a;
 
     const ZERO: Self = BigUint::ZERO;
 
@@ -98,24 +78,14 @@ impl<'enc> Encoding<'enc> for BigUint {
         b
     }
 
-    fn from_big_ref(b: &'enc <u64 as SmallNumber>::Big) -> Self::Borrowed<'enc> {
-        b
+    fn from_big_ref(b: &'enc <u64 as SmallNumber>::Big) -> Self {
+        b.clone()
     }
 
     fn into_static(self) -> Self::Static {
         self
     }
 
-    fn into_owned(self) -> Self::Owned {
-        self
-    }
-
-    fn borrow<'a>(&'a self) -> Self::Borrowed<'a> {
-        self
-    }
-}
-
-impl<'enc> OwnedEncoding<'enc> for BigUint {
     fn decode_mut(&mut self) -> Decoded<u64, &mut Self> {
         Decoded::Big(self)
     }
