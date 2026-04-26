@@ -2,8 +2,7 @@
 #![allow(unused_imports)]
 use crate::encoding::{Decode, Decoded, Encoding};
 use crate::num_traits::small_number::SmallNumber;
-use crate::wrappers::int::Int;
-use crate::wrappers::uint::Uint;
+use crate::wrappers::{Int, Uint};
 use crate::{CowInt128, CowUint128, duplicate_encoded_types, duplicate_signed_encoded_types};
 use crate::{duplicate_iprims, duplicate_prims, duplicate_uprims};
 use duplicate::duplicate_item;

@@ -2,8 +2,7 @@
 use crate::encoding::{Decode, Decoded, Encoding};
 use crate::num_traits::big_number::{BigNumber, BigSigned};
 use crate::num_traits::small_number::SmallNumber as _;
-use crate::wrappers::int::Int;
-use crate::wrappers::uint::Uint;
+use crate::wrappers::{Int, Uint};
 use crate::{
     duplicate_arith_ops, duplicate_bit_ops, duplicate_generic_bignum, duplicate_iprims,
     duplicate_prims, duplicate_shift_ops, duplicate_uprims, duplicate_uprims_and_iprims_if_signed,
@@ -704,7 +703,7 @@ mod test {
     use super::*;
     use crate::duplicate_arith_and_bit_ops;
     use crate::duplicate_encoded_types;
-    use crate::wrappers::int::Int;
+    use crate::wrappers::Int;
     use num_bigint::BigInt;
     use num_traits::Zero;
     use quickcheck::TestResult;

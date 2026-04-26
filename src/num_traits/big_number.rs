@@ -251,7 +251,6 @@ where
     } } }
 }
 
-#[macro_export]
 macro_rules! impl_big_number_body {
     () => {
         duplicate_arith_ops! {

@@ -1,5 +1,4 @@
-#![doc(hidden)]
-
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_unsigned_encoded_types {
     ([$EncodedType:ident, $encoding_tag:ident] $($body:tt)*) => {
@@ -19,6 +18,7 @@ macro_rules! duplicate_unsigned_encoded_types {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_signed_encoded_types {
     ([$EncodedType:ident, $encoding_tag:ident] $($body:tt)*) => {
@@ -38,6 +38,7 @@ macro_rules! duplicate_signed_encoded_types {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_encoded_types {
     ($($body:tt)*) => {
@@ -46,6 +47,7 @@ macro_rules! duplicate_encoded_types {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_generic_bignum {
     ($($body:tt)*) => {
@@ -60,6 +62,7 @@ macro_rules! duplicate_generic_bignum {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_arith_ops {
     ($($body:tt)*) => {
@@ -77,6 +80,7 @@ macro_rules! duplicate_arith_ops {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_shift_ops {
     ($($body:tt)*) => {
@@ -91,6 +95,7 @@ macro_rules! duplicate_shift_ops {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_bit_ops {
     ($($body:tt)*) => {
@@ -106,6 +111,7 @@ macro_rules! duplicate_bit_ops {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_arith_and_bit_ops {
     ($($body:tt)*) => {
@@ -114,6 +120,7 @@ macro_rules! duplicate_arith_and_bit_ops {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_iprims {
     ($($body:tt)*) => {
@@ -132,6 +139,7 @@ macro_rules! duplicate_iprims {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_uprims {
     ($($body:tt)*) => {
@@ -150,6 +158,7 @@ macro_rules! duplicate_uprims {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_prims {
     ($($body:tt)*) => {
@@ -158,6 +167,7 @@ macro_rules! duplicate_prims {
     }
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_iprims_if_unsigned {
     (signed; $($body:tt)*) => {
@@ -167,6 +177,7 @@ macro_rules! duplicate_iprims_if_unsigned {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_uprims_and_iprims_if_signed {
     (signed; $($body:tt)*) => {
@@ -178,6 +189,7 @@ macro_rules! duplicate_uprims_and_iprims_if_signed {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! duplicate_prims_with_signedness {
     (signed; $($body:tt)*) => {

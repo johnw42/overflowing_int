@@ -123,6 +123,7 @@ where
     /// A version of this encoding that has a static lifetime.
     type Static: Encoding<'static, Small = Self::Small, Big = Self::Big>;
 
+    /// The zero value of this encoding.
     const ZERO: Self;
 
     /// Encodes a small value.
@@ -159,14 +160,17 @@ where
     /// Converts this encoding to a version with a static lifetime.
     fn into_static(self) -> Self::Static;
 
+    #[doc(hidden)]
     fn parse_bytes(buf: &[u8], radix: u32) -> Option<Self> {
         Self::Big::parse_bytes(buf, radix).map(Self::from_big)
     }
 
+    #[doc(hidden)]
     fn to_str_radix(&self, radix: u32) -> String {
         self.big_cow().to_str_radix(radix)
     }
 
+    #[doc(hidden)]
     fn bit(&self, bit: u64) -> bool {
         match self.decode() {
             Decoded::Small(small) => {
@@ -180,6 +184,7 @@ where
         }
     }
 
+    #[doc(hidden)]
     fn bits(&self) -> u64 {
         match self.decode() {
             Decoded::Small(n) => {
@@ -194,22 +199,27 @@ where
         }
     }
 
+    #[doc(hidden)]
     fn checked_add(&self, v: &Self) -> Option<Self> {
         checked_op(self, v, CheckedAdd::checked_add, CheckedAdd::checked_add)
     }
 
+    #[doc(hidden)]
     fn checked_sub(&self, v: &Self) -> Option<Self> {
         checked_op(self, v, CheckedSub::checked_sub, CheckedSub::checked_sub)
     }
 
+    #[doc(hidden)]
     fn checked_mul(&self, v: &Self) -> Option<Self> {
         checked_op(self, v, CheckedMul::checked_mul, CheckedMul::checked_mul)
     }
 
+    #[doc(hidden)]
     fn checked_div(&self, v: &Self) -> Option<Self> {
         checked_op(self, v, CheckedDiv::checked_div, CheckedDiv::checked_div)
     }
 
+    #[doc(hidden)]
     fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         Self::from_big(
             self.big_cow()
@@ -217,6 +227,7 @@ where
         )
     }
 
+    #[doc(hidden)]
     fn sqrt(&self) -> Self {
         match self.decode() {
             Decoded::Small(n) => Self::from_small(n.sqrt()),
@@ -224,6 +235,7 @@ where
         }
     }
 
+    #[doc(hidden)]
     fn cbrt(&self) -> Self {
         match self.decode() {
             Decoded::Small(n) => Self::from_small(n.cbrt()),
@@ -231,6 +243,7 @@ where
         }
     }
 
+    #[doc(hidden)]
     fn nth_root(&self, n: u32) -> Self {
         match self.decode() {
             Decoded::Small(x) => {
@@ -247,6 +260,7 @@ where
         }
     }
 
+    #[doc(hidden)]
     fn trailing_zeros(&self) -> Option<u64> {
         match self.decode() {
             Decoded::Small(n) if n.is_zero() => None,
@@ -255,6 +269,7 @@ where
         }
     }
 
+    #[doc(hidden)]
     fn iter_u32_digits(&self) -> impl BigNumberDigits<'_, u32> {
         self.big_cow()
             .iter_u32_digits()
@@ -262,6 +277,7 @@ where
             .into_iter()
     }
 
+    #[doc(hidden)]
     fn iter_u64_digits(&self) -> impl BigNumberDigits<'_, u64> {
         self.big_cow()
             .iter_u64_digits()
@@ -269,10 +285,12 @@ where
             .into_iter()
     }
 
+    #[doc(hidden)]
     fn modinv(&self, modulus: &Self) -> Option<Self> {
         Some(Self::from_big(self.big_cow().modinv(&modulus.big_cow())?))
     }
 
+    #[doc(hidden)]
     fn set_bit(&mut self, bit: u64, value: bool) {
         match self.decode_mut() {
             Decoded::Small(n) if bit < (Self::Small::BITS - 1) as u64 => {

@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
 use crate::encoding::{Decoded, Encoding};
 use crate::num_traits::small_number::SmallNumber;
-use crate::wrappers::int::Int;
-use crate::wrappers::uint::Uint;
+use crate::wrappers::Int;
+use crate::wrappers::Uint;
 use crate::{
     CowInt128, CowUint128, duplicate_generic_bignum, duplicate_iprims,
     duplicate_iprims_if_unsigned, duplicate_prims, duplicate_signed_encoded_types,
@@ -18,14 +18,21 @@ use std::error::Error;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 
+/// An error type for failed conversions from big integers to narrower types.
+///
+/// This is basically the same as [`num_bigint::TryFromBigIntError`], but it
+/// provides a public constructor method.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TryFromBigIntError<T>(T);
 
 impl<T> TryFromBigIntError<T> {
+    /// Creates a new `TryFromBigIntError` with the given value, accessible by
+    /// the `into_original` method.
     pub fn new(value: T) -> Self {
         Self(value)
     }
 
+    /// Gets the original value that failed to convert.
     pub fn into_original(self) -> T {
         self.0
     }

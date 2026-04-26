@@ -449,7 +449,7 @@ where
         Uint::from_encoding(E::Unsigned::from_big(self.into_parts().1))
     }
 
-    // Returns the sign of the [`Int`] as a Sign.
+    /// Returns the sign of the [`Int`] as a `Sign`.
     #[inline]
     pub fn sign(&self) -> Sign {
         match self.decode() {
@@ -496,21 +496,25 @@ where
         }
     }
 
+    /// Calls [`CheckedAdd::checked_add`].
     #[inline]
     pub fn checked_add(&self, v: &Self) -> Option<Self> {
         CheckedAdd::checked_add(self, v)
     }
 
+    /// Calls [`CheckedSub::checked_sub`].
     #[inline]
     pub fn checked_sub(&self, v: &Self) -> Option<Self> {
         CheckedSub::checked_sub(self, v)
     }
 
+    /// Calls [`CheckedMul::checked_mul`].
     #[inline]
     pub fn checked_mul(&self, v: &Self) -> Option<Self> {
         CheckedMul::checked_mul(self, v)
     }
 
+    /// Calls [`CheckedDiv::checked_div`].
     #[inline]
     pub fn checked_div(&self, v: &Self) -> Option<Self> {
         CheckedDiv::checked_div(self, v)
