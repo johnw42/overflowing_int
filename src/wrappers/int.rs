@@ -7,31 +7,30 @@ use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Pow, Zero};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
-use std::marker::PhantomData;
 use std::ops::Neg;
 
 /// A signed overflowing integer type that can be used with any encoding that
 /// implements `Encoding` with `Big = BigInt`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Int<'enc, E>(pub(crate) E, PhantomData<&'enc ()>);
+pub struct Int<E>(pub(crate) E);
 
 /// A wrapper around an encoding of a signed big integer.  It exposes all the
 /// same methods as `BigInt` with mostly identical signatures, and implements
 /// the same traits, allowing it to be used as a drop-in replacement for
 /// `BigInt` in most cases, but with better performance for small values.
-impl<'enc, E> Int<'enc, E>
+impl<'enc, E> Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
     pub(crate) const fn from_encoding(encoding: E) -> Self {
-        Self(encoding, PhantomData)
+        Self(encoding)
     }
 
     /// Converts an `Int` with one encoding into an `Int` with another encoding.
     ///
     /// This cannot be implemented using the standard `From` trait because it would overlap
     /// with the blanket implementation of `T: From<T>`.
-    pub fn reencode_from<'e2, E2>(other: Int<'e2, E2>) -> Self
+    pub fn reencode_from<'e2, E2>(other: Int<E2>) -> Self
     where
         E::Small: TryFrom<<E2::Small as Widen<E::Small>>::Output>,
         E2: Encoding<'e2, Big = BigInt>,
@@ -42,7 +41,7 @@ where
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigInt`.
-    pub fn into_static(self) -> Int<'static, E::Static> {
+    pub fn into_static(self) -> Int<E::Static> {
         Int::from_encoding(self.0.into_static())
     }
 
@@ -69,8 +68,21 @@ where
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
-    pub fn from_biguint(sign: Sign, data: Uint<'enc, E::Unsigned>) -> Self {
-        BigInt::from_biguint(sign, BigUint::from(data)).into()
+    pub fn from_biguint(sign: Sign, data: Uint<E::Unsigned>) -> Self {
+        Self::from_encoding(match data.into_decoded() {
+            Decoded::Small(s) => {
+                if let Ok(small) = E::Small::try_from(s) {
+                    E::from_small(match sign {
+                        Sign::Plus => small,
+                        Sign::Minus => E::Small::zero() - small,
+                        Sign::NoSign => E::Small::zero(),
+                    })
+                } else {
+                    E::from_big(BigInt::from_biguint(sign, s.to_big()))
+                }
+            }
+            Decoded::Big(b) => E::from_big(BigInt::from_biguint(sign, b.into_owned())),
+        })
     }
 
     /// Creates and initializes a bigint.
@@ -433,8 +445,8 @@ where
     /// assert!(ArcInt128::ZERO.clone().magnitude().is_zero());
     /// ```
     #[inline]
-    pub fn magnitude(self) -> Uint<'enc, E::Unsigned> {
-        Uint::from(self.into_parts().1)
+    pub fn magnitude(self) -> Uint<E::Unsigned> {
+        Uint::from_encoding(E::Unsigned::from_big(self.into_parts().1))
     }
 
     // Returns the sign of the [`Int`] as a Sign.
@@ -477,7 +489,7 @@ where
 
     /// Converts this bigint into a an unsigned bigint, if it's not negative.
     #[inline]
-    pub fn to_biguint(&'enc self) -> Option<Uint<'enc, E::Unsigned>> {
+    pub fn to_biguint(&self) -> Option<Uint<E::Unsigned>> {
         match self.sign() {
             Sign::Minus => None,
             _ => Some(self.clone().magnitude()),
@@ -621,7 +633,7 @@ where
     }
 }
 
-impl<'enc, E> Default for Int<'enc, E>
+impl<'enc, E> Default for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -630,7 +642,7 @@ where
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for Int<'enc, E>
+impl<'enc, E> Decode<'enc, E::Small> for Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {
@@ -643,7 +655,7 @@ where
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for &Int<'enc, E>
+impl<'enc, E> Decode<'enc, E::Small> for &Int<E>
 where
     E: Encoding<'enc, Big = BigInt>,
 {

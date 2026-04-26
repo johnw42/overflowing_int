@@ -1,6 +1,5 @@
 #![cfg(test)]
 
-use crate::{encoding::Encoding, wrappers::int::Int, wrappers::uint::Uint};
 use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, Pow, Zero};
@@ -92,18 +91,6 @@ impl Arbitrary for BinaryRadixBytes {
             }
         }))
     }
-}
-
-/// Needed to find unsigned versions of signed integer types.
-trait Unsigned {
-    type Unsigned;
-}
-
-impl<'enc, E> Unsigned for Int<'enc, E>
-where
-    E: Encoding<'enc, Big = BigInt>,
-{
-    type Unsigned = Uint<'enc, E::Unsigned>;
 }
 
 duplicate_encoded_types! {
@@ -301,8 +288,6 @@ mod signed {
             ImplType::from(a.clone())
         }
 
-        type UnsignedEncodedType = <EncodedType as Unsigned>::Unsigned;
-
         #[derive(Clone, Debug)]
         struct ArbSign(Sign);
 
@@ -322,6 +307,11 @@ mod signed {
                 )
             }
         }
+
+        trait Unsigned {
+            type Unsigned;
+        }
+
         crate::duplicate_signed_encoded_types! { [SourceType, source_tag]
             paste! {
                 #[quickcheck]

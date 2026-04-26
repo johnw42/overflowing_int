@@ -4,30 +4,29 @@ use crate::num_traits::small_number::{SmallNumber, Widen};
 use num_bigint::BigUint;
 use num_traits::{Pow, PrimInt as _, Zero as _};
 use std::borrow::Cow;
-use std::marker::PhantomData;
 
 /// An unsigned overflowing integer type that can be used with any encoding that
 /// implements `Encoding` with `Big = BigUint`.
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Uint<'enc, E>(pub(crate) E, PhantomData<&'enc ()>);
+pub struct Uint<E>(pub(crate) E);
 
 /// A wrapper around an encoding of an unsigned big integer.  It exposes all the
 /// same methods as `BigUint` with mostly identical signatures, and implements
 /// the same traits, allowing it to be used as a drop-in replacement for
 /// `BigUint` in most cases, but with better performance for small values.
-impl<'enc, E> Uint<'enc, E>
+impl<'enc, E> Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
     pub(crate) const fn from_encoding(encoding: E) -> Self {
-        Self(encoding, PhantomData)
+        Self(encoding)
     }
 
     /// Converts an `Uint` with one encoding into a `Uint` with another encoding.
     ///
     /// This cannot be implemented using the standard `From` trait because it would overlap
     /// with the blanket implementation of `T: From<T>`.
-    pub fn reencode_from<'e2, E2>(other: Uint<'e2, E2>) -> Self
+    pub fn reencode_from<'e2, E2>(other: Uint<E2>) -> Self
     where
         E::Small: TryFrom<<E2::Small as Widen<E::Small>>::Output>,
         E2: Encoding<'e2, Big = BigUint>,
@@ -38,7 +37,7 @@ where
     }
 
     /// Converts this big integer to a version with a static lifetime.  This may require cloning a `BigUint`.
-    pub fn into_static(self) -> Uint<'static, E::Static> {
+    pub fn into_static(self) -> Uint<E::Static> {
         Uint::from_encoding(self.0.into_static())
     }
 
@@ -437,7 +436,7 @@ where
     }
 }
 
-impl<'enc, E> Default for Uint<'enc, E>
+impl<'enc, E> Default for Uint<E>
 where
     E: Encoding<'enc, Big = BigUint>,
 {
@@ -446,7 +445,7 @@ where
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for Uint<'enc, E>
+impl<'enc, E> Decode<'enc, E::Small> for Uint<E>
 where
     E: Encoding<'enc>,
 {
@@ -459,7 +458,7 @@ where
     }
 }
 
-impl<'enc, E> Decode<'enc, E::Small> for &Uint<'enc, E>
+impl<'enc, E> Decode<'enc, E::Small> for &Uint<E>
 where
     E: Encoding<'enc>,
 {

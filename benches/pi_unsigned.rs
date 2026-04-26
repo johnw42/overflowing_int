@@ -9,9 +9,7 @@ use criterion::{
 
 use num_bigint::BigUint;
 use num_traits::Zero;
-use overflowing_int::{
-    ArcUint64, ArcUint128, CowUint128, OverflowingUint128, bench::IdentityBigUint,
-};
+use overflowing_int::{ArcUint64, ArcUint128, CowUint128, OverflowingU128, bench::IdentityBigUint};
 use paste::paste;
 
 macro_rules! duplicate_bigint_types {
@@ -23,7 +21,7 @@ macro_rules! duplicate_bigint_types {
                 [ArcSize]     [ArcUint64];
                 [Cow]         [CowUint128::<lifetime>];
                 [Identity]    [IdentityBigUint];
-                [Enum]        [OverflowingUint128];
+                [Enum]        [OverflowingU128];
                 [Control]     [BigUint];
             ]
             $($body)*
@@ -34,6 +32,7 @@ macro_rules! duplicate_bigint_types {
 duplicate_bigint_types! {
     paste! {
         fn [<calc_pi_atan_ label:lower>](digits: u32) -> BigUint(['static]) {
+            #[allow(clippy::extra_unused_lifetimes)]
             fn pi_atan_rc<'a>(k: BigUint(['a]), n: BigUint(['a])) -> BigUint(['static]) {
                 let mut a = BigUint(['static])::zero();
                 let mut w = n * &k;
