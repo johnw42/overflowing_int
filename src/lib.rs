@@ -1,8 +1,9 @@
 #![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
 
-pub use crate::{convert::TryFromBigIntError, encoding::Encoding};
-pub use num_bigint::{BigInt, BigUint, ParseBigIntError, Sign, ToBigInt, ToBigUint};
+pub use crate::convert::TryFromBigIntError;
+use num_bigint::{BigInt, BigUint};
+pub use num_bigint::{ParseBigIntError, Sign};
 
 use crate::{
     encoding::arc::ArcEncoding,
@@ -19,7 +20,7 @@ mod num_tests;
 mod num_traits;
 mod trait_impl_tests;
 mod trait_impls;
-pub mod wrappers;
+mod wrappers;
 
 /// An integer encoded as either an `i64` or an `Arc<BigInt>`, depending on the value.
 pub type ArcInt64 = Int<ArcEncoding<i64>>;
@@ -66,9 +67,13 @@ pub mod bench {
     pub type IdentityBigUint = Uint<BigUint>;
 }
 
+// A compile-time assertion that the sizes of the various types are as expected.
 #[cfg(target_pointer_width = "64")]
 const _: () = {
     use std::mem::size_of;
+
+    assert!(size_of::<BigInt>() == 32);
+    assert!(size_of::<BigUint>() == 24);
 
     assert!(size_of::<ArcInt64>() == 8);
     assert!(size_of::<ArcUint64>() == 8);

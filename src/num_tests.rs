@@ -308,10 +308,6 @@ mod signed {
             }
         }
 
-        trait Unsigned {
-            type Unsigned;
-        }
-
         crate::duplicate_signed_encoded_types! { [SourceType, source_tag]
             paste! {
                 #[quickcheck]
