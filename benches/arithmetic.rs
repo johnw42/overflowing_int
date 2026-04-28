@@ -1,6 +1,7 @@
 use criterion::{
     BatchSize, BenchmarkId, Criterion, PlotConfiguration, criterion_group, criterion_main,
 };
+use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::{CheckedAdd, CheckedDiv, CheckedEuclid, CheckedMul, CheckedSub, Euclid, Pow};
 use paste::paste;

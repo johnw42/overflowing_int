@@ -1,8 +1,8 @@
-use crate::encoding::{Decode, Decoded, Encoding, shifted::Shifted};
+use crate::encoding::int_or_ptr::{IntOrPtr, IntOrPtrData};
+use crate::encoding::{Decode, Decoded, Encoding};
 use crate::num_traits::small_number::SmallNumber;
 use num_bigint::{BigInt, BigUint};
 use std::hash::Hash;
-use std::mem::ManuallyDrop;
 use std::sync::Arc;
 use std::{borrow::Cow, fmt::Debug};
 
@@ -13,82 +13,29 @@ const _: () = {
     assert!(size_of::<Arc<BigUint>>() == size_of::<u64>());
 };
 
-union ArcEncodedRepr<S: SmallNumber> {
-    small: Shifted<S>,
-    big: ManuallyDrop<Arc<S::Big>>,
-}
-
-impl<S> Clone for ArcEncodedRepr<S>
-where
-    S: SmallNumber,
-{
-    fn clone(&self) -> Self {
-        unsafe {
-            if self.small.validate().is_some() {
-                ArcEncodedRepr { small: self.small }
-            } else {
-                ArcEncodedRepr {
-                    big: ManuallyDrop::new(Arc::clone(&self.big)),
-                }
-            }
-        }
-    }
-}
-
-impl<S> Drop for ArcEncodedRepr<S>
-where
-    S: SmallNumber,
-{
-    fn drop(&mut self) {
-        unsafe {
-            if self.small.validate().is_none() {
-                ManuallyDrop::drop(&mut self.big);
-            }
-        }
-    }
-}
-
 /// An encoding that uses `Arc` for big values, and a small value with the LSB
 /// set to 1 for small values.  This encoding is used for `ArcBigInt` and
 /// `ArcBigUint`.
 #[derive(Clone)]
-pub struct ArcEncoding<S>(ArcEncodedRepr<S>)
+pub struct ArcEncoding<S>(IntOrPtrData<S, S::Big, Arc<S::Big>>)
 where
     S: SmallNumber;
-
-impl<S> ArcEncoding<S>
-where
-    S: SmallNumber,
-{
-    fn from_shifted(shifted: Shifted<S>) -> Self {
-        Self(ArcEncodedRepr { small: shifted })
-    }
-}
 
 impl<'enc, S> Decode<'enc, S> for ArcEncoding<S>
 where
     S: SmallNumber,
 {
-    fn into_decoded(mut self) -> Decoded<S, Cow<'static, S::Big>> {
-        unsafe {
-            if let Some(s) = self.0.small.validate() {
-                Decoded::Small(s)
-            } else {
-                let taken = ManuallyDrop::take(&mut self.0.big);
-                // Reset the encoding to a valid small so the Drop implementation doesn't try to drop the big value again.
-                self.0.small = Shifted::default();
-                Decoded::Big(Cow::Owned(Arc::unwrap_or_clone(taken)))
-            }
+    fn into_decoded(self) -> Decoded<S, Cow<'static, S::Big>> {
+        match self.0.into_inner() {
+            IntOrPtr::Int(s) => Decoded::Small(s),
+            IntOrPtr::Ptr(b) => Decoded::Big(Cow::Owned(Arc::unwrap_or_clone(b))),
         }
     }
 
     fn decode<'a>(&'a self) -> Decoded<S, Cow<'a, <S as SmallNumber>::Big>> {
-        unsafe {
-            if let Some(s) = self.0.small.validate() {
-                Decoded::Small(s)
-            } else {
-                Decoded::Big(Cow::Borrowed(Arc::as_ref(&self.0.big)))
-            }
+        match self.0.get() {
+            IntOrPtr::Int(s) => Decoded::Small(s),
+            IntOrPtr::Ptr(b) => Decoded::Big(Cow::Borrowed(b)),
         }
     }
 }
@@ -102,48 +49,27 @@ where
     type Unsigned = ArcEncoding<S::Unsigned>;
     type Static = Self;
 
-    const ZERO: Self = Self(ArcEncodedRepr {
-        small: Shifted::ZERO,
-    });
+    const ZERO: Self = Self(IntOrPtrData::ZERO);
 
     fn from_small(s: S) -> Self {
-        if let Some(shifted) = Shifted::try_new(s) {
-            Self(ArcEncodedRepr { small: shifted })
-        } else {
-            let r = Self::from_big(s.to_big());
-            unsafe {
-                debug_assert!(r.0.small.validate().is_none());
-            }
-            r
-        }
+        Self(match IntOrPtrData::new_int(s) {
+            Some(int) => int,
+            None => IntOrPtrData::new_ptr(Arc::new(s.to_big())),
+        })
     }
 
     fn from_big(b: S::Big) -> Self {
-        Self(
-            if let Some(small) = S::try_from(&b).ok()
-                && let Some(shifted) = Shifted::try_new(small)
-            {
-                ArcEncodedRepr { small: shifted }
-            } else {
-                ArcEncodedRepr {
-                    big: ManuallyDrop::new(Arc::new(b)),
-                }
-            },
-        )
+        Self(match S::try_from(&b).ok() {
+            Some(small) if let Some(int) = IntOrPtrData::new_int(small) => int,
+            _ => IntOrPtrData::new_ptr(Arc::new(b)),
+        })
     }
 
     fn from_big_ref(b: &'enc S::Big) -> Self {
-        Self(
-            if let Some(small) = S::try_from(b).ok()
-                && let Some(shifted) = Shifted::try_new(small)
-            {
-                ArcEncodedRepr { small: shifted }
-            } else {
-                ArcEncodedRepr {
-                    big: ManuallyDrop::new(Arc::new(b.clone())),
-                }
-            },
-        )
+        Self(match S::try_from(b).ok() {
+            Some(small) if let Some(int) = IntOrPtrData::new_int(small) => int,
+            _ => IntOrPtrData::new_ptr(Arc::new(b.clone())),
+        })
     }
 
     fn into_static(self) -> Self::Static {
@@ -151,11 +77,9 @@ where
     }
 
     fn decode_mut(&mut self) -> Decoded<S, &mut S::Big> {
-        unsafe {
-            match self.0.small.validate() {
-                Some(s) => Decoded::Small(s),
-                None => Decoded::Big(Arc::make_mut(&mut *self.0.big)),
-            }
+        match self.0.get_mut() {
+            IntOrPtr::Int(s) => Decoded::Small(s),
+            IntOrPtr::Ptr(b) => Decoded::Big(Arc::make_mut(b)),
         }
     }
 }
@@ -206,7 +130,7 @@ where
 {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         if bool::arbitrary(g) {
-            Self::from_shifted(Shifted::<S>::arbitrary(g))
+            Self::from_small(<S as quickcheck::Arbitrary>::arbitrary(g) >> 1u32)
         } else {
             Self::from_big(S::Big::arbitrary(g))
         }
@@ -214,13 +138,13 @@ where
 }
 
 #[cfg(feature = "arbitrary")]
-impl<'enc, S> arbitrary::Arbitrary<'enc> for ArcEncoding<S>
+impl<S> arbitrary::Arbitrary<'_> for ArcEncoding<S>
 where
     S: SmallNumber,
 {
     fn arbitrary(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Self> {
         Ok(if bool::arbitrary(u)? {
-            Self::from_shifted(Shifted::<S>::arbitrary(u)?)
+            Self::from_small(<S as arbitrary::Arbitrary>::arbitrary(u)? >> 1u32)
         } else {
             Self::from_big(S::Big::arbitrary(u)?)
         })

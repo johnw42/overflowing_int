@@ -441,7 +441,6 @@ dependencies = [
  "rand 0.8.6",
  "serde",
  "serde_json",
- "test_suite_macro",
 ]
 
 [[package]]
@@ -739,17 +738,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "test_suite_macro"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01e4fed32b2df92465bb6a5b02a2a0ed7efb77e1dfde6df627e61ec864db4b58"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

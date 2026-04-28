@@ -14,6 +14,7 @@ pub mod arc;
 pub mod bignum;
 pub mod cow;
 pub mod decoded;
+mod int_or_ptr;
 mod shifted;
 
 /// A decoded big number, which may be either small or big.  Also used to
@@ -307,7 +308,6 @@ where
     }
 }
 
-// TODO Why doesn't this conflict with other impls for reference types?
 impl<'enc, 'r, E> Decode<'enc, E::Small> for &'r E
 where
     E: Encoding<'enc>,
