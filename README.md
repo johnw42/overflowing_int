@@ -86,6 +86,41 @@ wrapper types.  In the case of small numbers, no reference counting is done,
 and in the case of big numbers, the overhead of reference counting is
 negligible compared to the overhead of performing arithmetic on big numbers.
 
+### Benchmark Results
+
+The `Pi` benchmark clearly shows the relative performance of of the different
+implementations using a somewhat realistic workload.  The chart below shows the
+time taken to compute different numbers of digits of pi.  The line labeled
+`Control` shows the result of using `BigInt` directly, and the line labeled
+`Identity` shows an trivial encoding that always encodes its value as a
+`BigInt`; it is meant to gague the overhead of using an encoding when no
+optimizations apply for small numbers.
+
+The chart shows that `ArcInt64` is clearly the fastest for a workload involving
+mostly small integers (less than 63 bits), but it quickly ceases to be helpful
+once large integers are in play.  The next fastest implementations.  The 128-bit
+encodings show performance improvements for calculating up to 30-40 digits of
+pi, with `CowInt128` and `OverflowingI128` being the clear performance winners
+over `ArcInt128`.  This is to be expected, as the benchmark does little that
+would take advantage of sharing `BigInt` values between encoding instances.  The
+lack of sharing also explains why `CowInt128` shows no advantage over
+`OverflowingI128`.
+
+The performance gap between all implementations starts to close as the number of
+digits approaches 1000, showing that in this case, the small integer
+optimizations are not helpful, but the cost of performing arithmetic on
+increasingly large integers begins to dwarf the overhead of the useless
+optimizations.
+
+![Performance comparison: time](time.svg)
+
+An alternate way to look at the same performance data is to look at throughput,
+measured as the number of digits of pi computed per second.  Aside for perhaps
+being slighly easier to read, this chart shows that every type, including
+`BigInt` itself, has a "sweet spot" for throughput.
+
+![Performance comparison: throughput](throughput.svg)
+
 ## Additions to the `BigInt` and `BigUint` APIs
 
 The wrapper types provide a few methods that are not present on `BigInt` and

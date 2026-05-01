@@ -16,13 +16,13 @@ macro_rules! duplicate_bigint_types {
     ($($body:tt)*) => {
         duplicate::duplicate! {
             [
-                label         BigInt(lifetime);
-                [Arc]         [ArcInt128];
-                [ArcSize]     [ArcInt64];
-                [Cow]         [CowInt128::<lifetime>];
-                [Identity]    [IdentityBigInt];
-                [Enum]        [OverflowingI128];
-                [Control]     [BigInt];
+                label             BigInt(lifetime);
+                [ArcInt128]       [ArcInt128];
+                [ArcInt64]        [ArcInt64];
+                [CowInt128]       [CowInt128::<lifetime>];
+                [Identity]        [IdentityBigInt];
+                [OverflowingI128] [OverflowingI128];
+                [Control]         [BigInt];
             ]
             $($body)*
         }
@@ -65,7 +65,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("Pi");
     group.plot_config(plot_config.clone());
-    for digits in [10, 15, 20, 30, 40, 50, 100] {
+    for digits in [10, 15, 20, 30, 40, 50, 100, 500, 1000] {
         group.throughput(criterion::Throughput::Elements(digits as u64));
         duplicate_bigint_types! {
             paste! {
@@ -82,8 +82,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     config = Criterion::default()
-        .warm_up_time(Duration::from_millis(100))
-        .measurement_time(Duration::from_secs(1));
+        .warm_up_time(Duration::from_millis(500))
+        .measurement_time(Duration::from_secs(5));
     targets = criterion_benchmark
 );
 criterion_main!(benches);
