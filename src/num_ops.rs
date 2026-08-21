@@ -391,7 +391,7 @@ duplicate_arith_ops! {
             impl<'enc, E> OpTrait<EncodedType<E>> for prim
             where
                 E: Encoding<'enc, Big = ImplType>,
-                E::Big: BigSigned,
+                for<'trivial_bound> E::Big: BigSigned,
             {
                 type Output = EncodedType<E>;
 
@@ -404,7 +404,7 @@ duplicate_arith_ops! {
             impl<'enc, E> OpTrait<EncodedType<E>> for &prim
             where
                 E: Encoding<'enc, Big = ImplType>,
-                E::Big: BigSigned,
+                for<'trivial_bound> E::Big: BigSigned,
             {
                 type Output = EncodedType<E>;
 
@@ -416,7 +416,7 @@ duplicate_arith_ops! {
             impl<'enc, 'rhs, E> OpTrait<&'rhs EncodedType<E>> for prim
             where
                 E: Encoding<'enc, Big = ImplType>,
-                E::Big: BigSigned,
+                for<'trivial_bound> E::Big: BigSigned,
             {
                 type Output = EncodedType<E>;
 
@@ -429,7 +429,7 @@ duplicate_arith_ops! {
             impl<'enc, 'rhs, E> OpTrait<&'rhs EncodedType<E>> for &prim
             where
                 E: Encoding<'enc, Big = ImplType>,
-                E::Big: BigSigned,
+                for<'trivial_bound> E::Big: BigSigned,
             {
                 type Output = EncodedType<E>;
 
